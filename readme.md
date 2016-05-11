@@ -1,0 +1,47 @@
+Spectrum rendering component.
+
+[![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
+
+```js
+var Spectrum = require('gl-spectrum');
+
+var spectrum = new Spectrum({
+	container: document.body,
+
+	//pass existing canvas or it will be created
+	canvas: canvas,
+	context: 'webgl',
+
+	//evenly distributed within indicated diapasone
+	data: frequencies,
+
+	maxDecibels: 0,
+	minDecibels: -90,
+
+	maxFrequency: 20000,
+	minFrequency: 20,
+
+	smoothing: 0.2,
+
+	grid: true,
+
+	logFrequency: false,
+	logDecibels: false,
+
+	style: 'classic',
+	fillColor: [100,100,100,255],
+	lineColor: [100,100,100,255],
+	lineWidth: 1
+});
+
+//update spectrum data
+spectrum.setData(frequencies);
+
+//render spectrum data
+spectrum.draw();
+```
+
+## Styles
+
+### `classic`
+
