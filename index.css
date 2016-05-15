@@ -1,0 +1,71 @@
+:host {
+	position: relative;
+	margin: 0;
+	padding: 0;
+	font-family: sans-serif;
+}
+
+/** Decorative elements repeat canvas’s size */
+.grid {
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	right: 0;
+}
+.grid-line {
+	/*opacity: .2;*/
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 0;
+}
+.grid-line:after {
+	content: attr(data-value);
+	position: absolute;
+	height: 1rem;
+	line-height: 1rem;
+	font-size: .8rem;
+    text-align: center;
+	width: 3rem;
+}
+
+.grid-line-h {
+	border-left: 1px dotted;
+	margin-left: -1px;
+	height: 100%;
+	width: 0px;
+}
+.grid-line-h:after {
+	bottom: -1rem;
+	left: -1.5rem;
+}
+.grid-line-h.grid-line-first {
+	margin-left: 0px;
+}
+.grid-line-h.grid-line-first:after {
+	left: 0;
+	text-align: left;
+}
+.grid-line-h.grid-line-last:after {
+	left: -3rem;
+	text-align: right;
+}
+
+.grid-line-v {
+	border-bottom: 1px dotted;
+	width: 100%;
+	top: auto;
+	height: 0;
+}
+.grid-line-v:after {
+	text-align: right;
+	left: -3rem;
+	margin-left: -.1rem;
+	top: -0.5rem;
+}
+.grid-line-v.grid-line-first:after {
+}
+.grid-line-v.grid-line-last:after {
+	top: 0rem;
+}
