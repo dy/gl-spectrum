@@ -8,7 +8,10 @@
     "get-canvas-context": "^1.0.1",
     "gl-component": "^1.0.1",
     "inherits": "^2.0.1",
+    "is-browser": "^2.0.1",
+    "mumath": "^2.0.0",
     "raf-loop": "^1.1.3",
+    "sheetify": "^5.0.0",
     "xtend": "^4.0.1"
   },
   "devDependencies": {
@@ -16,6 +19,7 @@
     "audio-sink": "^1.1.2",
     "audio-slice": "^1.1.0",
     "audio-speaker": "^1.2.4",
+    "fourier-transform": "^1.0.0",
     "tst": "^1.3.1"
   },
   "scripts": {
@@ -31,6 +35,11 @@
     "spectrum",
     "audio"
   ],
+  "browserify": {
+    "transform": [
+      "sheetify/transform"
+    ]
+  },
   "author": "ΔY <dfcreative@gmail.com>",
   "license": "MIT",
   "bugs": {

@@ -2,6 +2,10 @@ Spectrum rendering component.
 
 [![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
 
+## Usage
+
+[![npm install gl-spectrum](https://nodei.co/npm/gl-spectrum.png?mini=true)](https://npmjs.org/package/gl-spectrum/)
+
 ```js
 var Spectrum = require('gl-spectrum');
 
@@ -21,16 +25,19 @@ var spectrum = new Spectrum({
 	maxFrequency: 20000,
 	minFrequency: 20,
 
+	logFrequency: false,
+	logDecibels: false,
+
 	smoothing: 0.2,
 
 	grid: true,
 
-	logFrequency: false,
-	logDecibels: false,
-
 	style: 'classic',
+	backgroundColor: [0,0,0,1],
+	//todo: replace this with color map or texture
 	fillColor: [100,100,100,255],
 	lineColor: [100,100,100,255],
+	maxColor: [100,100,100,255],
 	lineWidth: 1
 });
 
