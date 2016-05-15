@@ -9,11 +9,13 @@ var isBrowser = require('is-browser');
 
 var N = 4096;
 var sine = new Float32Array(N);
+var saw = new Float32Array(N);
 var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
 	sine[i] = Math.sin(2000 * Math.PI * 2 * (i / rate));
+	saw[i] = 2 * ((2000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
 
@@ -22,20 +24,20 @@ if (isBrowser) {
 	document.body.style.boxSizing = 'border-box';
 }
 
-test('simple', function () {
+test('linear classics', function () {
 	var frequencies = ft(sine);
-	var el = document.createElement('div');
-	document.body.appendChild(el);
-	el.style.height = '100vh';
-	el.style.width = '100vw';
 
 	var spectrum = new Spectrum({
-		container: el,
+		// container: el,
 		frequencies: new Float32Array(frequencies),
 		viewport: function (w, h) {
 			return [30,0,w-30,h-20];
 		}
 	});
+});
+
+test('log scale', function () {
+
 });
 
 test.skip('streaming', function () {

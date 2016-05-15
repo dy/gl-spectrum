@@ -38,7 +38,7 @@ function Spectrum (options) {
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
-		//setup data texture
+		//setup frequencies texture
 		this.texture = createTexture(gl);
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -48,11 +48,18 @@ function Spectrum (options) {
 		var frequenciesLocation = gl.getUniformLocation(this.program, 'frequencies');
 		gl.useProgram(this.program);
 		gl.uniform1i(frequenciesLocation, 0);
+
+		//setup kernel
+		var kernelLocation = gl.getUniformLocation(this.program, "kernel[0]");
+		var kernelWeightLocation = gl.getUniformLocation(this.program, "kernelWeight");
+		gl.uniform1fv(kernelLocation, this.kernel);
+		gl.uniform1f(kernelWeightLocation, this.kernel.reduce((prev, curr) => prev + curr, 0));
 	}
 	else {
 
 	}
 
+	//init grid
 	if (isBrowser) {
 		//detect decades
 		var decades = Math.round(lg(this.maxFrequency/this.minFrequency));
@@ -120,26 +127,38 @@ inherits(Spectrum, Component);
 
 
 /**
- * Default frag painter code
+ * Here we might have to do kernel averaging for some
  */
 Spectrum.prototype.frag = `
 	precision mediump float;
 
 	uniform sampler2D frequencies;
 	uniform vec4 viewport;
+	uniform float kernel[5];
+	uniform float kernelWeight;
 
 	float frequency;
 	float intensity;
 
 	void main () {
 		vec2 coord = (gl_FragCoord.xy - viewport.xy) / viewport.zw;
+		float onePixel = 1. / viewport.z;
 
-		intensity = texture2D(frequencies, vec2(coord.x, 0)).w;
+		//weighted value of intensity
+		intensity =
+			texture2D(frequencies, coord + onePixel * vec2(-2, 0)).w * kernel[0] +
+			texture2D(frequencies, coord + onePixel * vec2(-1, 0)).w * kernel[1] +
+			texture2D(frequencies, coord + onePixel * vec2( 0, 0)).w * kernel[2] +
+			texture2D(frequencies, coord + onePixel * vec2( 1, 0)).w * kernel[3] +
+			texture2D(frequencies, coord + onePixel * vec2( 2, 0)).w * kernel[4];
+		intensity /= kernelWeight;
 
-		gl_FragColor = vec4(vec3(intensity), step(0.1, intensity) + 0.1);
+		// gl_FragColor = vec4(vec3(intensity*20.), 1);
 
 		float dist = abs(coord.y - intensity);
-		// gl_FragColor = vec4(vec3(1. - smoothstep(0.0, 0.04, dist)), 1);
+		gl_FragColor = vec4(vec3(1. - smoothstep(0.0, 0.04, dist)), 1);
+
+		// gl_FragColor = vec4( vec3( coord.y / 4. > intensity ? 1 : 0) , 1);
 	}
 `;
 
@@ -166,6 +185,9 @@ Spectrum.prototype.orientation = 'horizontal';
 
 //TODO: line (with tail), bars,
 Spectrum.prototype.style = 'classic';
+
+//5-items linear kernel for smoothing frequencies
+Spectrum.prototype.kernel = [1, 2, 20, 2, 1];
 
 
 /**
