@@ -28,10 +28,9 @@ test('linear classics', function () {
 	var frequencies = ft(sine);
 
 	var spectrum = new Spectrum({
-		// container: el,
 		frequencies: new Float32Array(frequencies),
 		viewport: function (w, h) {
-			return [30,0,w-30,h-20];
+			return [50,20,w-70,h-60];
 		}
 	});
 });

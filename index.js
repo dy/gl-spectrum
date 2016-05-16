@@ -6,10 +6,8 @@ var extend = require('xtend/mutable');
 var Component = require('gl-component');
 var inherits = require('inherits');
 var lg = require('mumath/lg');
-var sf = require('sheetify');
-var cssClass = sf('./index.css');
 var isBrowser = require('is-browser');
-
+var createGrid = require('plot-grid');
 
 module.exports = Spectrum;
 
@@ -26,7 +24,6 @@ function Spectrum (options) {
 	Component.call(this, options);
 
 	if (isBrowser) {
-		this.container.classList.add(cssClass);
 		this.container.classList.add('gl-spectrum');
 	}
 
@@ -59,68 +56,48 @@ function Spectrum (options) {
 
 	}
 
-	//init grid
-	if (isBrowser) {
-		//detect decades
-		var decades = Math.round(lg(this.maxFrequency/this.minFrequency));
-		var decadeOffset = lg(this.minFrequency/10);
+	this.grid = createGrid({
+		container: this.container,
+		viewport: this.viewport,
+		lines: [{
+			min: this.minFrequency,
+			max: this.maxFrequency,
+			orientation: 'x',
+			logarithmic: true,
+			titles: function (value) {
+				return value >= 1000 ? ((value / 1000).toFixed(0) + 'k') : value;
+			}
+		}, {
+			min: this.minDecibels,
+			max: this.maxDecibels,
+			orientation: 'y'
+		}, {
+			min: this.minFrequency,
+			max: this.maxFrequency,
+			orientation: 'x',
+			logarithmic: true,
+			values: function (value) {
+				var str = value.toString();
+				if (str[0] !== '1') return null;
+				return value;
+			},
+			style: {
+				borderLeftStyle: 'solid'
+			}
+		}],
+		axes: [{
+			name: 'Frequency',
+			labels: function (value, i, opt) {
+				var str = value.toString();
+				if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
+				return opt.titles[i];
+			}
+		}, {
+			name: 'Magniture'
+		}]
+	});
 
-		//display grid
-		this.grid = document.createElement('div');
-		this.grid.classList.add('grid');
-
-		//show frequencies
-		var line;
-		for (var f = this.minFrequency, i = 0; f <= this.maxFrequency; f*=10, i++) {
-			line = document.createElement('span');
-			line.classList.add('grid-line');
-			line.classList.add('grid-line-h');
-			if (!i) line.classList.add('grid-line-first');
-			line.setAttribute('data-value', f.toLocaleString());
-			line.style.left = f2w(f, 100) + '%';
-			this.grid.appendChild(line);
-		}
-		line.classList.add('grid-line-last');
-
-		//draw magnitude limits
-		var mRange = this.maxDecibels - this.minDecibels;
-		for (var m = this.minDecibels, i = 0; m <= this.maxDecibels; m += 10, i += 10) {
-			line = document.createElement('span');
-			line.classList.add('grid-line');
-			line.classList.add('grid-line-v');
-			if (!i) line.classList.add('grid-line-first');
-			line.setAttribute('data-value', m.toLocaleString());
-			line.style.bottom = 100 * i / mRange + '%';
-			this.grid.appendChild(line);
-		}
-		line.classList.add('grid-line-last');
-
-		this.container.appendChild(this.grid);
-
-		//make grid repeat size of canvas
-		this.on('resize', function (viewport) {
-			that.grid.style.left = viewport[0] + 'px';
-			that.grid.style.top = viewport[1] + 'px';
-			that.grid.style.width = viewport[2] + 'px';
-			that.grid.style.height = viewport[3] + 'px';
-		});
-
-		this.resize();
-	}
-
-
-	/** Map frequency to an x coord */
-	function f2w (f, w) {
-		var decadeW = w / decades;
-		return decadeW * (lg(f) - 1 - decadeOffset);
-	};
-
-
-	/** Map x coord to a frequency */
-	function w2f (x, w) {
-		var decadeW = w / decades;
-		return Math.pow(10, x/decadeW + 1 + decadeOffset);
-	};
+	this.on('resize', (w, h) => this.grid.update());
 }
 
 inherits(Spectrum, Component);
@@ -167,7 +144,7 @@ Spectrum.prototype.frag = `
 Spectrum.prototype.frequencies = null;
 
 Spectrum.prototype.maxDecibels = 0;
-Spectrum.prototype.minDecibels = -90;
+Spectrum.prototype.minDecibels = -100;
 
 Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
@@ -203,6 +180,8 @@ Spectrum.prototype.render = function () {
 	else {
 
 	}
+
+	return this;
 };
 
 
