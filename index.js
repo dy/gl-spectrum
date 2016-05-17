@@ -41,15 +41,30 @@ function Spectrum (options) {
 		this.setFrequencies(this.frequencies);
 
 		//setup kernel
-		var kernelLocation = gl.getUniformLocation(this.program, "kernel[0]");
-		var kernelWeightLocation = gl.getUniformLocation(this.program, "kernelWeight");
+		var kernelLocation = gl.getUniformLocation(this.program, 'kernel[0]');
+		var kernelWeightLocation = gl.getUniformLocation(this.program, 'kernelWeight');
 		gl.uniform1fv(kernelLocation, this.kernel);
 		gl.uniform1f(kernelWeightLocation, this.kernel.reduce((prev, curr) => prev + curr, 0));
+
+		//setup params
+		var logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
+		gl.uniform1i(logarithmicLocation, this.logarithmic ? 1 : 0);
+		var minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
+		gl.uniform1f(minFrequencyLocation, this.minFrequency);
+		var maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
+		gl.uniform1f(maxFrequencyLocation, this.maxFrequency);
+		var minDecibelsLocation = gl.getUniformLocation(this.program, 'minDecibels');
+		gl.uniform1f(minDecibelsLocation, this.minDecibels);
+		var maxDecibelsLocation = gl.getUniformLocation(this.program, 'maxDecibels');
+		gl.uniform1f(maxDecibelsLocation, this.maxDecibels);
+		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
+		gl.uniform1f(sampleRateLocation, this.sampleRate);
 	}
 	else {
 
 	}
 
+	//setup grid
 	this.grid = createGrid({
 		container: this.container,
 		viewport: this.viewport,
@@ -57,7 +72,7 @@ function Spectrum (options) {
 			min: this.minFrequency,
 			max: this.maxFrequency,
 			orientation: 'x',
-			logarithmic: true,
+			logarithmic: this.logarithmic,
 			titles: function (value) {
 				return value >= 1000 ? ((value / 1000).toFixed(0) + 'k') : value;
 			}
@@ -65,11 +80,11 @@ function Spectrum (options) {
 			min: this.minDecibels,
 			max: this.maxDecibels,
 			orientation: 'y'
-		}, {
+		}, this.logarithmic ? {
 			min: this.minFrequency,
 			max: this.maxFrequency,
 			orientation: 'x',
-			logarithmic: true,
+			logarithmic: this.logarithmic,
 			values: function (value) {
 				var str = value.toString();
 				if (str[0] !== '1') return null;
@@ -78,7 +93,7 @@ function Spectrum (options) {
 			style: {
 				borderLeftStyle: 'solid'
 			}
-		}],
+		} : null],
 		axes: this.gridAxes && [{
 			name: 'Frequency',
 			labels: function (value, i, opt) {
@@ -109,21 +124,52 @@ Spectrum.prototype.frag = `
 	uniform vec4 viewport;
 	uniform float kernel[5];
 	uniform float kernelWeight;
+	uniform int logarithmic;
+	uniform float maxFrequency;
+	uniform float minFrequency;
+	uniform float maxDecibels;
+	uniform float minDecibels;
+	uniform float sampleRate;
 
 	float frequency;
 	float intensity;
 
+	const float log10 = log(10.);
+
+	float lg (float a) {
+		return log(a) / log10;
+	}
+
+	//TODO: make log light
+	//TODO: fix log scale
+
+	float logRatio (float ratio) {
+		float frequency = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );
+		return (frequency - minFrequency) / (maxFrequency - minFrequency);
+	}
+
 	void main () {
-		vec2 coord = (gl_FragCoord.xy - viewport.xy) / viewport.zw;
-		float onePixel = 1. / viewport.z;
+		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
+		float oneStep = 1. / viewport.z;
+
+		if (logarithmic == 1) {
+			coord.x = logRatio(coord.x);
+			oneStep = logRatio(oneStep);
+		}
+
+		//map the whole freq range to visible range
+		float halfRate = sampleRate * 0.5;
+		float left = minFrequency / halfRate;
+		float right = maxFrequency / halfRate;
+		coord.x = left + coord.x * (right - left);
 
 		//weighted value of intensity
 		intensity =
-			texture2D(frequencies, coord + onePixel * vec2(-2, 0)).w * kernel[0] +
-			texture2D(frequencies, coord + onePixel * vec2(-1, 0)).w * kernel[1] +
-			texture2D(frequencies, coord + onePixel * vec2( 0, 0)).w * kernel[2] +
-			texture2D(frequencies, coord + onePixel * vec2( 1, 0)).w * kernel[3] +
-			texture2D(frequencies, coord + onePixel * vec2( 2, 0)).w * kernel[4];
+			texture2D(frequencies, coord + oneStep * vec2(-2, 0)).w * kernel[0] +
+			texture2D(frequencies, coord + oneStep * vec2(-1, 0)).w * kernel[1] +
+			texture2D(frequencies, coord + oneStep * vec2( 0, 0)).w * kernel[2] +
+			texture2D(frequencies, coord + oneStep * vec2( 1, 0)).w * kernel[3] +
+			texture2D(frequencies, coord + oneStep * vec2( 2, 0)).w * kernel[4];
 		intensity /= kernelWeight;
 
 		// gl_FragColor = vec4(vec3(intensity*20.), 1);
@@ -131,6 +177,7 @@ Spectrum.prototype.frag = `
 		float dist = abs(coord.y - intensity);
 		gl_FragColor = vec4(vec3(1. - smoothstep(0.0, 0.04, dist)), 1);
 
+		// gl_FragColor = vec4(vec3(coord.x), 1);
 		// gl_FragColor = vec4( vec3( coord.y / 4. > intensity ? 1 : 0) , 1);
 	}
 `;
@@ -154,8 +201,10 @@ Spectrum.prototype.grid = true;
 
 Spectrum.prototype.logarithmic = true;
 
-
 Spectrum.prototype.orientation = 'horizontal';
+
+//required to detect frequency resolution
+Spectrum.prototype.sampleRate = 44100;
 
 
 //TODO: line (with tail), bars,
@@ -225,8 +274,8 @@ function createTexture (gl) {
 	gl.activeTexture(gl.TEXTURE0);
 
 	gl.bindTexture(gl.TEXTURE_2D, texture);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 

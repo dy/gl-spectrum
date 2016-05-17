@@ -40,7 +40,7 @@ var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(10000 * Math.PI * 2 * (i / rate));
+	sine[i] = Math.sin(1000 * Math.PI * 2 * (i / rate));
 	saw[i] = 2 * ((10000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
@@ -59,7 +59,8 @@ test('linear classics', function () {
 
 	var spectrum = new Spectrum({
 		gridAxes: false,
-		frequencies: frequencies
+		frequencies: frequencies,
+		// logarithmic: false
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }

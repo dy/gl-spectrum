@@ -25,10 +25,12 @@ var spectrum = new Spectrum({
 	maxFrequency: 20000,
 	minFrequency: 20,
 
-	logFrequency: false,
-	logDecibels: false,
+	//to detect resolution frequency
+	sampleRate: 44100,
+	logarithmic: true,
 
 	smoothing: 0.2,
+
 
 	grid: true,
 	gridAxes: false,
