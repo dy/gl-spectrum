@@ -8,6 +8,8 @@ var inherits = require('inherits');
 var lg = require('mumath/lg');
 var isBrowser = require('is-browser');
 var createGrid = require('plot-grid');
+var colormap = require('colormap');
+
 
 module.exports = Spectrum;
 
@@ -135,9 +137,9 @@ Spectrum.prototype.frag = `
 	uniform float maxDecibels;
 	uniform float minDecibels;
 	uniform float sampleRate;
+	uniform sampler2D colorMap;
 
 	float frequency;
-	float magnitude;
 
 	const float log10 = log(10.);
 
@@ -147,51 +149,48 @@ Spectrum.prototype.frag = `
 
 	//TODO: make log light
 
-	float logRatio (float ratio) {
-		float frequency = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );
-		return (frequency - minFrequency) / (maxFrequency - minFrequency);
+	//return frequency coordinate from screen position
+	float f (float ratio) {
+		if (logarithmic == 1) {
+			float frequency = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );
+			ratio = (frequency - minFrequency) / (maxFrequency - minFrequency);
+		}
+
+		//map the freq range to visible range
+		float halfRate = sampleRate * 0.5;
+		float left = minFrequency / halfRate;
+		float right = maxFrequency / halfRate;
+
+		ratio = left + ratio * (right - left);
+
+		return ratio;
 	}
 
 	void main () {
 		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
-		float oneStep = 1. / viewport.z;
+		vec2 bin = vec2(1. / viewport.zw);
 
-		if (logarithmic == 1) {
-			coord.x = logRatio(coord.x);
-			oneStep = logRatio(oneStep);
-		}
+		//collect 5 closest magnitudes
+		float magnitude[5];
+		magnitude[0] = texture2D(frequencies, vec2(f(coord.x - 2.*bin.x), 0)).w;
+		magnitude[1] = texture2D(frequencies, vec2(f(coord.x - bin.x), 0)).w;
+		magnitude[2] = texture2D(frequencies, vec2(f(coord.x), 0)).w;
+		magnitude[3] = texture2D(frequencies, vec2(f(coord.x + bin.x), 0)).w;
+		magnitude[4] = texture2D(frequencies, vec2(f(coord.x + 2.*bin.x), 0)).w;
 
-		//map the whole freq range to visible range
-		float halfRate = sampleRate * 0.5;
-		float left = minFrequency / halfRate;
-		float right = maxFrequency / halfRate;
-		coord.x = left + coord.x * (right - left);
+		//pick distances to nearby magnitudes
+		float dist[5];
+		dist[0] = (magnitude[0] - coord.y) / max(magnitude[0] + 2.*bin.y, 1e-20);
+		dist[1] = (magnitude[1] - coord.y) / max(magnitude[1] + 1.*bin.y, 1e-20);
+		dist[2] = (magnitude[2] - coord.y) / max(magnitude[2], 1e-20);
+		dist[3] = (magnitude[3] - coord.y) / max(magnitude[3] + 1.*bin.y, 1e-20);
+		dist[4] = (magnitude[4] - coord.y) / max(magnitude[4] + 2.*bin.y, 1e-20);
 
-		//weighted value of intensity
-		magnitude =
-			texture2D(frequencies, coord + oneStep * vec2(-2, 0)).w * kernel[0] +
-			texture2D(frequencies, coord + oneStep * vec2(-1, 0)).w * kernel[1] +
-			texture2D(frequencies, coord + oneStep * vec2( 0, 0)).w * kernel[2] +
-			texture2D(frequencies, coord + oneStep * vec2( 1, 0)).w * kernel[3] +
-			texture2D(frequencies, coord + oneStep * vec2( 2, 0)).w * kernel[4];
-		magnitude /= kernelWeight;
+		float intensity = (dist[0] * kernel[0] + dist[1] * kernel[1] + dist[2] * kernel[2] + dist[3] * kernel[3] + dist[4] * kernel[4]) / kernelWeight;
 
-		float dist = (magnitude - coord.y) / magnitude;
-		float intensity;
-		// if (dist < 0.) {
-			// intensity = 2. * exp(-4. * dist) - 1. * exp(-8. * dist);
-		// 	intensity = (1. - dist) / sqrt(dist);
-		// }
-		// else {
-			intensity = max(intensity, (1. - log(dist)) / 10.);
-		// }
+		// texture2D();
 
 		gl_FragColor = vec4(vec3(intensity), 1);
-
-		// gl_FragColor = vec4(vec3(magnitude*20.), 1);
-		// gl_FragColor = vec4(vec3(1. - smoothstep(0.0, 0.04, dist)), 1);
-		// gl_FragColor = vec4(vec3(coord.x), 1);
-		// gl_FragColor = vec4( vec3( coord.y / 4. > intensity ? 1 : 0) , 1);
 	}
 `;
 
@@ -219,12 +218,15 @@ Spectrum.prototype.orientation = 'horizontal';
 //required to detect frequency resolution
 Spectrum.prototype.sampleRate = 44100;
 
+//colors to map spectrum against
+Spectrum.prototype.colorMap = 'hot';
+
 
 //TODO: line (with tail), bars,
 Spectrum.prototype.style = 'classic';
 
 //5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [1, 2, 10, 2, 1];
+Spectrum.prototype.kernel = [1, 2, 3, 2, 1];
 
 
 /**
@@ -287,8 +289,8 @@ function createTexture (gl) {
 	gl.activeTexture(gl.TEXTURE0);
 
 	gl.bindTexture(gl.TEXTURE_2D, texture);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 

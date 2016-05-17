@@ -61,7 +61,7 @@ test('linear classics', function () {
 	var spectrum = new Spectrum({
 		gridAxes: false,
 		frequencies: frequencies,
-		minFrequency: 40
+		minFrequency: 40,
 		// logarithmic: false
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
