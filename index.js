@@ -106,7 +106,7 @@ function Spectrum (options) {
 		}]
 	});
 
-	this.on('resize', (vp) => console.log(vp) && this.grid.update({
+	this.on('resize', (vp) => this.grid.update({
 		viewport: vp
 	}));
 }
