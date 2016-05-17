@@ -33,14 +33,5 @@ var spectrum = new Spectrum({
 	gridAxes: false
 });
 
-//update spectrum data
-spectrum.setData(frequencies);
-
-//render spectrum data
-spectrum.draw();
+spectrum.setFrequencies(frequencies);
 ```
-
-## Styles
-
-### `classic`
-
