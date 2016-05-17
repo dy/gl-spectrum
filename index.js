@@ -36,17 +36,9 @@ function Spectrum (options) {
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
 		//setup frequencies texture
-		this.texture = createTexture(gl);
-		gl.activeTexture(gl.TEXTURE0);
-		gl.bindTexture(gl.TEXTURE_2D, this.texture);
-
-		//FIXME: freq location can be changed
-		var frequenciesLocation = gl.getUniformLocation(this.program, 'frequencies');
-		gl.useProgram(this.program);
-		gl.uniform1i(frequenciesLocation, 0);
-
+		this.frequenciesTexture = createTexture(gl);
+		this.bindFrequencies(this.frequenciesTextureUnit);
 		this.setFrequencies(this.frequencies);
-
 
 		//setup kernel
 		var kernelLocation = gl.getUniformLocation(this.program, "kernel[0]");
@@ -147,6 +139,9 @@ Spectrum.prototype.frag = `
 //evenly distributed within indicated diapasone
 Spectrum.prototype.frequencies = new Float32Array(1024);
 
+//index of frequencies texture
+Spectrum.prototype.frequenciesTextureUnit = 0;
+
 Spectrum.prototype.maxDecibels = 0;
 Spectrum.prototype.minDecibels = -100;
 
@@ -180,6 +175,24 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 	gl.activeTexture(gl.TEXTURE0);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, frequencies.length, 1, 0, gl.ALPHA, gl.FLOAT, frequencies);
+
+	return this;
+};
+
+/**
+ * Bind frequencies texture to a spot
+ */
+Spectrum.prototype.bindFrequencies = function (unit) {
+	var gl = this.context;
+
+	this.frequenciesTextureUnit = unit == null ? this.frequenciesTextureUnit : unit;
+
+	var frequenciesLocation = gl.getUniformLocation(this.program, 'frequencies');
+	gl.useProgram(this.program);
+	gl.uniform1i(frequenciesLocation, this.frequenciesTextureUnit);
+
+	gl.activeTexture(gl.TEXTURE0 + this.frequenciesTextureUnit);
+	gl.bindTexture(gl.TEXTURE_2D, this.frequenciesTexture);
 
 	return this;
 };
