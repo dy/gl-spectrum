@@ -1,6 +1,8 @@
+# gl-spectrum [![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
+
 Spectrum rendering component.
 
-[![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
+[![Spectrum](https://raw.githubusercontent.com/dfcreative/gl-spectrum/gh-pages/preview.png "Spectrum")](http://dfcreative.github.io/gl-spectrum/)
 
 ## Usage
 
