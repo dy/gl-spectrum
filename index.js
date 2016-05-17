@@ -74,12 +74,15 @@ function Spectrum (options) {
 			orientation: 'x',
 			logarithmic: this.logarithmic,
 			titles: function (value) {
-				return (value >= 1000 ? ((value / 1000).toFixed(0) + 'k') : value)+'Hz';
+				return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
 			}
 		}, {
 			min: this.minDecibels,
 			max: this.maxDecibels,
-			orientation: 'y'
+			orientation: 'y',
+			titles: function (value) {
+				return value.toLocaleString() + 'dB';
+			}
 		}, this.logarithmic ? {
 			min: this.minFrequency,
 			max: this.maxFrequency,
@@ -90,8 +93,10 @@ function Spectrum (options) {
 				if (str[0] !== '1') return null;
 				return value;
 			},
+			titles: null,
 			style: {
-				borderLeftStyle: 'solid'
+				borderLeftStyle: 'solid',
+				pointerEvents: 'none'
 			}
 		} : null],
 		axes: this.gridAxes && [{
