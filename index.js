@@ -40,11 +40,13 @@ function Spectrum (options) {
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, this.texture);
 
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, this.frequencies.length, 1, 0, gl.ALPHA, gl.FLOAT, this.frequencies);
-
+		//FIXME: freq location can be changed
 		var frequenciesLocation = gl.getUniformLocation(this.program, 'frequencies');
 		gl.useProgram(this.program);
 		gl.uniform1i(frequenciesLocation, 0);
+
+		this.setFrequencies(this.frequencies);
+
 
 		//setup kernel
 		var kernelLocation = gl.getUniformLocation(this.program, "kernel[0]");
@@ -85,7 +87,7 @@ function Spectrum (options) {
 				borderLeftStyle: 'solid'
 			}
 		}],
-		axes: [{
+		axes: this.gridAxes && [{
 			name: 'Frequency',
 			labels: function (value, i, opt) {
 				var str = value.toString();
@@ -97,7 +99,9 @@ function Spectrum (options) {
 		}]
 	});
 
-	this.on('resize', (w, h) => this.grid.update());
+	this.on('resize', (vp) => console.log(vp) && this.grid.update({
+		viewport: vp
+	}));
 }
 
 inherits(Spectrum, Component);
@@ -141,7 +145,7 @@ Spectrum.prototype.frag = `
 
 
 //evenly distributed within indicated diapasone
-Spectrum.prototype.frequencies = null;
+Spectrum.prototype.frequencies = new Float32Array(1024);
 
 Spectrum.prototype.maxDecibels = 0;
 Spectrum.prototype.minDecibels = -100;
@@ -153,8 +157,7 @@ Spectrum.prototype.smoothing = 0.2;
 
 Spectrum.prototype.grid = true;
 
-Spectrum.prototype.logFrequency = false;
-Spectrum.prototype.logDecibels = false;
+Spectrum.prototype.logarithmic = true;
 
 
 Spectrum.prototype.orientation = 'horizontal';
@@ -165,6 +168,21 @@ Spectrum.prototype.style = 'classic';
 
 //5-items linear kernel for smoothing frequencies
 Spectrum.prototype.kernel = [1, 2, 20, 2, 1];
+
+
+/**
+ * Set frequencies data
+ */
+Spectrum.prototype.setFrequencies = function (frequencies) {
+	var gl = this.context;
+
+	var frequencies = frequencies || this.frequencies;
+
+	gl.activeTexture(gl.TEXTURE0);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, frequencies.length, 1, 0, gl.ALPHA, gl.FLOAT, frequencies);
+
+	return this;
+};
 
 
 /**
