@@ -31,7 +31,6 @@ var spectrum = new Spectrum({
 
 	smoothing: 0.2,
 
-
 	grid: true,
 	gridAxes: false,
 

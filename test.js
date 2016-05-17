@@ -1,9 +1,9 @@
 var test = require('tst');
 var Spectrum = require('./');
-var Formant = require('audio-formant');
-var Speaker = require('audio-speaker');
-var Sink = require('audio-sink');
-var Slice = require('audio-slice');
+// var Formant = require('audio-formant');
+// var Speaker = require('audio-speaker');
+// var Sink = require('audio-sink');
+// var Slice = require('audio-slice');
 var ft = require('fourier-transform');
 var isBrowser = require('is-browser');
 var SCBadge = require('soundcloud-badge');
@@ -24,7 +24,7 @@ var badge = SCBadge({
 	audio.src = src;//'https://api.soundcloud.com/tracks/263762161/stream?client_id=6b7ae5b9df6a0eb3fcca34cc3bb0ef14';
 	audio.crossOrigin = 'Anonymous';
 	audio.addEventListener('canplay', function() {
-		// audio.play();
+		audio.play();
 	}, false);
 });
 
@@ -40,8 +40,8 @@ var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(1000 * Math.PI * 2 * (i / rate));
-	saw[i] = 2 * ((10000 * i / rate) % 1) - 1;
+	sine[i] = Math.sin(50 * Math.PI * 2 * (i / rate));
+	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
 
@@ -54,22 +54,24 @@ if (isBrowser) {
 
 
 test('linear classics', function () {
-	var frequencies = new Float32Array(ft(sine));
-	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	// var frequencies = new Float32Array(ft(sine));
+	// var frequencies = new Float32Array(1024).fill(0.5);
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 
 	var spectrum = new Spectrum({
 		gridAxes: false,
 		frequencies: frequencies,
+		minFrequency: 40
 		// logarithmic: false
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
 	}).on('render', function () {
-		// analyser.analyser.getFloatFrequencyData(frequencies);
-		// frequencies = frequencies.map(function (v) {
-		// 	return (100 + v) / 100;
-		// });
-		// spectrum.setFrequencies(frequencies);
+		analyser.analyser.getFloatFrequencyData(frequencies);
+		frequencies = frequencies.map(function (v) {
+			return (100 + v) / 100;
+		});
+		spectrum.setFrequencies(frequencies);
 	});
 });
 

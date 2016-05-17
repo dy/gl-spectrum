@@ -74,7 +74,7 @@ function Spectrum (options) {
 			orientation: 'x',
 			logarithmic: this.logarithmic,
 			titles: function (value) {
-				return value >= 1000 ? ((value / 1000).toFixed(0) + 'k') : value;
+				return (value >= 1000 ? ((value / 1000).toFixed(0) + 'k') : value)+'Hz';
 			}
 		}, {
 			min: this.minDecibels,
@@ -102,7 +102,7 @@ function Spectrum (options) {
 				return opt.titles[i];
 			}
 		}, {
-			name: 'Magniture'
+			name: 'Magnitude'
 		}]
 	});
 
@@ -132,7 +132,7 @@ Spectrum.prototype.frag = `
 	uniform float sampleRate;
 
 	float frequency;
-	float intensity;
+	float magnitude;
 
 	const float log10 = log(10.);
 
@@ -141,7 +141,6 @@ Spectrum.prototype.frag = `
 	}
 
 	//TODO: make log light
-	//TODO: fix log scale
 
 	float logRatio (float ratio) {
 		float frequency = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );
@@ -164,19 +163,28 @@ Spectrum.prototype.frag = `
 		coord.x = left + coord.x * (right - left);
 
 		//weighted value of intensity
-		intensity =
+		magnitude =
 			texture2D(frequencies, coord + oneStep * vec2(-2, 0)).w * kernel[0] +
 			texture2D(frequencies, coord + oneStep * vec2(-1, 0)).w * kernel[1] +
 			texture2D(frequencies, coord + oneStep * vec2( 0, 0)).w * kernel[2] +
 			texture2D(frequencies, coord + oneStep * vec2( 1, 0)).w * kernel[3] +
 			texture2D(frequencies, coord + oneStep * vec2( 2, 0)).w * kernel[4];
-		intensity /= kernelWeight;
+		magnitude /= kernelWeight;
 
-		// gl_FragColor = vec4(vec3(intensity*20.), 1);
+		float dist = (magnitude - coord.y) / magnitude;
+		float intensity;
+		// if (dist < 0.) {
+			// intensity = 2. * exp(-4. * dist) - 1. * exp(-8. * dist);
+		// 	intensity = (1. - dist) / sqrt(dist);
+		// }
+		// else {
+			intensity = max(intensity, (1. - log(dist)) / 10.);
+		// }
 
-		float dist = abs(coord.y - intensity);
-		gl_FragColor = vec4(vec3(1. - smoothstep(0.0, 0.04, dist)), 1);
+		gl_FragColor = vec4(vec3(intensity), 1);
 
+		// gl_FragColor = vec4(vec3(magnitude*20.), 1);
+		// gl_FragColor = vec4(vec3(1. - smoothstep(0.0, 0.04, dist)), 1);
 		// gl_FragColor = vec4(vec3(coord.x), 1);
 		// gl_FragColor = vec4( vec3( coord.y / 4. > intensity ? 1 : 0) , 1);
 	}
@@ -211,7 +219,7 @@ Spectrum.prototype.sampleRate = 44100;
 Spectrum.prototype.style = 'classic';
 
 //5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [1, 2, 20, 2, 1];
+Spectrum.prototype.kernel = [1, 2, 10, 2, 1];
 
 
 /**
