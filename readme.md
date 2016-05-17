@@ -2,7 +2,7 @@
 
 Spectrum rendering component.
 
-[![Spectrum](https://raw.githubusercontent.com/dfcreative/gl-spectrum/gh-pages/preview.png "Spectrum")](http://dfcreative.github.io/gl-spectrum/)
+[![Spectrum](https://raw.githubusercontent.com/audio-lab/gl-spectrum/gh-pages/preview.png "Spectrum")](http://audio-lab.github.io/gl-spectrum/)
 
 ## Usage
 
