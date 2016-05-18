@@ -221,7 +221,7 @@ Spectrum.prototype.minDecibels = -100;
 Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
 
-Spectrum.prototype.smoothing = 0.2;
+Spectrum.prototype.smoothing = 0.5;
 
 Spectrum.prototype.grid = true;
 

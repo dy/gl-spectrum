@@ -63,7 +63,7 @@ test.only('linear classics', function () {
 		frequencies: frequencies,
 		minFrequency: 40,
 		logarithmic: true,
-		smoothing: .9
+		smoothing: .5
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
