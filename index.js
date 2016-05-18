@@ -71,17 +71,21 @@ function Spectrum (options) {
 			if (typeof this.colorMap === 'string') {
 				this.colorMap = new Float32Array(flatten(colormap({
 					colormap: this.colorMap,
-					nshades: 10,
+					nshades: 128,
 					format: 'rgba',
 					alpha: 1
-				})));
+				})).map((v,i) => !((i + 1) % 4) ? v : v/255));
 			}
 			//custom array
 			else {
 				this.colorMap = new Float32Array(this.colorMap);
 			}
 			this.bindTexture({colorMap: this.colorMapTextureUnit});
-			this.setTexture('colorMap', this.colorMap);
+			this.setTexture('colorMap', {
+				data: this.colorMap,
+				width: 128,
+				format: gl.RGBA
+			});
 		}
 	}
 	else {
@@ -208,11 +212,13 @@ Spectrum.prototype.frag = `
 		dist[3] = (magnitude[3] - coord.y) / max(magnitude[3] + 1.*bin.y, 1e-20);
 		dist[4] = (magnitude[4] - coord.y) / max(magnitude[4] + 2.*bin.y, 1e-20);
 
-		float intensity = (dist[0] * kernel[0] + dist[1] * kernel[1] + dist[2] * kernel[2] + dist[3] * kernel[3] + dist[4] * kernel[4]) / kernelWeight;
+		//average distance
+		float d = (dist[0] * kernel[0] + dist[1] * kernel[1] + dist[2] * kernel[2] + dist[3] * kernel[3] + dist[4] * kernel[4]) / kernelWeight;
 
-		// texture2D();
+		// float intensity = 2. * exp(-10. * d) - exp(-20. * d);
 
-		gl_FragColor = vec4(vec3(intensity), 1);
+		gl_FragColor = vec4(vec3(d + 0.5), 1);
+		// gl_FragColor = texture2D(colorMap, vec2(max(0.,intensity), 0.5));
 	}
 `;
 
@@ -241,7 +247,7 @@ Spectrum.prototype.orientation = 'horizontal';
 Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
-Spectrum.prototype.colorMap = 'hot';
+Spectrum.prototype.colorMap = 'portland';
 Spectrum.prototype.colorMapTextureUnit = 1;
 
 

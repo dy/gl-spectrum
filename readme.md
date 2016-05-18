@@ -32,6 +32,7 @@ var spectrum = new Spectrum({
 	grid: true,
 	gridAxes: false,
 
+	//map -1..1 distance colors by colormap
 	colorMap: []
 });
 
