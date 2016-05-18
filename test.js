@@ -71,7 +71,7 @@ test('linear classics', function () {
 		frequencies = frequencies.map(function (v) {
 			return (100 + v) / 100;
 		});
-		spectrum.setFrequencies(frequencies);
+		spectrum.setTexture({frequencies: frequencies});
 	});
 });
 

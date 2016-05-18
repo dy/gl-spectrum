@@ -9,6 +9,7 @@ var lg = require('mumath/lg');
 var isBrowser = require('is-browser');
 var createGrid = require('plot-grid');
 var colormap = require('colormap');
+var flatten = require('array-flatten');
 
 
 module.exports = Spectrum;
@@ -38,9 +39,11 @@ function Spectrum (options) {
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
 		//setup frequencies texture
-		this.frequenciesTexture = createTexture(gl);
-		this.bindFrequencies(this.frequenciesTextureUnit);
-		this.setFrequencies(this.frequencies);
+		this.bindTexture('frequencies', this.frequenciesTextureUnit);
+		this.setTexture('frequencies', {
+			data: this.frequencies,
+			format: gl.ALPHA
+		});
 
 		//setup kernel
 		var kernelLocation = gl.getUniformLocation(this.program, 'kernel[0]');
@@ -61,6 +64,25 @@ function Spectrum (options) {
 		gl.uniform1f(maxDecibelsLocation, this.maxDecibels);
 		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
 		gl.uniform1f(sampleRateLocation, this.sampleRate);
+
+		//setup colormap
+		if (this.colorMap) {
+			//named colormap
+			if (typeof this.colorMap === 'string') {
+				this.colorMap = new Float32Array(flatten(colormap({
+					colormap: this.colorMap,
+					nshades: 10,
+					format: 'rgba',
+					alpha: 1
+				})));
+			}
+			//custom array
+			else {
+				this.colorMap = new Float32Array(this.colorMap);
+			}
+			this.bindTexture({colorMap: this.colorMapTextureUnit});
+			this.setTexture('colorMap', this.colorMap);
+		}
 	}
 	else {
 
@@ -220,6 +242,7 @@ Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
 Spectrum.prototype.colorMap = 'hot';
+Spectrum.prototype.colorMapTextureUnit = 1;
 
 
 //TODO: line (with tail), bars,
@@ -227,39 +250,6 @@ Spectrum.prototype.style = 'classic';
 
 //5-items linear kernel for smoothing frequencies
 Spectrum.prototype.kernel = [1, 2, 3, 2, 1];
-
-
-/**
- * Set frequencies data
- */
-Spectrum.prototype.setFrequencies = function (frequencies) {
-	var gl = this.context;
-
-	var frequencies = frequencies || this.frequencies;
-
-	gl.activeTexture(gl.TEXTURE0);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, frequencies.length, 1, 0, gl.ALPHA, gl.FLOAT, frequencies);
-
-	return this;
-};
-
-/**
- * Bind frequencies texture to a spot
- */
-Spectrum.prototype.bindFrequencies = function (unit) {
-	var gl = this.context;
-
-	this.frequenciesTextureUnit = unit == null ? this.frequenciesTextureUnit : unit;
-
-	var frequenciesLocation = gl.getUniformLocation(this.program, 'frequencies');
-	gl.useProgram(this.program);
-	gl.uniform1i(frequenciesLocation, this.frequenciesTextureUnit);
-
-	gl.activeTexture(gl.TEXTURE0 + this.frequenciesTextureUnit);
-	gl.bindTexture(gl.TEXTURE_2D, this.frequenciesTexture);
-
-	return this;
-};
 
 
 /**
@@ -278,21 +268,3 @@ Spectrum.prototype.render = function () {
 
 	return this;
 };
-
-
-
-
-//create texture
-function createTexture (gl) {
-	var texture = gl.createTexture();
-
-	gl.activeTexture(gl.TEXTURE0);
-
-	gl.bindTexture(gl.TEXTURE_2D, texture);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-
-	return texture;
-}
