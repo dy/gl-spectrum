@@ -93,51 +93,53 @@ function Spectrum (options) {
 	}
 
 	//setup grid
-	this.grid = createGrid({
-		container: this.container,
-		viewport: this.viewport,
-		lines: [{
-			min: this.minFrequency,
-			max: this.maxFrequency,
-			orientation: 'x',
-			logarithmic: this.logarithmic,
-			titles: function (value) {
-				return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
-			}
-		}, {
-			min: this.minDecibels,
-			max: this.maxDecibels,
-			orientation: 'y',
-			titles: function (value) {
-				return value.toLocaleString() + 'dB';
-			}
-		}, this.logarithmic ? {
-			min: this.minFrequency,
-			max: this.maxFrequency,
-			orientation: 'x',
-			logarithmic: this.logarithmic,
-			values: function (value) {
-				var str = value.toString();
-				if (str[0] !== '1') return null;
-				return value;
-			},
-			titles: null,
-			style: {
-				borderLeftStyle: 'solid',
-				pointerEvents: 'none'
-			}
-		} : null],
-		axes: this.gridAxes && [{
-			name: 'Frequency',
-			labels: function (value, i, opt) {
-				var str = value.toString();
-				if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
-				return opt.titles[i];
-			}
-		}, {
-			name: 'Magnitude'
-		}]
-	});
+	if (this.grid) {
+		this.grid = createGrid({
+			container: this.container,
+			viewport: this.viewport,
+			lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
+				min: this.minFrequency,
+				max: this.maxFrequency,
+				orientation: 'x',
+				logarithmic: this.logarithmic,
+				titles: function (value) {
+					return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
+				}
+			}, {
+				min: this.minDecibels,
+				max: this.maxDecibels,
+				orientation: 'y',
+				titles: function (value) {
+					return value.toLocaleString() + 'dB';
+				}
+			}, this.logarithmic ? {
+				min: this.minFrequency,
+				max: this.maxFrequency,
+				orientation: 'x',
+				logarithmic: this.logarithmic,
+				values: function (value) {
+					var str = value.toString();
+					if (str[0] !== '1') return null;
+					return value;
+				},
+				titles: null,
+				style: {
+					borderLeftStyle: 'solid',
+					pointerEvents: 'none'
+				}
+			} : null],
+			axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.gridAxes) && [{
+				name: 'Frequency',
+				labels: function (value, i, opt) {
+					var str = value.toString();
+					if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
+					return opt.titles[i];
+				}
+			}, {
+				name: 'Magnitude'
+			}]
+		});
+	};
 
 	this.on('resize', (vp) => this.grid.update({
 		viewport: vp
@@ -224,6 +226,7 @@ Spectrum.prototype.minFrequency = 20;
 Spectrum.prototype.smoothing = 0.5;
 
 Spectrum.prototype.grid = true;
+Spectrum.prototype.gridAxes = false;
 
 Spectrum.prototype.logarithmic = true;
 

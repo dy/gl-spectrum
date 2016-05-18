@@ -59,7 +59,6 @@ test.only('linear classics', function () {
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 
 	var spectrum = new Spectrum({
-		gridAxes: false,
 		frequencies: frequencies,
 		minFrequency: 40,
 		logarithmic: true,

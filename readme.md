@@ -29,8 +29,10 @@ var spectrum = new Spectrum({
 
 	smoothing: 0.2,
 
-	grid: true,
-	gridAxes: false,
+	grid: {
+		lines: true,
+		axes: false
+	},
 
 	//map -1..1 distance colors by colormap
 	colorMap: []
