@@ -203,31 +203,35 @@ Spectrum.prototype.frag = `
 		return ratio;
 	}
 
-	float distanceToLine (vec2 p1, vec2 p2, vec2 p0)
-	{
+	float distanceToLine (vec2 p1, vec2 p2, vec2 p0) {
 		vec2 lineDir = p2 - p1;
 		vec2 perpDir = vec2(lineDir.y, -lineDir.x);
 		vec2 dirToPt1 = p1 - p0;
 		return abs(dot(normalize(perpDir), dirToPt1));
 	}
 
+	//return [weighted] magnitude of [normalized] frequency
+	float magnitude (float nf) {
+		vec2 bin = vec2(1. / viewport.zw);
+
+		return (kernel[0] * texture2D(frequencies, vec2(f(nf - 2. * bin.x), 0)).w +
+			kernel[1] * texture2D(frequencies, vec2(f(nf - bin.x), 0)).w +
+			kernel[2] * texture2D(frequencies, vec2(f(nf), 0)).w +
+			kernel[3] * texture2D(frequencies, vec2(f(nf + bin.x), 0)).w +
+			kernel[4] * texture2D(frequencies, vec2(f(nf + 2. * bin.x), 0)).w) / kernelWeight;
+	}
+
 	void main () {
 		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		vec2 bin = vec2(1. / viewport.zw);
 
-		float mag = texture2D(frequencies, vec2(f(coord.x), 0)).w;
-		float prevMag = texture2D(frequencies, vec2(f(coord.x - bin.x), 0)).w;
+		vec2 p2 = vec2(coord.x, magnitude(coord.x + bin.x*.5));
+		vec2 p1 = vec2(coord.x - bin.x, magnitude(coord.x - bin.x*.5));
 
-		// float dist = abs(coord.y - mag);
+		float vertDist = abs(coord.y - magnitude(coord.x));
+		float normalDist = distanceToLine(p2, p1, coord);
 
-		//dist from point to a line
-		float y2 = mag, y1 = prevMag, x2 = coord.x, x1 = coord.x - bin.x, y0 = coord.y, x0 = x2;
-		// float y21 = y2 - y1, x21 = x2 - x1;
-		// float dist = abs(y21*x0 - x21*y0 + x2*y1 - y2*x1) / sqrt( y21*y21 + x21*x21 );
-
-		float dist = distanceToLine(vec2(x1,y1), vec2(x2,y2), vec2(x0,y0));
-
-		float intensity = 1. - smoothstep(.0007, .0013, dist);
+		float intensity = 1. - smoothstep(.0007, .0013, vertDist);
 
 		gl_FragColor = vec4(vec3(intensity), 1);
 
@@ -267,7 +271,7 @@ Spectrum.prototype.colormapTextureUnit = 1;
 
 
 //5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [1, 2, 3, 2, 1];
+Spectrum.prototype.kernel = [0, 0, 1, 0, 0];
 
 
 /**
