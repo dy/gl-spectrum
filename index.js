@@ -10,7 +10,7 @@ var isBrowser = require('is-browser');
 var createGrid = require('plot-grid');
 var colormap = require('colormap');
 var flatten = require('array-flatten');
-
+var clamp = require('mumath/clamp');
 
 module.exports = Spectrum;
 
@@ -189,6 +189,8 @@ Spectrum.prototype.frag = `
 
 		ratio = left + ratio * (right - left);
 
+		// ratio = .01 * floor(ratio / .01);
+
 		return ratio;
 	}
 
@@ -196,28 +198,12 @@ Spectrum.prototype.frag = `
 		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		vec2 bin = vec2(1. / viewport.zw);
 
-		//collect 5 closest magnitudes
-		float magnitude[5];
-		magnitude[0] = texture2D(frequencies, vec2(f(coord.x - 2.*bin.x), 0)).w;
-		magnitude[1] = texture2D(frequencies, vec2(f(coord.x - bin.x), 0)).w;
-		magnitude[2] = texture2D(frequencies, vec2(f(coord.x), 0)).w;
-		magnitude[3] = texture2D(frequencies, vec2(f(coord.x + bin.x), 0)).w;
-		magnitude[4] = texture2D(frequencies, vec2(f(coord.x + 2.*bin.x), 0)).w;
+		float magnitude = texture2D(frequencies, vec2(f(coord.x), 0)).w;
 
-		//pick distances to nearby magnitudes
-		float dist[5];
-		dist[0] = (magnitude[0] - coord.y) / max(magnitude[0] + 2.*bin.y, 1e-20);
-		dist[1] = (magnitude[1] - coord.y) / max(magnitude[1] + 1.*bin.y, 1e-20);
-		dist[2] = (magnitude[2] - coord.y) / max(magnitude[2], 1e-20);
-		dist[3] = (magnitude[3] - coord.y) / max(magnitude[3] + 1.*bin.y, 1e-20);
-		dist[4] = (magnitude[4] - coord.y) / max(magnitude[4] + 2.*bin.y, 1e-20);
+		float intensity = coord.y < magnitude ? 1. : 0.;
 
-		//average distance
-		float d = (dist[0] * kernel[0] + dist[1] * kernel[1] + dist[2] * kernel[2] + dist[3] * kernel[3] + dist[4] * kernel[4]) / kernelWeight;
+		gl_FragColor = vec4(vec3(intensity), 1);
 
-		// float intensity = 2. * exp(-10. * d) - exp(-20. * d);
-
-		gl_FragColor = vec4(vec3(d + 0.5), 1);
 		// gl_FragColor = texture2D(colorMap, vec2(max(0.,intensity), 0.5));
 	}
 `;
@@ -256,6 +242,34 @@ Spectrum.prototype.style = 'classic';
 
 //5-items linear kernel for smoothing frequencies
 Spectrum.prototype.kernel = [1, 2, 3, 2, 1];
+
+
+/**
+ * Set frequencies texture taking into account smoothing
+ */
+Spectrum.prototype.setFrequencies = function (frequencies) {
+	if (!frequencies) return this;
+	if (!this.frequencies) return this.setTexture('frequencies', {
+		data: frequencies,
+		format: gl.ALPHA
+	});
+
+	var gl = this.context;
+
+	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
+	var shorter = bigger === frequencies ? this.frequencies : frequencies;
+
+	var smoothing = bigger === this.frequencies ? this.smoothing : 1 - this.smoothing;
+
+	for (var i = 0; i < bigger.length; i++) {
+		bigger[i] = clamp(bigger[i] * smoothing + shorter[Math.floor(shorter.length * (i / bigger.length))] * (1 - smoothing), 0, 1);
+	}
+
+	return this.setTexture('frequencies', {
+		data: bigger,
+		format: gl.ALPHA
+	});
+};
 
 
 /**

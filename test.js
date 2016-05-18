@@ -40,7 +40,7 @@ var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(50 * Math.PI * 2 * (i / rate));
+	sine[i] = Math.sin(1000 * Math.PI * 2 * (i / rate));
 	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
@@ -53,7 +53,7 @@ if (isBrowser) {
 
 
 
-test('linear classics', function () {
+test.only('linear classics', function () {
 	// var frequencies = new Float32Array(ft(sine));
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
@@ -62,16 +62,17 @@ test('linear classics', function () {
 		gridAxes: false,
 		frequencies: frequencies,
 		minFrequency: 40,
-		// logarithmic: false
+		logarithmic: true,
+		smoothing: .9
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
 	}).on('render', function () {
 		analyser.analyser.getFloatFrequencyData(frequencies);
 		frequencies = frequencies.map(function (v) {
-			return (100 + v) / 100;
+			return Math.max((100 + v) / 100, 0);
 		});
-		spectrum.setTexture({frequencies: frequencies});
+		spectrum.setFrequencies(frequencies);
 	});
 });
 
