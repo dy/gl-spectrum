@@ -39,7 +39,12 @@ function Spectrum (options) {
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
 		//setup frequencies texture
-		this.bindTexture('frequencies', this.frequenciesTextureUnit);
+		this.bindTexture('frequencies', {
+			unit: this.frequenciesTextureUnit,
+			wrap: gl.CLAMP_TO_EDGE,
+			magFilter: gl.NEAREST,
+			minFilter: gl.NEAREST
+		});
 		this.setTexture('frequencies', {
 			data: this.frequencies,
 			format: gl.ALPHA
@@ -66,11 +71,11 @@ function Spectrum (options) {
 		gl.uniform1f(sampleRateLocation, this.sampleRate);
 
 		//setup colormap
-		if (this.colorMap) {
+		if (this.colormap) {
 			//named colormap
-			if (typeof this.colorMap === 'string') {
-				this.colorMap = new Float32Array(flatten(colormap({
-					colormap: this.colorMap,
+			if (typeof this.colormap === 'string') {
+				this.colormap = new Float32Array(flatten(colormap({
+					colormap: this.colormap,
 					nshades: 128,
 					format: 'rgba',
 					alpha: 1
@@ -78,11 +83,11 @@ function Spectrum (options) {
 			}
 			//custom array
 			else {
-				this.colorMap = new Float32Array(this.colorMap);
+				this.colormap = new Float32Array(this.colormap);
 			}
-			this.bindTexture({colorMap: this.colorMapTextureUnit});
-			this.setTexture('colorMap', {
-				data: this.colorMap,
+			this.bindTexture({colormap: this.colormapTextureUnit});
+			this.setTexture('colormap', {
+				data: this.colormap,
 				width: 128,
 				format: gl.RGBA
 			});
@@ -165,11 +170,13 @@ Spectrum.prototype.frag = `
 	uniform float maxDecibels;
 	uniform float minDecibels;
 	uniform float sampleRate;
-	uniform sampler2D colorMap;
+	uniform sampler2D colormap;
 
 	float frequency;
 
 	const float log10 = log(10.);
+	const float pi = ${Math.PI};
+	const float pi2 = ${Math.PI*2};
 
 	float lg (float a) {
 		return log(a) / log10;
@@ -196,17 +203,35 @@ Spectrum.prototype.frag = `
 		return ratio;
 	}
 
+	float distanceToLine (vec2 p1, vec2 p2, vec2 p0)
+	{
+		vec2 lineDir = p2 - p1;
+		vec2 perpDir = vec2(lineDir.y, -lineDir.x);
+		vec2 dirToPt1 = p1 - p0;
+		return abs(dot(normalize(perpDir), dirToPt1));
+	}
+
 	void main () {
 		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		vec2 bin = vec2(1. / viewport.zw);
 
-		float magnitude = texture2D(frequencies, vec2(f(coord.x), 0)).w;
+		float mag = texture2D(frequencies, vec2(f(coord.x), 0)).w;
+		float prevMag = texture2D(frequencies, vec2(f(coord.x - bin.x), 0)).w;
 
-		float intensity = coord.y < magnitude ? 1. : 0.;
+		// float dist = abs(coord.y - mag);
+
+		//dist from point to a line
+		float y2 = mag, y1 = prevMag, x2 = coord.x, x1 = coord.x - bin.x, y0 = coord.y, x0 = x2;
+		// float y21 = y2 - y1, x21 = x2 - x1;
+		// float dist = abs(y21*x0 - x21*y0 + x2*y1 - y2*x1) / sqrt( y21*y21 + x21*x21 );
+
+		float dist = distanceToLine(vec2(x1,y1), vec2(x2,y2), vec2(x0,y0));
+
+		float intensity = 1. - smoothstep(.0007, .0013, dist);
 
 		gl_FragColor = vec4(vec3(intensity), 1);
 
-		// gl_FragColor = texture2D(colorMap, vec2(max(0.,intensity), 0.5));
+		// gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
 	}
 `;
 
@@ -230,18 +255,16 @@ Spectrum.prototype.gridAxes = false;
 
 Spectrum.prototype.logarithmic = true;
 
+//TODO
 Spectrum.prototype.orientation = 'horizontal';
 
 //required to detect frequency resolution
 Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
-Spectrum.prototype.colorMap = 'portland';
-Spectrum.prototype.colorMapTextureUnit = 1;
+Spectrum.prototype.colormap = 'portland';
+Spectrum.prototype.colormapTextureUnit = 1;
 
-
-//TODO: line (with tail), bars,
-Spectrum.prototype.style = 'classic';
 
 //5-items linear kernel for smoothing frequencies
 Spectrum.prototype.kernel = [1, 2, 3, 2, 1];

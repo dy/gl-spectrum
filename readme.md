@@ -19,7 +19,7 @@ var spectrum = new Spectrum({
 	frequencies: frequenciesData,
 
 	maxDecibels: 0,
-	minDecibels: -90,
+	minDecibels: -100,
 
 	maxFrequency: 20000,
 	minFrequency: 20,
@@ -27,16 +27,33 @@ var spectrum = new Spectrum({
 	sampleRate: 44100,
 	logarithmic: true,
 
-	smoothing: 0.2,
+	smoothing: 0.5,
 
-	grid: {
-		lines: true,
-		axes: false
-	},
+	grid: true,
+	gridAxes: false,
 
-	//map -1..1 distance colors by colormap
-	colorMap: []
+	//colormap texture
+	colormap: [],
+
+	//line fn: covers lineWidth, glow and color. And bg?
+	line: [],
+
+	bins: 400,
+
+	//shadow frequencies
+	shadow: [],
+
+	//masking texture (one dot): replaces dots, glow, bin width/radius,
+	mask: 'bar',
+
+	//'repeat' for dots-like, 'stretch' for bars
+	maskType: 'repeat'
 });
 
 spectrum.setFrequencies(frequencies);
 ```
+
+## Related
+
+* [colormap](https://github.com/bpostlethwaite/colormap) — list of js color maps.
+* [cli-visualizer](https://github.com/dpayne/cli-visualizer) — C++ spectrum visualizer.

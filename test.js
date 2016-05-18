@@ -13,15 +13,16 @@ var Analyser = require('web-audio-analyser');
 //stream soundcloud
 var audio = new Audio;
 var badge = SCBadge({
-	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14'
-	, song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016'
-	, dark: false
-	, getFonts: false
+	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
+	// , song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016'
+	song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	dark: false,
+	getFonts: false
 }, function(err, src, data, div) {
 	if (err) throw err;
 
 	//TODO: read url from href here
-	audio.src = src;//'https://api.soundcloud.com/tracks/263762161/stream?client_id=6b7ae5b9df6a0eb3fcca34cc3bb0ef14';
+	audio.src = src;
 	audio.crossOrigin = 'Anonymous';
 	audio.addEventListener('canplay', function() {
 		audio.play();
@@ -62,7 +63,7 @@ test.only('linear classics', function () {
 		frequencies: frequencies,
 		minFrequency: 40,
 		logarithmic: true,
-		smoothing: .5
+		smoothing: .8
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
