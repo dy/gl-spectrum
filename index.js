@@ -85,7 +85,12 @@ function Spectrum (options) {
 			else {
 				this.colormap = new Float32Array(this.colormap);
 			}
-			this.bindTexture({colormap: this.colormapTextureUnit});
+			this.bindTexture({colormap: {
+				unit: this.colormapTextureUnit,
+				magFilter: gl.NEAREST,
+				minFilter: gl.NEAREST,
+				wrap: gl.CLAMP_TO_EDGE,
+			}});
 			this.setTexture('colormap', {
 				data: this.colormap,
 				width: 128,
@@ -153,43 +158,17 @@ function Spectrum (options) {
 
 inherits(Spectrum, Component);
 
-/*
-Spectrum.prototype.vert = `
-	precision mediump float;
-
-	attribute vec2 position;
-	uniform sampler2D frequencies;
-	const float step = 1. / 4096.;
-
-	varying float average;
-	varying float peak;
-
-	void main () {
-		float sum = 0., value, _peak = 0.;
-
-		for (float i = 0.; i < 1.; i+= step) {
-			value = texture2D(frequencies, vec2(i, 0)).w;
-			sum += value;
-			_peak = max(value, _peak);
-		}
-		peak = _peak;
-		average = sum * step;
-
-		gl_Position = vec4(position, 0, 1);
-	}
-`;
-*/
 
 /**
  * Here we might have to do kernel averaging for some
  */
 Spectrum.prototype.frag = `
-	precision mediump float;
+	precision lowp float;
 
 	uniform sampler2D frequencies;
 	uniform sampler2D colormap;
 	uniform vec4 viewport;
-	uniform float kernel[7];
+	uniform float kernel[5];
 	uniform float kernelWeight;
 	uniform int logarithmic;
 	uniform float maxFrequency;
@@ -228,46 +207,42 @@ Spectrum.prototype.frag = `
 		return ratio;
 	}
 
-	float distanceToLine (vec2 p1, vec2 p2, vec2 p0) {
-		vec2 lineDir = p2 - p1;
-		vec2 perpDir = vec2(lineDir.y, -lineDir.x);
-		vec2 dirToPt1 = p1 - p0;
-		return abs(dot(normalize(perpDir), dirToPt1));
-	}
-
 	//return [weighted] magnitude of [normalized] frequency
 	float magnitude (float nf) {
 		vec2 bin = vec2(1. / viewport.zw);
 
-		return (kernel[0] * texture2D(frequencies, vec2(f(nf - 3. * bin.x), 0)).w +
-			kernel[1] * texture2D(frequencies, vec2(f(nf - 2. * bin.x), 0)).w +
-			kernel[2] * texture2D(frequencies, vec2(f(nf - bin.x), 0)).w +
-			kernel[3] * texture2D(frequencies, vec2(f(nf), 0)).w +
-			kernel[4] * texture2D(frequencies, vec2(f(nf + bin.x), 0)).w +
-			kernel[5] * texture2D(frequencies, vec2(f(nf + 2. * bin.x), 0)).w +
-			kernel[6] * texture2D(frequencies, vec2(f(nf + 3. * bin.x), 0)).w) / kernelWeight;
+		return texture2D(frequencies, vec2(f(nf), 0)).w;
+
+		return (
+			kernel[0] * texture2D(frequencies, vec2(f(nf - 2. * bin.x), 0)).w +
+			kernel[1] * texture2D(frequencies, vec2(f(nf - bin.x), 0)).w +
+			kernel[2] * texture2D(frequencies, vec2(f(nf), 0)).w +
+			kernel[3] * texture2D(frequencies, vec2(f(nf + bin.x), 0)).w +
+			kernel[4] * texture2D(frequencies, vec2(f(nf + 2. * bin.x), 0)).w) / kernelWeight;
 	}
 
 	void main () {
 		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		vec2 bin = vec2(1. / viewport.zw);
+		float prevMag = magnitude(coord.x - bin.x);
+		float currMag = magnitude(coord.x);
+		float maxMag = max(currMag, prevMag);
+		float minMag = min(currMag, prevMag);
 
-		vec2 p2 = vec2(coord.x, magnitude(coord.x + bin.x*.5));
-		vec2 p1 = vec2(coord.x - bin.x, magnitude(coord.x - bin.x*.5));
+		vec2 p2 = vec2(coord.x, currMag);
+		vec2 p1 = vec2(coord.x - bin.x, prevMag);
 
-		float dist = coord.y - magnitude(coord.x);
+		float dist = coord.y - currMag;
 		float vertDist = abs(dist);
-		float normalDist = distanceToLine(p2, p1, coord);
-		float mixDist = normalDist * .95 + vertDist * .05;
 
-		float intensity = 1. - smoothstep(.000, .003, mixDist);
-		if (dist < 0.) {
-			intensity += -.17*log(1. - coord.y) * .6 + (coord.y) * .4 + (coord.x * .1);
-		}
+		float intensity = 0.;
+		intensity += 1. - smoothstep(.0, .0032, vertDist);
+		intensity += (1. - step(0., dist)) * (-.8*log(1. - coord.y) * .5 + coord.y * .5);
+		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
 		gl_FragColor = vec4(vec3(intensity), 1);
 
-		// gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
+		gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
 	}
 `;
 
@@ -298,12 +273,12 @@ Spectrum.prototype.orientation = 'horizontal';
 Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
-Spectrum.prototype.colormap = 'portland';
+Spectrum.prototype.colormap = 'yignbu';
 Spectrum.prototype.colormapTextureUnit = 1;
 
 
 //5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [1, 2, 3, 4, 3, 2, 1];
+Spectrum.prototype.kernel = [2, 3, 4, 3, 2];
 
 
 /**
