@@ -1,6 +1,1610 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 
 },{}],2:[function(require,module,exports){
+'use strict'
+
+exports.toByteArray = toByteArray
+exports.fromByteArray = fromByteArray
+
+var lookup = []
+var revLookup = []
+var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array
+
+function init () {
+  var code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  for (var i = 0, len = code.length; i < len; ++i) {
+    lookup[i] = code[i]
+    revLookup[code.charCodeAt(i)] = i
+  }
+
+  revLookup['-'.charCodeAt(0)] = 62
+  revLookup['_'.charCodeAt(0)] = 63
+}
+
+init()
+
+function toByteArray (b64) {
+  var i, j, l, tmp, placeHolders, arr
+  var len = b64.length
+
+  if (len % 4 > 0) {
+    throw new Error('Invalid string. Length must be a multiple of 4')
+  }
+
+  // the number of equal signs (place holders)
+  // if there are two placeholders, than the two characters before it
+  // represent one byte
+  // if there is only one, then the three characters before it represent 2 bytes
+  // this is just a cheap hack to not do indexOf twice
+  placeHolders = b64[len - 2] === '=' ? 2 : b64[len - 1] === '=' ? 1 : 0
+
+  // base64 is 4/3 + up to two characters of the original data
+  arr = new Arr(len * 3 / 4 - placeHolders)
+
+  // if there are placeholders, only get up to the last complete 4 chars
+  l = placeHolders > 0 ? len - 4 : len
+
+  var L = 0
+
+  for (i = 0, j = 0; i < l; i += 4, j += 3) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 18) | (revLookup[b64.charCodeAt(i + 1)] << 12) | (revLookup[b64.charCodeAt(i + 2)] << 6) | revLookup[b64.charCodeAt(i + 3)]
+    arr[L++] = (tmp >> 16) & 0xFF
+    arr[L++] = (tmp >> 8) & 0xFF
+    arr[L++] = tmp & 0xFF
+  }
+
+  if (placeHolders === 2) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 2) | (revLookup[b64.charCodeAt(i + 1)] >> 4)
+    arr[L++] = tmp & 0xFF
+  } else if (placeHolders === 1) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 10) | (revLookup[b64.charCodeAt(i + 1)] << 4) | (revLookup[b64.charCodeAt(i + 2)] >> 2)
+    arr[L++] = (tmp >> 8) & 0xFF
+    arr[L++] = tmp & 0xFF
+  }
+
+  return arr
+}
+
+function tripletToBase64 (num) {
+  return lookup[num >> 18 & 0x3F] + lookup[num >> 12 & 0x3F] + lookup[num >> 6 & 0x3F] + lookup[num & 0x3F]
+}
+
+function encodeChunk (uint8, start, end) {
+  var tmp
+  var output = []
+  for (var i = start; i < end; i += 3) {
+    tmp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
+    output.push(tripletToBase64(tmp))
+  }
+  return output.join('')
+}
+
+function fromByteArray (uint8) {
+  var tmp
+  var len = uint8.length
+  var extraBytes = len % 3 // if we have 1 byte left, pad 2 bytes
+  var output = ''
+  var parts = []
+  var maxChunkLength = 16383 // must be multiple of 3
+
+  // go through the array every three bytes, we'll deal with trailing stuff later
+  for (var i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
+    parts.push(encodeChunk(uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)))
+  }
+
+  // pad the end with zeros, but make sure to not forget the extra bytes
+  if (extraBytes === 1) {
+    tmp = uint8[len - 1]
+    output += lookup[tmp >> 2]
+    output += lookup[(tmp << 4) & 0x3F]
+    output += '=='
+  } else if (extraBytes === 2) {
+    tmp = (uint8[len - 2] << 8) + (uint8[len - 1])
+    output += lookup[tmp >> 10]
+    output += lookup[(tmp >> 4) & 0x3F]
+    output += lookup[(tmp << 2) & 0x3F]
+    output += '='
+  }
+
+  parts.push(output)
+
+  return parts.join('')
+}
+
+},{}],3:[function(require,module,exports){
+(function (global){
+/*!
+ * The buffer module from node.js, for the browser.
+ *
+ * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
+ * @license  MIT
+ */
+/* eslint-disable no-proto */
+
+'use strict'
+
+var base64 = require('base64-js')
+var ieee754 = require('ieee754')
+var isArray = require('isarray')
+
+exports.Buffer = Buffer
+exports.SlowBuffer = SlowBuffer
+exports.INSPECT_MAX_BYTES = 50
+Buffer.poolSize = 8192 // not used by this implementation
+
+var rootParent = {}
+
+/**
+ * If `Buffer.TYPED_ARRAY_SUPPORT`:
+ *   === true    Use Uint8Array implementation (fastest)
+ *   === false   Use Object implementation (most compatible, even IE6)
+ *
+ * Browsers that support typed arrays are IE 10+, Firefox 4+, Chrome 7+, Safari 5.1+,
+ * Opera 11.6+, iOS 4.2+.
+ *
+ * Due to various browser bugs, sometimes the Object implementation will be used even
+ * when the browser supports typed arrays.
+ *
+ * Note:
+ *
+ *   - Firefox 4-29 lacks support for adding new properties to `Uint8Array` instances,
+ *     See: https://bugzilla.mozilla.org/show_bug.cgi?id=695438.
+ *
+ *   - Chrome 9-10 is missing the `TypedArray.prototype.subarray` function.
+ *
+ *   - IE10 has a broken `TypedArray.prototype.subarray` function which returns arrays of
+ *     incorrect length in some situations.
+
+ * We detect these buggy browsers and set `Buffer.TYPED_ARRAY_SUPPORT` to `false` so they
+ * get the Object implementation, which is slower but behaves correctly.
+ */
+Buffer.TYPED_ARRAY_SUPPORT = global.TYPED_ARRAY_SUPPORT !== undefined
+  ? global.TYPED_ARRAY_SUPPORT
+  : typedArraySupport()
+
+function typedArraySupport () {
+  try {
+    var arr = new Uint8Array(1)
+    arr.foo = function () { return 42 }
+    return arr.foo() === 42 && // typed array instances can be augmented
+        typeof arr.subarray === 'function' && // chrome 9-10 lack `subarray`
+        arr.subarray(1, 1).byteLength === 0 // ie10 has broken `subarray`
+  } catch (e) {
+    return false
+  }
+}
+
+function kMaxLength () {
+  return Buffer.TYPED_ARRAY_SUPPORT
+    ? 0x7fffffff
+    : 0x3fffffff
+}
+
+/**
+ * The Buffer constructor returns instances of `Uint8Array` that have their
+ * prototype changed to `Buffer.prototype`. Furthermore, `Buffer` is a subclass of
+ * `Uint8Array`, so the returned instances will have all the node `Buffer` methods
+ * and the `Uint8Array` methods. Square bracket notation works as expected -- it
+ * returns a single octet.
+ *
+ * The `Uint8Array` prototype remains unmodified.
+ */
+function Buffer (arg) {
+  if (!(this instanceof Buffer)) {
+    // Avoid going through an ArgumentsAdaptorTrampoline in the common case.
+    if (arguments.length > 1) return new Buffer(arg, arguments[1])
+    return new Buffer(arg)
+  }
+
+  if (!Buffer.TYPED_ARRAY_SUPPORT) {
+    this.length = 0
+    this.parent = undefined
+  }
+
+  // Common case.
+  if (typeof arg === 'number') {
+    return fromNumber(this, arg)
+  }
+
+  // Slightly less common case.
+  if (typeof arg === 'string') {
+    return fromString(this, arg, arguments.length > 1 ? arguments[1] : 'utf8')
+  }
+
+  // Unusual.
+  return fromObject(this, arg)
+}
+
+// TODO: Legacy, not needed anymore. Remove in next major version.
+Buffer._augment = function (arr) {
+  arr.__proto__ = Buffer.prototype
+  return arr
+}
+
+function fromNumber (that, length) {
+  that = allocate(that, length < 0 ? 0 : checked(length) | 0)
+  if (!Buffer.TYPED_ARRAY_SUPPORT) {
+    for (var i = 0; i < length; i++) {
+      that[i] = 0
+    }
+  }
+  return that
+}
+
+function fromString (that, string, encoding) {
+  if (typeof encoding !== 'string' || encoding === '') encoding = 'utf8'
+
+  // Assumption: byteLength() return value is always < kMaxLength.
+  var length = byteLength(string, encoding) | 0
+  that = allocate(that, length)
+
+  that.write(string, encoding)
+  return that
+}
+
+function fromObject (that, object) {
+  if (Buffer.isBuffer(object)) return fromBuffer(that, object)
+
+  if (isArray(object)) return fromArray(that, object)
+
+  if (object == null) {
+    throw new TypeError('must start with number, buffer, array or string')
+  }
+
+  if (typeof ArrayBuffer !== 'undefined') {
+    if (object.buffer instanceof ArrayBuffer) {
+      return fromTypedArray(that, object)
+    }
+    if (object instanceof ArrayBuffer) {
+      return fromArrayBuffer(that, object)
+    }
+  }
+
+  if (object.length) return fromArrayLike(that, object)
+
+  return fromJsonObject(that, object)
+}
+
+function fromBuffer (that, buffer) {
+  var length = checked(buffer.length) | 0
+  that = allocate(that, length)
+  buffer.copy(that, 0, 0, length)
+  return that
+}
+
+function fromArray (that, array) {
+  var length = checked(array.length) | 0
+  that = allocate(that, length)
+  for (var i = 0; i < length; i += 1) {
+    that[i] = array[i] & 255
+  }
+  return that
+}
+
+// Duplicate of fromArray() to keep fromArray() monomorphic.
+function fromTypedArray (that, array) {
+  var length = checked(array.length) | 0
+  that = allocate(that, length)
+  // Truncating the elements is probably not what people expect from typed
+  // arrays with BYTES_PER_ELEMENT > 1 but it's compatible with the behavior
+  // of the old Buffer constructor.
+  for (var i = 0; i < length; i += 1) {
+    that[i] = array[i] & 255
+  }
+  return that
+}
+
+function fromArrayBuffer (that, array) {
+  array.byteLength // this throws if `array` is not a valid ArrayBuffer
+
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    // Return an augmented `Uint8Array` instance, for best performance
+    that = new Uint8Array(array)
+    that.__proto__ = Buffer.prototype
+  } else {
+    // Fallback: Return an object instance of the Buffer class
+    that = fromTypedArray(that, new Uint8Array(array))
+  }
+  return that
+}
+
+function fromArrayLike (that, array) {
+  var length = checked(array.length) | 0
+  that = allocate(that, length)
+  for (var i = 0; i < length; i += 1) {
+    that[i] = array[i] & 255
+  }
+  return that
+}
+
+// Deserialize { type: 'Buffer', data: [1,2,3,...] } into a Buffer object.
+// Returns a zero-length buffer for inputs that don't conform to the spec.
+function fromJsonObject (that, object) {
+  var array
+  var length = 0
+
+  if (object.type === 'Buffer' && isArray(object.data)) {
+    array = object.data
+    length = checked(array.length) | 0
+  }
+  that = allocate(that, length)
+
+  for (var i = 0; i < length; i += 1) {
+    that[i] = array[i] & 255
+  }
+  return that
+}
+
+if (Buffer.TYPED_ARRAY_SUPPORT) {
+  Buffer.prototype.__proto__ = Uint8Array.prototype
+  Buffer.__proto__ = Uint8Array
+  if (typeof Symbol !== 'undefined' && Symbol.species &&
+      Buffer[Symbol.species] === Buffer) {
+    // Fix subarray() in ES2016. See: https://github.com/feross/buffer/pull/97
+    Object.defineProperty(Buffer, Symbol.species, {
+      value: null,
+      configurable: true
+    })
+  }
+} else {
+  // pre-set for values that may exist in the future
+  Buffer.prototype.length = undefined
+  Buffer.prototype.parent = undefined
+}
+
+function allocate (that, length) {
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    // Return an augmented `Uint8Array` instance, for best performance
+    that = new Uint8Array(length)
+    that.__proto__ = Buffer.prototype
+  } else {
+    // Fallback: Return an object instance of the Buffer class
+    that.length = length
+  }
+
+  var fromPool = length !== 0 && length <= Buffer.poolSize >>> 1
+  if (fromPool) that.parent = rootParent
+
+  return that
+}
+
+function checked (length) {
+  // Note: cannot use `length < kMaxLength` here because that fails when
+  // length is NaN (which is otherwise coerced to zero.)
+  if (length >= kMaxLength()) {
+    throw new RangeError('Attempt to allocate Buffer larger than maximum ' +
+                         'size: 0x' + kMaxLength().toString(16) + ' bytes')
+  }
+  return length | 0
+}
+
+function SlowBuffer (subject, encoding) {
+  if (!(this instanceof SlowBuffer)) return new SlowBuffer(subject, encoding)
+
+  var buf = new Buffer(subject, encoding)
+  delete buf.parent
+  return buf
+}
+
+Buffer.isBuffer = function isBuffer (b) {
+  return !!(b != null && b._isBuffer)
+}
+
+Buffer.compare = function compare (a, b) {
+  if (!Buffer.isBuffer(a) || !Buffer.isBuffer(b)) {
+    throw new TypeError('Arguments must be Buffers')
+  }
+
+  if (a === b) return 0
+
+  var x = a.length
+  var y = b.length
+
+  for (var i = 0, len = Math.min(x, y); i < len; ++i) {
+    if (a[i] !== b[i]) {
+      x = a[i]
+      y = b[i]
+      break
+    }
+  }
+
+  if (x < y) return -1
+  if (y < x) return 1
+  return 0
+}
+
+Buffer.isEncoding = function isEncoding (encoding) {
+  switch (String(encoding).toLowerCase()) {
+    case 'hex':
+    case 'utf8':
+    case 'utf-8':
+    case 'ascii':
+    case 'binary':
+    case 'base64':
+    case 'raw':
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      return true
+    default:
+      return false
+  }
+}
+
+Buffer.concat = function concat (list, length) {
+  if (!isArray(list)) throw new TypeError('list argument must be an Array of Buffers.')
+
+  if (list.length === 0) {
+    return new Buffer(0)
+  }
+
+  var i
+  if (length === undefined) {
+    length = 0
+    for (i = 0; i < list.length; i++) {
+      length += list[i].length
+    }
+  }
+
+  var buf = new Buffer(length)
+  var pos = 0
+  for (i = 0; i < list.length; i++) {
+    var item = list[i]
+    item.copy(buf, pos)
+    pos += item.length
+  }
+  return buf
+}
+
+function byteLength (string, encoding) {
+  if (typeof string !== 'string') string = '' + string
+
+  var len = string.length
+  if (len === 0) return 0
+
+  // Use a for loop to avoid recursion
+  var loweredCase = false
+  for (;;) {
+    switch (encoding) {
+      case 'ascii':
+      case 'binary':
+      // Deprecated
+      case 'raw':
+      case 'raws':
+        return len
+      case 'utf8':
+      case 'utf-8':
+        return utf8ToBytes(string).length
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return len * 2
+      case 'hex':
+        return len >>> 1
+      case 'base64':
+        return base64ToBytes(string).length
+      default:
+        if (loweredCase) return utf8ToBytes(string).length // assume utf8
+        encoding = ('' + encoding).toLowerCase()
+        loweredCase = true
+    }
+  }
+}
+Buffer.byteLength = byteLength
+
+function slowToString (encoding, start, end) {
+  var this$1 = this;
+
+  var loweredCase = false
+
+  start = start | 0
+  end = end === undefined || end === Infinity ? this.length : end | 0
+
+  if (!encoding) encoding = 'utf8'
+  if (start < 0) start = 0
+  if (end > this.length) end = this.length
+  if (end <= start) return ''
+
+  while (true) {
+    switch (encoding) {
+      case 'hex':
+        return hexSlice(this$1, start, end)
+
+      case 'utf8':
+      case 'utf-8':
+        return utf8Slice(this$1, start, end)
+
+      case 'ascii':
+        return asciiSlice(this$1, start, end)
+
+      case 'binary':
+        return binarySlice(this$1, start, end)
+
+      case 'base64':
+        return base64Slice(this$1, start, end)
+
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return utf16leSlice(this$1, start, end)
+
+      default:
+        if (loweredCase) throw new TypeError('Unknown encoding: ' + encoding)
+        encoding = (encoding + '').toLowerCase()
+        loweredCase = true
+    }
+  }
+}
+
+// The property is used by `Buffer.isBuffer` and `is-buffer` (in Safari 5-7) to detect
+// Buffer instances.
+Buffer.prototype._isBuffer = true
+
+Buffer.prototype.toString = function toString () {
+  var length = this.length | 0
+  if (length === 0) return ''
+  if (arguments.length === 0) return utf8Slice(this, 0, length)
+  return slowToString.apply(this, arguments)
+}
+
+Buffer.prototype.equals = function equals (b) {
+  if (!Buffer.isBuffer(b)) throw new TypeError('Argument must be a Buffer')
+  if (this === b) return true
+  return Buffer.compare(this, b) === 0
+}
+
+Buffer.prototype.inspect = function inspect () {
+  var str = ''
+  var max = exports.INSPECT_MAX_BYTES
+  if (this.length > 0) {
+    str = this.toString('hex', 0, max).match(/.{2}/g).join(' ')
+    if (this.length > max) str += ' ... '
+  }
+  return '<Buffer ' + str + '>'
+}
+
+Buffer.prototype.compare = function compare (b) {
+  if (!Buffer.isBuffer(b)) throw new TypeError('Argument must be a Buffer')
+  return Buffer.compare(this, b)
+}
+
+Buffer.prototype.indexOf = function indexOf (val, byteOffset) {
+  if (byteOffset > 0x7fffffff) byteOffset = 0x7fffffff
+  else if (byteOffset < -0x80000000) byteOffset = -0x80000000
+  byteOffset >>= 0
+
+  if (this.length === 0) return -1
+  if (byteOffset >= this.length) return -1
+
+  // Negative offsets start from the end of the buffer
+  if (byteOffset < 0) byteOffset = Math.max(this.length + byteOffset, 0)
+
+  if (typeof val === 'string') {
+    if (val.length === 0) return -1 // special case: looking for empty string always fails
+    return String.prototype.indexOf.call(this, val, byteOffset)
+  }
+  if (Buffer.isBuffer(val)) {
+    return arrayIndexOf(this, val, byteOffset)
+  }
+  if (typeof val === 'number') {
+    if (Buffer.TYPED_ARRAY_SUPPORT && Uint8Array.prototype.indexOf === 'function') {
+      return Uint8Array.prototype.indexOf.call(this, val, byteOffset)
+    }
+    return arrayIndexOf(this, [ val ], byteOffset)
+  }
+
+  function arrayIndexOf (arr, val, byteOffset) {
+    var foundIndex = -1
+    for (var i = 0; byteOffset + i < arr.length; i++) {
+      if (arr[byteOffset + i] === val[foundIndex === -1 ? 0 : i - foundIndex]) {
+        if (foundIndex === -1) foundIndex = i
+        if (i - foundIndex + 1 === val.length) return byteOffset + foundIndex
+      } else {
+        foundIndex = -1
+      }
+    }
+    return -1
+  }
+
+  throw new TypeError('val must be string, number or Buffer')
+}
+
+function hexWrite (buf, string, offset, length) {
+  offset = Number(offset) || 0
+  var remaining = buf.length - offset
+  if (!length) {
+    length = remaining
+  } else {
+    length = Number(length)
+    if (length > remaining) {
+      length = remaining
+    }
+  }
+
+  // must be an even number of digits
+  var strLen = string.length
+  if (strLen % 2 !== 0) throw new Error('Invalid hex string')
+
+  if (length > strLen / 2) {
+    length = strLen / 2
+  }
+  for (var i = 0; i < length; i++) {
+    var parsed = parseInt(string.substr(i * 2, 2), 16)
+    if (isNaN(parsed)) throw new Error('Invalid hex string')
+    buf[offset + i] = parsed
+  }
+  return i
+}
+
+function utf8Write (buf, string, offset, length) {
+  return blitBuffer(utf8ToBytes(string, buf.length - offset), buf, offset, length)
+}
+
+function asciiWrite (buf, string, offset, length) {
+  return blitBuffer(asciiToBytes(string), buf, offset, length)
+}
+
+function binaryWrite (buf, string, offset, length) {
+  return asciiWrite(buf, string, offset, length)
+}
+
+function base64Write (buf, string, offset, length) {
+  return blitBuffer(base64ToBytes(string), buf, offset, length)
+}
+
+function ucs2Write (buf, string, offset, length) {
+  return blitBuffer(utf16leToBytes(string, buf.length - offset), buf, offset, length)
+}
+
+Buffer.prototype.write = function write (string, offset, length, encoding) {
+  // Buffer#write(string)
+  var this$1 = this;
+
+  if (offset === undefined) {
+    encoding = 'utf8'
+    length = this.length
+    offset = 0
+  // Buffer#write(string, encoding)
+  } else if (length === undefined && typeof offset === 'string') {
+    encoding = offset
+    length = this.length
+    offset = 0
+  // Buffer#write(string, offset[, length][, encoding])
+  } else if (isFinite(offset)) {
+    offset = offset | 0
+    if (isFinite(length)) {
+      length = length | 0
+      if (encoding === undefined) encoding = 'utf8'
+    } else {
+      encoding = length
+      length = undefined
+    }
+  // legacy write(string, encoding, offset, length) - remove in v0.13
+  } else {
+    var swap = encoding
+    encoding = offset
+    offset = length | 0
+    length = swap
+  }
+
+  var remaining = this.length - offset
+  if (length === undefined || length > remaining) length = remaining
+
+  if ((string.length > 0 && (length < 0 || offset < 0)) || offset > this.length) {
+    throw new RangeError('attempt to write outside buffer bounds')
+  }
+
+  if (!encoding) encoding = 'utf8'
+
+  var loweredCase = false
+  for (;;) {
+    switch (encoding) {
+      case 'hex':
+        return hexWrite(this$1, string, offset, length)
+
+      case 'utf8':
+      case 'utf-8':
+        return utf8Write(this$1, string, offset, length)
+
+      case 'ascii':
+        return asciiWrite(this$1, string, offset, length)
+
+      case 'binary':
+        return binaryWrite(this$1, string, offset, length)
+
+      case 'base64':
+        // Warning: maxLength not taken into account in base64Write
+        return base64Write(this$1, string, offset, length)
+
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return ucs2Write(this$1, string, offset, length)
+
+      default:
+        if (loweredCase) throw new TypeError('Unknown encoding: ' + encoding)
+        encoding = ('' + encoding).toLowerCase()
+        loweredCase = true
+    }
+  }
+}
+
+Buffer.prototype.toJSON = function toJSON () {
+  return {
+    type: 'Buffer',
+    data: Array.prototype.slice.call(this._arr || this, 0)
+  }
+}
+
+function base64Slice (buf, start, end) {
+  if (start === 0 && end === buf.length) {
+    return base64.fromByteArray(buf)
+  } else {
+    return base64.fromByteArray(buf.slice(start, end))
+  }
+}
+
+function utf8Slice (buf, start, end) {
+  end = Math.min(buf.length, end)
+  var res = []
+
+  var i = start
+  while (i < end) {
+    var firstByte = buf[i]
+    var codePoint = null
+    var bytesPerSequence = (firstByte > 0xEF) ? 4
+      : (firstByte > 0xDF) ? 3
+      : (firstByte > 0xBF) ? 2
+      : 1
+
+    if (i + bytesPerSequence <= end) {
+      var secondByte, thirdByte, fourthByte, tempCodePoint
+
+      switch (bytesPerSequence) {
+        case 1:
+          if (firstByte < 0x80) {
+            codePoint = firstByte
+          }
+          break
+        case 2:
+          secondByte = buf[i + 1]
+          if ((secondByte & 0xC0) === 0x80) {
+            tempCodePoint = (firstByte & 0x1F) << 0x6 | (secondByte & 0x3F)
+            if (tempCodePoint > 0x7F) {
+              codePoint = tempCodePoint
+            }
+          }
+          break
+        case 3:
+          secondByte = buf[i + 1]
+          thirdByte = buf[i + 2]
+          if ((secondByte & 0xC0) === 0x80 && (thirdByte & 0xC0) === 0x80) {
+            tempCodePoint = (firstByte & 0xF) << 0xC | (secondByte & 0x3F) << 0x6 | (thirdByte & 0x3F)
+            if (tempCodePoint > 0x7FF && (tempCodePoint < 0xD800 || tempCodePoint > 0xDFFF)) {
+              codePoint = tempCodePoint
+            }
+          }
+          break
+        case 4:
+          secondByte = buf[i + 1]
+          thirdByte = buf[i + 2]
+          fourthByte = buf[i + 3]
+          if ((secondByte & 0xC0) === 0x80 && (thirdByte & 0xC0) === 0x80 && (fourthByte & 0xC0) === 0x80) {
+            tempCodePoint = (firstByte & 0xF) << 0x12 | (secondByte & 0x3F) << 0xC | (thirdByte & 0x3F) << 0x6 | (fourthByte & 0x3F)
+            if (tempCodePoint > 0xFFFF && tempCodePoint < 0x110000) {
+              codePoint = tempCodePoint
+            }
+          }
+      }
+    }
+
+    if (codePoint === null) {
+      // we did not generate a valid codePoint so insert a
+      // replacement char (U+FFFD) and advance only 1 byte
+      codePoint = 0xFFFD
+      bytesPerSequence = 1
+    } else if (codePoint > 0xFFFF) {
+      // encode to utf16 (surrogate pair dance)
+      codePoint -= 0x10000
+      res.push(codePoint >>> 10 & 0x3FF | 0xD800)
+      codePoint = 0xDC00 | codePoint & 0x3FF
+    }
+
+    res.push(codePoint)
+    i += bytesPerSequence
+  }
+
+  return decodeCodePointsArray(res)
+}
+
+// Based on http://stackoverflow.com/a/22747272/680742, the browser with
+// the lowest limit is Chrome, with 0x10000 args.
+// We go 1 magnitude less, for safety
+var MAX_ARGUMENTS_LENGTH = 0x1000
+
+function decodeCodePointsArray (codePoints) {
+  var len = codePoints.length
+  if (len <= MAX_ARGUMENTS_LENGTH) {
+    return String.fromCharCode.apply(String, codePoints) // avoid extra slice()
+  }
+
+  // Decode in chunks to avoid "call stack size exceeded".
+  var res = ''
+  var i = 0
+  while (i < len) {
+    res += String.fromCharCode.apply(
+      String,
+      codePoints.slice(i, i += MAX_ARGUMENTS_LENGTH)
+    )
+  }
+  return res
+}
+
+function asciiSlice (buf, start, end) {
+  var ret = ''
+  end = Math.min(buf.length, end)
+
+  for (var i = start; i < end; i++) {
+    ret += String.fromCharCode(buf[i] & 0x7F)
+  }
+  return ret
+}
+
+function binarySlice (buf, start, end) {
+  var ret = ''
+  end = Math.min(buf.length, end)
+
+  for (var i = start; i < end; i++) {
+    ret += String.fromCharCode(buf[i])
+  }
+  return ret
+}
+
+function hexSlice (buf, start, end) {
+  var len = buf.length
+
+  if (!start || start < 0) start = 0
+  if (!end || end < 0 || end > len) end = len
+
+  var out = ''
+  for (var i = start; i < end; i++) {
+    out += toHex(buf[i])
+  }
+  return out
+}
+
+function utf16leSlice (buf, start, end) {
+  var bytes = buf.slice(start, end)
+  var res = ''
+  for (var i = 0; i < bytes.length; i += 2) {
+    res += String.fromCharCode(bytes[i] + bytes[i + 1] * 256)
+  }
+  return res
+}
+
+Buffer.prototype.slice = function slice (start, end) {
+  var this$1 = this;
+
+  var len = this.length
+  start = ~~start
+  end = end === undefined ? len : ~~end
+
+  if (start < 0) {
+    start += len
+    if (start < 0) start = 0
+  } else if (start > len) {
+    start = len
+  }
+
+  if (end < 0) {
+    end += len
+    if (end < 0) end = 0
+  } else if (end > len) {
+    end = len
+  }
+
+  if (end < start) end = start
+
+  var newBuf
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    newBuf = this.subarray(start, end)
+    newBuf.__proto__ = Buffer.prototype
+  } else {
+    var sliceLen = end - start
+    newBuf = new Buffer(sliceLen, undefined)
+    for (var i = 0; i < sliceLen; i++) {
+      newBuf[i] = this$1[i + start]
+    }
+  }
+
+  if (newBuf.length) newBuf.parent = this.parent || this
+
+  return newBuf
+}
+
+/*
+ * Need to make sure that buffer isn't trying to write out of bounds.
+ */
+function checkOffset (offset, ext, length) {
+  if ((offset % 1) !== 0 || offset < 0) throw new RangeError('offset is not uint')
+  if (offset + ext > length) throw new RangeError('Trying to access beyond buffer length')
+}
+
+Buffer.prototype.readUIntLE = function readUIntLE (offset, byteLength, noAssert) {
+  var this$1 = this;
+
+  offset = offset | 0
+  byteLength = byteLength | 0
+  if (!noAssert) checkOffset(offset, byteLength, this.length)
+
+  var val = this[offset]
+  var mul = 1
+  var i = 0
+  while (++i < byteLength && (mul *= 0x100)) {
+    val += this$1[offset + i] * mul
+  }
+
+  return val
+}
+
+Buffer.prototype.readUIntBE = function readUIntBE (offset, byteLength, noAssert) {
+  var this$1 = this;
+
+  offset = offset | 0
+  byteLength = byteLength | 0
+  if (!noAssert) {
+    checkOffset(offset, byteLength, this.length)
+  }
+
+  var val = this[offset + --byteLength]
+  var mul = 1
+  while (byteLength > 0 && (mul *= 0x100)) {
+    val += this$1[offset + --byteLength] * mul
+  }
+
+  return val
+}
+
+Buffer.prototype.readUInt8 = function readUInt8 (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 1, this.length)
+  return this[offset]
+}
+
+Buffer.prototype.readUInt16LE = function readUInt16LE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 2, this.length)
+  return this[offset] | (this[offset + 1] << 8)
+}
+
+Buffer.prototype.readUInt16BE = function readUInt16BE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 2, this.length)
+  return (this[offset] << 8) | this[offset + 1]
+}
+
+Buffer.prototype.readUInt32LE = function readUInt32LE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 4, this.length)
+
+  return ((this[offset]) |
+      (this[offset + 1] << 8) |
+      (this[offset + 2] << 16)) +
+      (this[offset + 3] * 0x1000000)
+}
+
+Buffer.prototype.readUInt32BE = function readUInt32BE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 4, this.length)
+
+  return (this[offset] * 0x1000000) +
+    ((this[offset + 1] << 16) |
+    (this[offset + 2] << 8) |
+    this[offset + 3])
+}
+
+Buffer.prototype.readIntLE = function readIntLE (offset, byteLength, noAssert) {
+  var this$1 = this;
+
+  offset = offset | 0
+  byteLength = byteLength | 0
+  if (!noAssert) checkOffset(offset, byteLength, this.length)
+
+  var val = this[offset]
+  var mul = 1
+  var i = 0
+  while (++i < byteLength && (mul *= 0x100)) {
+    val += this$1[offset + i] * mul
+  }
+  mul *= 0x80
+
+  if (val >= mul) val -= Math.pow(2, 8 * byteLength)
+
+  return val
+}
+
+Buffer.prototype.readIntBE = function readIntBE (offset, byteLength, noAssert) {
+  var this$1 = this;
+
+  offset = offset | 0
+  byteLength = byteLength | 0
+  if (!noAssert) checkOffset(offset, byteLength, this.length)
+
+  var i = byteLength
+  var mul = 1
+  var val = this[offset + --i]
+  while (i > 0 && (mul *= 0x100)) {
+    val += this$1[offset + --i] * mul
+  }
+  mul *= 0x80
+
+  if (val >= mul) val -= Math.pow(2, 8 * byteLength)
+
+  return val
+}
+
+Buffer.prototype.readInt8 = function readInt8 (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 1, this.length)
+  if (!(this[offset] & 0x80)) return (this[offset])
+  return ((0xff - this[offset] + 1) * -1)
+}
+
+Buffer.prototype.readInt16LE = function readInt16LE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 2, this.length)
+  var val = this[offset] | (this[offset + 1] << 8)
+  return (val & 0x8000) ? val | 0xFFFF0000 : val
+}
+
+Buffer.prototype.readInt16BE = function readInt16BE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 2, this.length)
+  var val = this[offset + 1] | (this[offset] << 8)
+  return (val & 0x8000) ? val | 0xFFFF0000 : val
+}
+
+Buffer.prototype.readInt32LE = function readInt32LE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 4, this.length)
+
+  return (this[offset]) |
+    (this[offset + 1] << 8) |
+    (this[offset + 2] << 16) |
+    (this[offset + 3] << 24)
+}
+
+Buffer.prototype.readInt32BE = function readInt32BE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 4, this.length)
+
+  return (this[offset] << 24) |
+    (this[offset + 1] << 16) |
+    (this[offset + 2] << 8) |
+    (this[offset + 3])
+}
+
+Buffer.prototype.readFloatLE = function readFloatLE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 4, this.length)
+  return ieee754.read(this, offset, true, 23, 4)
+}
+
+Buffer.prototype.readFloatBE = function readFloatBE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 4, this.length)
+  return ieee754.read(this, offset, false, 23, 4)
+}
+
+Buffer.prototype.readDoubleLE = function readDoubleLE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 8, this.length)
+  return ieee754.read(this, offset, true, 52, 8)
+}
+
+Buffer.prototype.readDoubleBE = function readDoubleBE (offset, noAssert) {
+  if (!noAssert) checkOffset(offset, 8, this.length)
+  return ieee754.read(this, offset, false, 52, 8)
+}
+
+function checkInt (buf, value, offset, ext, max, min) {
+  if (!Buffer.isBuffer(buf)) throw new TypeError('buffer must be a Buffer instance')
+  if (value > max || value < min) throw new RangeError('value is out of bounds')
+  if (offset + ext > buf.length) throw new RangeError('index out of range')
+}
+
+Buffer.prototype.writeUIntLE = function writeUIntLE (value, offset, byteLength, noAssert) {
+  var this$1 = this;
+
+  value = +value
+  offset = offset | 0
+  byteLength = byteLength | 0
+  if (!noAssert) checkInt(this, value, offset, byteLength, Math.pow(2, 8 * byteLength), 0)
+
+  var mul = 1
+  var i = 0
+  this[offset] = value & 0xFF
+  while (++i < byteLength && (mul *= 0x100)) {
+    this$1[offset + i] = (value / mul) & 0xFF
+  }
+
+  return offset + byteLength
+}
+
+Buffer.prototype.writeUIntBE = function writeUIntBE (value, offset, byteLength, noAssert) {
+  var this$1 = this;
+
+  value = +value
+  offset = offset | 0
+  byteLength = byteLength | 0
+  if (!noAssert) checkInt(this, value, offset, byteLength, Math.pow(2, 8 * byteLength), 0)
+
+  var i = byteLength - 1
+  var mul = 1
+  this[offset + i] = value & 0xFF
+  while (--i >= 0 && (mul *= 0x100)) {
+    this$1[offset + i] = (value / mul) & 0xFF
+  }
+
+  return offset + byteLength
+}
+
+Buffer.prototype.writeUInt8 = function writeUInt8 (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 1, 0xff, 0)
+  if (!Buffer.TYPED_ARRAY_SUPPORT) value = Math.floor(value)
+  this[offset] = (value & 0xff)
+  return offset + 1
+}
+
+function objectWriteUInt16 (buf, value, offset, littleEndian) {
+  if (value < 0) value = 0xffff + value + 1
+  for (var i = 0, j = Math.min(buf.length - offset, 2); i < j; i++) {
+    buf[offset + i] = (value & (0xff << (8 * (littleEndian ? i : 1 - i)))) >>>
+      (littleEndian ? i : 1 - i) * 8
+  }
+}
+
+Buffer.prototype.writeUInt16LE = function writeUInt16LE (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 2, 0xffff, 0)
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    this[offset] = (value & 0xff)
+    this[offset + 1] = (value >>> 8)
+  } else {
+    objectWriteUInt16(this, value, offset, true)
+  }
+  return offset + 2
+}
+
+Buffer.prototype.writeUInt16BE = function writeUInt16BE (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 2, 0xffff, 0)
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    this[offset] = (value >>> 8)
+    this[offset + 1] = (value & 0xff)
+  } else {
+    objectWriteUInt16(this, value, offset, false)
+  }
+  return offset + 2
+}
+
+function objectWriteUInt32 (buf, value, offset, littleEndian) {
+  if (value < 0) value = 0xffffffff + value + 1
+  for (var i = 0, j = Math.min(buf.length - offset, 4); i < j; i++) {
+    buf[offset + i] = (value >>> (littleEndian ? i : 3 - i) * 8) & 0xff
+  }
+}
+
+Buffer.prototype.writeUInt32LE = function writeUInt32LE (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 4, 0xffffffff, 0)
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    this[offset + 3] = (value >>> 24)
+    this[offset + 2] = (value >>> 16)
+    this[offset + 1] = (value >>> 8)
+    this[offset] = (value & 0xff)
+  } else {
+    objectWriteUInt32(this, value, offset, true)
+  }
+  return offset + 4
+}
+
+Buffer.prototype.writeUInt32BE = function writeUInt32BE (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 4, 0xffffffff, 0)
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    this[offset] = (value >>> 24)
+    this[offset + 1] = (value >>> 16)
+    this[offset + 2] = (value >>> 8)
+    this[offset + 3] = (value & 0xff)
+  } else {
+    objectWriteUInt32(this, value, offset, false)
+  }
+  return offset + 4
+}
+
+Buffer.prototype.writeIntLE = function writeIntLE (value, offset, byteLength, noAssert) {
+  var this$1 = this;
+
+  value = +value
+  offset = offset | 0
+  if (!noAssert) {
+    var limit = Math.pow(2, 8 * byteLength - 1)
+
+    checkInt(this, value, offset, byteLength, limit - 1, -limit)
+  }
+
+  var i = 0
+  var mul = 1
+  var sub = value < 0 ? 1 : 0
+  this[offset] = value & 0xFF
+  while (++i < byteLength && (mul *= 0x100)) {
+    this$1[offset + i] = ((value / mul) >> 0) - sub & 0xFF
+  }
+
+  return offset + byteLength
+}
+
+Buffer.prototype.writeIntBE = function writeIntBE (value, offset, byteLength, noAssert) {
+  var this$1 = this;
+
+  value = +value
+  offset = offset | 0
+  if (!noAssert) {
+    var limit = Math.pow(2, 8 * byteLength - 1)
+
+    checkInt(this, value, offset, byteLength, limit - 1, -limit)
+  }
+
+  var i = byteLength - 1
+  var mul = 1
+  var sub = value < 0 ? 1 : 0
+  this[offset + i] = value & 0xFF
+  while (--i >= 0 && (mul *= 0x100)) {
+    this$1[offset + i] = ((value / mul) >> 0) - sub & 0xFF
+  }
+
+  return offset + byteLength
+}
+
+Buffer.prototype.writeInt8 = function writeInt8 (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 1, 0x7f, -0x80)
+  if (!Buffer.TYPED_ARRAY_SUPPORT) value = Math.floor(value)
+  if (value < 0) value = 0xff + value + 1
+  this[offset] = (value & 0xff)
+  return offset + 1
+}
+
+Buffer.prototype.writeInt16LE = function writeInt16LE (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 2, 0x7fff, -0x8000)
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    this[offset] = (value & 0xff)
+    this[offset + 1] = (value >>> 8)
+  } else {
+    objectWriteUInt16(this, value, offset, true)
+  }
+  return offset + 2
+}
+
+Buffer.prototype.writeInt16BE = function writeInt16BE (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 2, 0x7fff, -0x8000)
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    this[offset] = (value >>> 8)
+    this[offset + 1] = (value & 0xff)
+  } else {
+    objectWriteUInt16(this, value, offset, false)
+  }
+  return offset + 2
+}
+
+Buffer.prototype.writeInt32LE = function writeInt32LE (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 4, 0x7fffffff, -0x80000000)
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    this[offset] = (value & 0xff)
+    this[offset + 1] = (value >>> 8)
+    this[offset + 2] = (value >>> 16)
+    this[offset + 3] = (value >>> 24)
+  } else {
+    objectWriteUInt32(this, value, offset, true)
+  }
+  return offset + 4
+}
+
+Buffer.prototype.writeInt32BE = function writeInt32BE (value, offset, noAssert) {
+  value = +value
+  offset = offset | 0
+  if (!noAssert) checkInt(this, value, offset, 4, 0x7fffffff, -0x80000000)
+  if (value < 0) value = 0xffffffff + value + 1
+  if (Buffer.TYPED_ARRAY_SUPPORT) {
+    this[offset] = (value >>> 24)
+    this[offset + 1] = (value >>> 16)
+    this[offset + 2] = (value >>> 8)
+    this[offset + 3] = (value & 0xff)
+  } else {
+    objectWriteUInt32(this, value, offset, false)
+  }
+  return offset + 4
+}
+
+function checkIEEE754 (buf, value, offset, ext, max, min) {
+  if (offset + ext > buf.length) throw new RangeError('index out of range')
+  if (offset < 0) throw new RangeError('index out of range')
+}
+
+function writeFloat (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    checkIEEE754(buf, value, offset, 4, 3.4028234663852886e+38, -3.4028234663852886e+38)
+  }
+  ieee754.write(buf, value, offset, littleEndian, 23, 4)
+  return offset + 4
+}
+
+Buffer.prototype.writeFloatLE = function writeFloatLE (value, offset, noAssert) {
+  return writeFloat(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeFloatBE = function writeFloatBE (value, offset, noAssert) {
+  return writeFloat(this, value, offset, false, noAssert)
+}
+
+function writeDouble (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    checkIEEE754(buf, value, offset, 8, 1.7976931348623157E+308, -1.7976931348623157E+308)
+  }
+  ieee754.write(buf, value, offset, littleEndian, 52, 8)
+  return offset + 8
+}
+
+Buffer.prototype.writeDoubleLE = function writeDoubleLE (value, offset, noAssert) {
+  return writeDouble(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeDoubleBE = function writeDoubleBE (value, offset, noAssert) {
+  return writeDouble(this, value, offset, false, noAssert)
+}
+
+// copy(targetBuffer, targetStart=0, sourceStart=0, sourceEnd=buffer.length)
+Buffer.prototype.copy = function copy (target, targetStart, start, end) {
+  var this$1 = this;
+
+  if (!start) start = 0
+  if (!end && end !== 0) end = this.length
+  if (targetStart >= target.length) targetStart = target.length
+  if (!targetStart) targetStart = 0
+  if (end > 0 && end < start) end = start
+
+  // Copy 0 bytes; we're done
+  if (end === start) return 0
+  if (target.length === 0 || this.length === 0) return 0
+
+  // Fatal error conditions
+  if (targetStart < 0) {
+    throw new RangeError('targetStart out of bounds')
+  }
+  if (start < 0 || start >= this.length) throw new RangeError('sourceStart out of bounds')
+  if (end < 0) throw new RangeError('sourceEnd out of bounds')
+
+  // Are we oob?
+  if (end > this.length) end = this.length
+  if (target.length - targetStart < end - start) {
+    end = target.length - targetStart + start
+  }
+
+  var len = end - start
+  var i
+
+  if (this === target && start < targetStart && targetStart < end) {
+    // descending copy from end
+    for (i = len - 1; i >= 0; i--) {
+      target[i + targetStart] = this$1[i + start]
+    }
+  } else if (len < 1000 || !Buffer.TYPED_ARRAY_SUPPORT) {
+    // ascending copy from start
+    for (i = 0; i < len; i++) {
+      target[i + targetStart] = this$1[i + start]
+    }
+  } else {
+    Uint8Array.prototype.set.call(
+      target,
+      this.subarray(start, start + len),
+      targetStart
+    )
+  }
+
+  return len
+}
+
+// fill(value, start=0, end=buffer.length)
+Buffer.prototype.fill = function fill (value, start, end) {
+  var this$1 = this;
+
+  if (!value) value = 0
+  if (!start) start = 0
+  if (!end) end = this.length
+
+  if (end < start) throw new RangeError('end < start')
+
+  // Fill 0 bytes; we're done
+  if (end === start) return
+  if (this.length === 0) return
+
+  if (start < 0 || start >= this.length) throw new RangeError('start out of bounds')
+  if (end < 0 || end > this.length) throw new RangeError('end out of bounds')
+
+  var i
+  if (typeof value === 'number') {
+    for (i = start; i < end; i++) {
+      this$1[i] = value
+    }
+  } else {
+    var bytes = utf8ToBytes(value.toString())
+    var len = bytes.length
+    for (i = start; i < end; i++) {
+      this$1[i] = bytes[i % len]
+    }
+  }
+
+  return this
+}
+
+// HELPER FUNCTIONS
+// ================
+
+var INVALID_BASE64_RE = /[^+\/0-9A-Za-z-_]/g
+
+function base64clean (str) {
+  // Node strips out invalid characters like \n and \t from the string, base64-js does not
+  str = stringtrim(str).replace(INVALID_BASE64_RE, '')
+  // Node converts strings with length < 2 to ''
+  if (str.length < 2) return ''
+  // Node allows for non-padded base64 strings (missing trailing ===), base64-js does not
+  while (str.length % 4 !== 0) {
+    str = str + '='
+  }
+  return str
+}
+
+function stringtrim (str) {
+  if (str.trim) return str.trim()
+  return str.replace(/^\s+|\s+$/g, '')
+}
+
+function toHex (n) {
+  if (n < 16) return '0' + n.toString(16)
+  return n.toString(16)
+}
+
+function utf8ToBytes (string, units) {
+  units = units || Infinity
+  var codePoint
+  var length = string.length
+  var leadSurrogate = null
+  var bytes = []
+
+  for (var i = 0; i < length; i++) {
+    codePoint = string.charCodeAt(i)
+
+    // is surrogate component
+    if (codePoint > 0xD7FF && codePoint < 0xE000) {
+      // last char was a lead
+      if (!leadSurrogate) {
+        // no lead yet
+        if (codePoint > 0xDBFF) {
+          // unexpected trail
+          if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
+          continue
+        } else if (i + 1 === length) {
+          // unpaired lead
+          if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
+          continue
+        }
+
+        // valid lead
+        leadSurrogate = codePoint
+
+        continue
+      }
+
+      // 2 leads in a row
+      if (codePoint < 0xDC00) {
+        if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
+        leadSurrogate = codePoint
+        continue
+      }
+
+      // valid surrogate pair
+      codePoint = (leadSurrogate - 0xD800 << 10 | codePoint - 0xDC00) + 0x10000
+    } else if (leadSurrogate) {
+      // valid bmp char, but last char was a lead
+      if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
+    }
+
+    leadSurrogate = null
+
+    // encode utf8
+    if (codePoint < 0x80) {
+      if ((units -= 1) < 0) break
+      bytes.push(codePoint)
+    } else if (codePoint < 0x800) {
+      if ((units -= 2) < 0) break
+      bytes.push(
+        codePoint >> 0x6 | 0xC0,
+        codePoint & 0x3F | 0x80
+      )
+    } else if (codePoint < 0x10000) {
+      if ((units -= 3) < 0) break
+      bytes.push(
+        codePoint >> 0xC | 0xE0,
+        codePoint >> 0x6 & 0x3F | 0x80,
+        codePoint & 0x3F | 0x80
+      )
+    } else if (codePoint < 0x110000) {
+      if ((units -= 4) < 0) break
+      bytes.push(
+        codePoint >> 0x12 | 0xF0,
+        codePoint >> 0xC & 0x3F | 0x80,
+        codePoint >> 0x6 & 0x3F | 0x80,
+        codePoint & 0x3F | 0x80
+      )
+    } else {
+      throw new Error('Invalid code point')
+    }
+  }
+
+  return bytes
+}
+
+function asciiToBytes (str) {
+  var byteArray = []
+  for (var i = 0; i < str.length; i++) {
+    // Node's code seems to be doing this and not & 0x7F..
+    byteArray.push(str.charCodeAt(i) & 0xFF)
+  }
+  return byteArray
+}
+
+function utf16leToBytes (str, units) {
+  var c, hi, lo
+  var byteArray = []
+  for (var i = 0; i < str.length; i++) {
+    if ((units -= 2) < 0) break
+
+    c = str.charCodeAt(i)
+    hi = c >> 8
+    lo = c % 256
+    byteArray.push(lo)
+    byteArray.push(hi)
+  }
+
+  return byteArray
+}
+
+function base64ToBytes (str) {
+  return base64.toByteArray(base64clean(str))
+}
+
+function blitBuffer (src, dst, offset, length) {
+  for (var i = 0; i < length; i++) {
+    if ((i + offset >= dst.length) || (i >= src.length)) break
+    dst[i + offset] = src[i]
+  }
+  return i
+}
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"base64-js":2,"ieee754":6,"isarray":4}],4:[function(require,module,exports){
+var toString = {}.toString;
+
+module.exports = Array.isArray || function (arr) {
+  return toString.call(arr) == '[object Array]';
+};
+
+},{}],5:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -304,7 +1908,93 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],3:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
+exports.read = function (buffer, offset, isLE, mLen, nBytes) {
+  var e, m
+  var eLen = nBytes * 8 - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var nBits = -7
+  var i = isLE ? (nBytes - 1) : 0
+  var d = isLE ? -1 : 1
+  var s = buffer[offset + i]
+
+  i += d
+
+  e = s & ((1 << (-nBits)) - 1)
+  s >>= (-nBits)
+  nBits += eLen
+  for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+
+  m = e & ((1 << (-nBits)) - 1)
+  e >>= (-nBits)
+  nBits += mLen
+  for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+
+  if (e === 0) {
+    e = 1 - eBias
+  } else if (e === eMax) {
+    return m ? NaN : ((s ? -1 : 1) * Infinity)
+  } else {
+    m = m + Math.pow(2, mLen)
+    e = e - eBias
+  }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
+}
+
+exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
+  var e, m, c
+  var eLen = nBytes * 8 - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
+  var i = isLE ? 0 : (nBytes - 1)
+  var d = isLE ? 1 : -1
+  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0
+
+  value = Math.abs(value)
+
+  if (isNaN(value) || value === Infinity) {
+    m = isNaN(value) ? 1 : 0
+    e = eMax
+  } else {
+    e = Math.floor(Math.log(value) / Math.LN2)
+    if (value * (c = Math.pow(2, -e)) < 1) {
+      e--
+      c *= 2
+    }
+    if (e + eBias >= 1) {
+      value += rt / c
+    } else {
+      value += rt * Math.pow(2, 1 - eBias)
+    }
+    if (value * c >= 2) {
+      e++
+      c /= 2
+    }
+
+    if (e + eBias >= eMax) {
+      m = 0
+      e = eMax
+    } else if (e + eBias >= 1) {
+      m = (value * c - 1) * Math.pow(2, mLen)
+      e = e + eBias
+    } else {
+      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
+      e = 0
+    }
+  }
+
+  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
+
+  e = (e << mLen) | m
+  eLen += mLen
+  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
+
+  buffer[offset + i - d] |= s * 128
+}
+
+},{}],7:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -399,7 +2089,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],4:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -485,7 +2175,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],5:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -572,13 +2262,13 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],6:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":4,"./encode":5}],7:[function(require,module,exports){
+},{"./decode":8,"./encode":9}],11:[function(require,module,exports){
 /**
  * @module  gl-spectrum
  */
@@ -589,6 +2279,9 @@ var inherits = require('inherits');
 var lg = require('mumath/lg');
 var isBrowser = require('is-browser');
 var createGrid = require('plot-grid');
+var colormap = require('colormap');
+var flatten = require('array-flatten');
+var clamp = require('mumath/clamp');
 
 module.exports = Spectrum;
 
@@ -618,11 +2311,6 @@ function Spectrum (options) {
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
-		//setup frequencies texture
-		this.frequenciesTexture = createTexture(gl);
-		this.bindFrequencies(this.frequenciesTextureUnit);
-		this.setFrequencies(this.frequencies);
-
 		//setup kernel
 		var kernelLocation = gl.getUniformLocation(this.program, 'kernel[0]');
 		var kernelWeightLocation = gl.getUniformLocation(this.program, 'kernelWeight');
@@ -642,52 +2330,78 @@ function Spectrum (options) {
 		gl.uniform1f(maxDecibelsLocation, this.maxDecibels);
 		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
 		gl.uniform1f(sampleRateLocation, this.sampleRate);
+
+		//setup frequencies texture
+		this.bindTexture('frequencies', {
+			unit: this.frequenciesTextureUnit,
+			wrap: gl.CLAMP_TO_EDGE,
+			magFilter: gl.LINEAR,
+			minFilter: gl.LINEAR
+		});
+		this.setTexture('frequencies', {
+			data: this.frequencies,
+			format: gl.ALPHA
+		});
+		this.bindTexture({colormap: {
+			unit: this.colormapTextureUnit,
+			magFilter: gl.NEAREST,
+			minFilter: gl.NEAREST,
+			wrap: gl.CLAMP_TO_EDGE,
+		}});
+		this.setColormap(this.colormap);
 	}
 	else {
 
 	}
 
 	//setup grid
-	this.grid = createGrid({
-		container: this.container,
-		viewport: this.viewport,
-		lines: [{
-			min: this.minFrequency,
-			max: this.maxFrequency,
-			orientation: 'x',
-			logarithmic: this.logarithmic,
-			titles: function (value) {
-				return (value >= 1000 ? ((value / 1000).toFixed(0) + 'k') : value)+'Hz';
-			}
-		}, {
-			min: this.minDecibels,
-			max: this.maxDecibels,
-			orientation: 'y'
-		}, this.logarithmic ? {
-			min: this.minFrequency,
-			max: this.maxFrequency,
-			orientation: 'x',
-			logarithmic: this.logarithmic,
-			values: function (value) {
-				var str = value.toString();
-				if (str[0] !== '1') return null;
-				return value;
-			},
-			style: {
-				borderLeftStyle: 'solid'
-			}
-		} : null],
-		axes: this.gridAxes && [{
-			name: 'Frequency',
-			labels: function (value, i, opt) {
-				var str = value.toString();
-				if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
-				return opt.titles[i];
-			}
-		}, {
-			name: 'Magnitude'
-		}]
-	});
+	if (this.grid) {
+		this.grid = createGrid({
+			container: this.container,
+			viewport: this.viewport,
+			lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
+				min: this.minFrequency,
+				max: this.maxFrequency,
+				orientation: 'x',
+				logarithmic: this.logarithmic,
+				titles: function (value) {
+					return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
+				}
+			}, {
+				min: this.minDecibels,
+				max: this.maxDecibels,
+				orientation: 'y',
+				titles: function (value) {
+					return value.toLocaleString() + 'dB';
+				}
+			}, this.logarithmic ? {
+				min: this.minFrequency,
+				max: this.maxFrequency,
+				orientation: 'x',
+				logarithmic: this.logarithmic,
+				values: function (value) {
+					var str = value.toString();
+					if (str[0] !== '1') return null;
+					return value;
+				},
+				titles: null,
+				style: {
+					borderLeftStyle: 'solid',
+					pointerEvents: 'none'
+				}
+			} : null],
+			axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.gridAxes) && [{
+				name: 'Frequency',
+				labels: function (value, i, opt) {
+					var str = value.toString();
+					if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
+					return opt.titles[i];
+				}
+			}, {
+				name: 'Magnitude'
+			}]
+		});
+	};
 
 	this.on('resize', function (vp) { return this$1.grid.update({
 		viewport: vp
@@ -700,7 +2414,7 @@ inherits(Spectrum, Component);
 /**
  * Here we might have to do kernel averaging for some
  */
-Spectrum.prototype.frag = "\n\tprecision mediump float;\n\n\tuniform sampler2D frequencies;\n\tuniform vec4 viewport;\n\tuniform float kernel[5];\n\tuniform float kernelWeight;\n\tuniform int logarithmic;\n\tuniform float maxFrequency;\n\tuniform float minFrequency;\n\tuniform float maxDecibels;\n\tuniform float minDecibels;\n\tuniform float sampleRate;\n\n\tfloat frequency;\n\tfloat magnitude;\n\n\tconst float log10 = log(10.);\n\n\tfloat lg (float a) {\n\t\treturn log(a) / log10;\n\t}\n\n\t//TODO: make log light\n\n\tfloat logRatio (float ratio) {\n\t\tfloat frequency = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\t\treturn (frequency - minFrequency) / (maxFrequency - minFrequency);\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tfloat oneStep = 1. / viewport.z;\n\n\t\tif (logarithmic == 1) {\n\t\t\tcoord.x = logRatio(coord.x);\n\t\t\toneStep = logRatio(oneStep);\n\t\t}\n\n\t\t//map the whole freq range to visible range\n\t\tfloat halfRate = sampleRate * 0.5;\n\t\tfloat left = minFrequency / halfRate;\n\t\tfloat right = maxFrequency / halfRate;\n\t\tcoord.x = left + coord.x * (right - left);\n\n\t\t//weighted value of intensity\n\t\tmagnitude =\n\t\t\ttexture2D(frequencies, coord + oneStep * vec2(-2, 0)).w * kernel[0] +\n\t\t\ttexture2D(frequencies, coord + oneStep * vec2(-1, 0)).w * kernel[1] +\n\t\t\ttexture2D(frequencies, coord + oneStep * vec2( 0, 0)).w * kernel[2] +\n\t\t\ttexture2D(frequencies, coord + oneStep * vec2( 1, 0)).w * kernel[3] +\n\t\t\ttexture2D(frequencies, coord + oneStep * vec2( 2, 0)).w * kernel[4];\n\t\tmagnitude /= kernelWeight;\n\n\t\tfloat dist = (magnitude - coord.y) / magnitude;\n\t\tfloat intensity;\n\t\t// if (dist < 0.) {\n\t\t\t// intensity = 2. * exp(-4. * dist) - 1. * exp(-8. * dist);\n\t\t// \tintensity = (1. - dist) / sqrt(dist);\n\t\t// }\n\t\t// else {\n\t\t\tintensity = max(intensity, (1. - log(dist)) / 10.);\n\t\t// }\n\n\t\tgl_FragColor = vec4(vec3(intensity), 1);\n\n\t\t// gl_FragColor = vec4(vec3(magnitude*20.), 1);\n\t\t// gl_FragColor = vec4(vec3(1. - smoothstep(0.0, 0.04, dist)), 1);\n\t\t// gl_FragColor = vec4(vec3(coord.x), 1);\n\t\t// gl_FragColor = vec4( vec3( coord.y / 4. > intensity ? 1 : 0) , 1);\n\t}\n";
+Spectrum.prototype.frag = "\n\tprecision lowp float;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D colormap;\n\tuniform vec4 viewport;\n\tuniform float kernel[5];\n\tuniform float kernelWeight;\n\tuniform int logarithmic;\n\tuniform float maxFrequency;\n\tuniform float minFrequency;\n\tuniform float maxDecibels;\n\tuniform float minDecibels;\n\tuniform float sampleRate;\n\n\tfloat frequency;\n\n\t// varying float average;\n\t// varying float peak;\n\n\tconst float log10 = log(10.);\n\tconst float pi = " + (Math.PI) + ";\n\tconst float pi2 = " + (Math.PI*2) + ";\n\n\tfloat lg (float a) {\n\t\treturn log(a) / log10;\n\t}\n\n\t//return frequency coordinate from screen position\n\tfloat f (float ratio) {\n\t\tif (logarithmic == 1) {\n\t\t\tfloat frequency = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\t\t\tratio = (frequency - minFrequency) / (maxFrequency - minFrequency);\n\t\t}\n\n\t\t//map the freq range to visible range\n\t\tfloat halfRate = sampleRate * 0.5;\n\t\tfloat left = minFrequency / halfRate;\n\t\tfloat right = maxFrequency / halfRate;\n\n\t\tratio = left + ratio * (right - left);\n\n\t\treturn ratio;\n\t}\n\n\t//return [weighted] magnitude of [normalized] frequency\n\tfloat magnitude (float nf) {\n\t\tvec2 bin = vec2(1. / viewport.zw);\n\n\t\treturn texture2D(frequencies, vec2(f(nf), 0)).w;\n\n\t\treturn (\n\t\t\tkernel[0] * texture2D(frequencies, vec2(f(nf - 2. * bin.x), 0)).w +\n\t\t\tkernel[1] * texture2D(frequencies, vec2(f(nf - bin.x), 0)).w +\n\t\t\tkernel[2] * texture2D(frequencies, vec2(f(nf), 0)).w +\n\t\t\tkernel[3] * texture2D(frequencies, vec2(f(nf + bin.x), 0)).w +\n\t\t\tkernel[4] * texture2D(frequencies, vec2(f(nf + 2. * bin.x), 0)).w) / kernelWeight;\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tvec2 bin = vec2(1. / viewport.zw);\n\t\tfloat prevMag = magnitude(coord.x - bin.x);\n\t\tfloat currMag = magnitude(coord.x);\n\t\tfloat maxMag = max(currMag, prevMag);\n\t\tfloat minMag = min(currMag, prevMag);\n\n\t\tvec2 p2 = vec2(coord.x, currMag);\n\t\tvec2 p1 = vec2(coord.x - bin.x, prevMag);\n\n\t\tfloat dist = coord.y - currMag;\n\t\tfloat vertDist = abs(dist);\n\n\t\tfloat intensity = 0.;\n\t\tintensity += 1. - smoothstep(.0, .0032, vertDist);\n\t\tintensity += (1. - step(0., dist)) * (-.8*log(1. - coord.y) * .5 + coord.y * .5);\n\t\tintensity += step(coord.y, maxMag) * step(minMag, coord.y);\n\n\t\t// gl_FragColor = vec4(vec3(intensity), 1);\n\t\tgl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));\n\t}\n";
 
 
 //evenly distributed within indicated diapasone
@@ -715,53 +2429,84 @@ Spectrum.prototype.minDecibels = -100;
 Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
 
-Spectrum.prototype.smoothing = 0.2;
+Spectrum.prototype.smoothing = 0.5;
 
 Spectrum.prototype.grid = true;
+Spectrum.prototype.gridAxes = false;
 
 Spectrum.prototype.logarithmic = true;
 
+//TODO
 Spectrum.prototype.orientation = 'horizontal';
 
 //required to detect frequency resolution
 Spectrum.prototype.sampleRate = 44100;
 
+//colors to map spectrum against
+Spectrum.prototype.colormap = 'greys';
+Spectrum.prototype.colormapTextureUnit = 1;
 
-//TODO: line (with tail), bars,
-Spectrum.prototype.style = 'classic';
+//TODO bars, line, dots
+Spectrum.prototype.style = 'bars';
+
+//TODO implement shadow frequencies, like averaged/max values
+Spectrum.prototype.shadow;
+
 
 //5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [1, 2, 10, 2, 1];
+Spectrum.prototype.kernel = [2, 3, 4, 3, 2];
 
 
 /**
- * Set frequencies data
+ * Set frequencies texture taking into account smoothing
  */
 Spectrum.prototype.setFrequencies = function (frequencies) {
+	if (!frequencies) return this;
+	if (!this.frequencies) return this.setTexture('frequencies', {
+		data: frequencies,
+		format: gl.ALPHA
+	});
+
 	var gl = this.context;
 
-	var frequencies = frequencies || this.frequencies;
+	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
+	var shorter = bigger === frequencies ? this.frequencies : frequencies;
 
-	gl.activeTexture(gl.TEXTURE0);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, frequencies.length, 1, 0, gl.ALPHA, gl.FLOAT, frequencies);
+	var smoothing = bigger === this.frequencies ? this.smoothing : 1 - this.smoothing;
 
-	return this;
+	for (var i = 0; i < bigger.length; i++) {
+		bigger[i] = clamp(bigger[i] * smoothing + shorter[Math.floor(shorter.length * (i / bigger.length))] * (1 - smoothing), 0, 1);
+	}
+
+	return this.setTexture('frequencies', {
+		data: bigger,
+		format: gl.ALPHA
+	});
 };
 
+
 /**
- * Bind frequencies texture to a spot
+ * Reset colormap
  */
-Spectrum.prototype.bindFrequencies = function (unit) {
-	var gl = this.context;
-
-	this.frequenciesTextureUnit = unit == null ? this.frequenciesTextureUnit : unit;
-
-	var frequenciesLocation = gl.getUniformLocation(this.program, 'frequencies');
-	gl.useProgram(this.program);
-	gl.uniform1i(frequenciesLocation, this.frequenciesTextureUnit);
-
-	gl.activeTexture(gl.TEXTURE0 + this.frequenciesTextureUnit);
-	gl.bindTexture(gl.TEXTURE_2D, this.frequenciesTexture);
+Spectrum.prototype.setColormap = function (cm) {
+	//named colormap
+	if (typeof cm === 'string') {
+		this.colormap = new Float32Array(flatten(colormap({
+			colormap: cm,
+			nshades: 128,
+			format: 'rgba',
+			alpha: 1
+		})).map(function (v,i) { return !((i + 1) % 4) ? v : v/255; }));
+	}
+	//custom array
+	else {
+		this.colormap = new Float32Array(cm);
+	}
+	this.setTexture('colormap', {
+		data: this.colormap,
+		width: 128,
+		format: this.context.RGBA
+	});
 
 	return this;
 };
@@ -784,25 +2529,7 @@ Spectrum.prototype.render = function () {
 	return this;
 };
 
-
-
-
-//create texture
-function createTexture (gl) {
-	var texture = gl.createTexture();
-
-	gl.activeTexture(gl.TEXTURE0);
-
-	gl.bindTexture(gl.TEXTURE_2D, texture);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-
-	return texture;
-}
-
-},{"gl-component":20,"inherits":23,"is-browser":25,"mumath/lg":29,"plot-grid":35,"xtend/mutable":51}],8:[function(require,module,exports){
+},{"array-flatten":15,"colormap":22,"gl-component":30,"inherits":33,"is-browser":35,"mumath/clamp":38,"mumath/lg":40,"plot-grid":46,"xtend/mutable":62}],12:[function(require,module,exports){
 (function (process){
 'use strict';
 var ESC = '\u001b[';
@@ -912,13 +2639,13 @@ x.iTerm.setCwd = function (cwd) {
 };
 
 }).call(this,require('_process'))
-},{"_process":3}],9:[function(require,module,exports){
+},{"_process":7}],13:[function(require,module,exports){
 'use strict';
 module.exports = function () {
 	return /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
 };
 
-},{}],10:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 'use strict';
 
 function assembleStyles () {
@@ -985,7 +2712,306 @@ Object.defineProperty(module, 'exports', {
 	get: assembleStyles
 });
 
-},{}],11:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
+'use strict'
+
+/**
+ * Expose `arrayFlatten`.
+ */
+module.exports = flatten
+module.exports.from = flattenFrom
+module.exports.depth = flattenDepth
+module.exports.fromDepth = flattenFromDepth
+
+/**
+ * Flatten an array.
+ *
+ * @param  {Array} array
+ * @return {Array}
+ */
+function flatten (array) {
+  if (!Array.isArray(array)) {
+    throw new TypeError('Expected value to be an array')
+  }
+
+  return flattenFrom(array)
+}
+
+/**
+ * Flatten an array-like structure.
+ *
+ * @param  {Array} array
+ * @return {Array}
+ */
+function flattenFrom (array) {
+  return flattenDown(array, [], Infinity)
+}
+
+/**
+ * Flatten an array-like structure with depth.
+ *
+ * @param  {Array}  array
+ * @param  {number} depth
+ * @return {Array}
+ */
+function flattenDepth (array, depth) {
+  if (!Array.isArray(array)) {
+    throw new TypeError('Expected value to be an array')
+  }
+
+  return flattenFromDepth(array, depth)
+}
+
+/**
+ * Flatten an array-like structure with depth.
+ *
+ * @param  {Array}  array
+ * @param  {number} depth
+ * @return {Array}
+ */
+function flattenFromDepth (array, depth) {
+  if (typeof depth !== 'number') {
+    throw new TypeError('Expected the depth to be a number')
+  }
+
+  return flattenDownDepth(array, [], depth)
+}
+
+/**
+ * Flatten an array indefinitely.
+ *
+ * @param  {Array} array
+ * @param  {Array} result
+ * @return {Array}
+ */
+function flattenDown (array, result) {
+  for (var i = 0; i < array.length; i++) {
+    var value = array[i]
+
+    if (Array.isArray(value)) {
+      flattenDown(value, result)
+    } else {
+      result.push(value)
+    }
+  }
+
+  return result
+}
+
+/**
+ * Flatten an array with depth.
+ *
+ * @param  {Array}  array
+ * @param  {Array}  result
+ * @param  {number} depth
+ * @return {Array}
+ */
+function flattenDownDepth (array, result, depth) {
+  depth--
+
+  for (var i = 0; i < array.length; i++) {
+    var value = array[i]
+
+    if (depth > -1 && Array.isArray(value)) {
+      flattenDownDepth(value, result, depth)
+    } else {
+      result.push(value)
+    }
+  }
+
+  return result
+}
+
+},{}],16:[function(require,module,exports){
+'use strict';
+
+var arraytools  = function () {
+
+  var that = {};
+
+  var RGB_REGEX =  /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,.*)?\)$/;
+  var RGB_GROUP_REGEX = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,?\s*(.*)?\)$/;
+
+  function isPlainObject (v) {
+    return !Array.isArray(v) && v !== null && typeof v === 'object';
+  }
+
+  function linspace (start, end, num) {
+    var inc = (end - start) / Math.max(num - 1, 1);
+    var a = [];
+    for( var ii = 0; ii < num; ii++)
+      a.push(start + ii*inc);
+    return a;
+  }
+
+  function zip () {
+      var arrays = [].slice.call(arguments);
+      var lengths = arrays.map(function (a) {return a.length;});
+      var len = Math.min.apply(null, lengths);
+      var zipped = [];
+      for (var i = 0; i < len; i++) {
+          zipped[i] = [];
+          for (var j = 0; j < arrays.length; ++j) {
+              zipped[i][j] = arrays[j][i];
+          }
+      }
+      return zipped;
+  }
+
+  function zip3 (a, b, c) {
+      var len = Math.min.apply(null, [a.length, b.length, c.length]);
+      var result = [];
+      for (var n = 0; n < len; n++) {
+          result.push([a[n], b[n], c[n]]);
+      }
+      return result;
+  }
+
+  function sum (A) {
+    var acc = 0;
+    accumulate(A, acc);
+    function accumulate(x) {
+      for (var i = 0; i < x.length; i++) {
+        if (Array.isArray(x[i]))
+          accumulate(x[i], acc);
+        else
+          acc += x[i];
+      }
+    }
+    return acc;
+  }
+
+  function copy2D (arr) {
+    var carr = [];
+    for (var i = 0; i < arr.length; ++i) {
+      carr[i] = [];
+      for (var j = 0; j < arr[i].length; ++j) {
+        carr[i][j] = arr[i][j];
+      }
+    }
+
+    return carr;
+  }
+
+
+  function copy1D (arr) {
+    var carr = [];
+    for (var i = 0; i < arr.length; ++i) {
+      carr[i] = arr[i];
+    }
+
+    return carr;
+  }
+
+
+  function isEqual(arr1, arr2) {
+    if(arr1.length !== arr2.length)
+      return false;
+    for(var i = arr1.length; i--;) {
+      if(arr1[i] !== arr2[i])
+        return false;
+    }
+
+    return true;
+  }
+
+
+  function str2RgbArray(str, twoFiftySix) {
+    // convert hex or rbg strings to 0->1 or 0->255 rgb array
+    var rgb,
+        match;
+
+    if (typeof str !== 'string') return str;
+
+    rgb = [];
+    // hex notation
+    if (str[0] === '#') {
+      str = str.substr(1) // remove hash
+      if (str.length === 3) str += str // fff -> ffffff
+      match = parseInt(str, 16);
+      rgb[0] = ((match >> 16) & 255);
+      rgb[1] = ((match >> 8) & 255);
+      rgb[2] = (match & 255);
+    }
+
+    // rgb(34, 34, 127) or rgba(34, 34, 127, 0.1) notation
+    else if (RGB_REGEX.test(str)) {
+      match = str.match(RGB_GROUP_REGEX);
+      rgb[0] = parseInt(match[1]);
+      rgb[1] = parseInt(match[2]);
+      rgb[2] = parseInt(match[3]);
+    }
+
+    if (!twoFiftySix) {
+      for (var j=0; j<3; ++j) rgb[j] = rgb[j]/255
+    }
+
+
+    return rgb;
+  }
+
+
+  function str2RgbaArray(str, twoFiftySix) {
+    // convert hex or rbg strings to 0->1 or 0->255 rgb array
+    var rgb,
+        match;
+
+    if (typeof str !== 'string') return str;
+
+    rgb = [];
+    // hex notation
+    if (str[0] === '#') {
+      str = str.substr(1) // remove hash
+      if (str.length === 3) str += str // fff -> ffffff
+      match = parseInt(str, 16);
+      rgb[0] = ((match >> 16) & 255);
+      rgb[1] = ((match >> 8) & 255);
+      rgb[2] = (match & 255);
+    }
+
+    // rgb(34, 34, 127) or rgba(34, 34, 127, 0.1) notation
+    else if (RGB_REGEX.test(str)) {
+      match = str.match(RGB_GROUP_REGEX);
+      rgb[0] = parseInt(match[1]);
+      rgb[1] = parseInt(match[2]);
+      rgb[2] = parseInt(match[3]);
+      if (match[4]) rgb[3] = parseFloat(match[4]);
+      else rgb[3] = 1.0;
+    }
+
+
+
+    if (!twoFiftySix) {
+      for (var j=0; j<3; ++j) rgb[j] = rgb[j]/255
+    }
+
+
+    return rgb;
+  }
+
+
+
+
+
+  that.isPlainObject = isPlainObject;
+  that.linspace = linspace;
+  that.zip3 = zip3;
+  that.sum = sum;
+  that.zip = zip;
+  that.isEqual = isEqual;
+  that.copy2D = copy2D;
+  that.copy1D = copy1D;
+  that.str2RgbArray = str2RgbArray;
+  that.str2RgbaArray = str2RgbaArray;
+
+  return that
+
+}
+
+
+module.exports = arraytools();
+
+},{}],17:[function(require,module,exports){
 var size = require('element-size')
 
 module.exports = fit
@@ -1035,7 +3061,7 @@ function fit(canvas, parent, scale) {
   }
 }
 
-},{"element-size":15}],12:[function(require,module,exports){
+},{"element-size":24}],18:[function(require,module,exports){
 (function (process){
 'use strict';
 var escapeStringRegexp = require('escape-string-regexp');
@@ -1155,7 +3181,7 @@ module.exports.stripColor = stripAnsi;
 module.exports.supportsColor = supportsColor;
 
 }).call(this,require('_process'))
-},{"_process":3,"ansi-styles":10,"escape-string-regexp":16,"has-ansi":22,"strip-ansi":43,"supports-color":44}],13:[function(require,module,exports){
+},{"_process":7,"ansi-styles":14,"escape-string-regexp":25,"has-ansi":32,"strip-ansi":54,"supports-color":55}],19:[function(require,module,exports){
 (function (process){
 'use strict';
 var restoreCursor = require('restore-cursor');
@@ -1185,7 +3211,310 @@ exports.toggle = function (force) {
 };
 
 }).call(this,require('_process'))
-},{"_process":3,"restore-cursor":38}],14:[function(require,module,exports){
+},{"_process":7,"restore-cursor":49}],20:[function(require,module,exports){
+(function (Buffer){
+var clone = (function() {
+'use strict';
+
+/**
+ * Clones (copies) an Object using deep copying.
+ *
+ * This function supports circular references by default, but if you are certain
+ * there are no circular references in your object, you can save some CPU time
+ * by calling clone(obj, false).
+ *
+ * Caution: if `circular` is false and `parent` contains circular references,
+ * your program may enter an infinite loop and crash.
+ *
+ * @param `parent` - the object to be cloned
+ * @param `circular` - set to true if the object to be cloned may contain
+ *    circular references. (optional - true by default)
+ * @param `depth` - set to a number if the object is only to be cloned to
+ *    a particular depth. (optional - defaults to Infinity)
+ * @param `prototype` - sets the prototype to be used when cloning an object.
+ *    (optional - defaults to parent prototype).
+*/
+function clone(parent, circular, depth, prototype) {
+  var filter;
+  if (typeof circular === 'object') {
+    depth = circular.depth;
+    prototype = circular.prototype;
+    filter = circular.filter;
+    circular = circular.circular
+  }
+  // maintain two arrays for circular references, where corresponding parents
+  // and children have the same index
+  var allParents = [];
+  var allChildren = [];
+
+  var useBuffer = typeof Buffer != 'undefined';
+
+  if (typeof circular == 'undefined')
+    circular = true;
+
+  if (typeof depth == 'undefined')
+    depth = Infinity;
+
+  // recurse this function so we don't reset allParents and allChildren
+  function _clone(parent, depth) {
+    // cloning null always returns null
+    if (parent === null)
+      return null;
+
+    if (depth == 0)
+      return parent;
+
+    var child;
+    var proto;
+    if (typeof parent != 'object') {
+      return parent;
+    }
+
+    if (clone.__isArray(parent)) {
+      child = [];
+    } else if (clone.__isRegExp(parent)) {
+      child = new RegExp(parent.source, __getRegExpFlags(parent));
+      if (parent.lastIndex) child.lastIndex = parent.lastIndex;
+    } else if (clone.__isDate(parent)) {
+      child = new Date(parent.getTime());
+    } else if (useBuffer && Buffer.isBuffer(parent)) {
+      child = new Buffer(parent.length);
+      parent.copy(child);
+      return child;
+    } else {
+      if (typeof prototype == 'undefined') {
+        proto = Object.getPrototypeOf(parent);
+        child = Object.create(proto);
+      }
+      else {
+        child = Object.create(prototype);
+        proto = prototype;
+      }
+    }
+
+    if (circular) {
+      var index = allParents.indexOf(parent);
+
+      if (index != -1) {
+        return allChildren[index];
+      }
+      allParents.push(parent);
+      allChildren.push(child);
+    }
+
+    for (var i in parent) {
+      var attrs;
+      if (proto) {
+        attrs = Object.getOwnPropertyDescriptor(proto, i);
+      }
+
+      if (attrs && attrs.set == null) {
+        continue;
+      }
+      child[i] = _clone(parent[i], depth - 1);
+    }
+
+    return child;
+  }
+
+  return _clone(parent, depth);
+}
+
+/**
+ * Simple flat clone using prototype, accepts only objects, usefull for property
+ * override on FLAT configuration object (no nested props).
+ *
+ * USE WITH CAUTION! This may not behave as you wish if you do not know how this
+ * works.
+ */
+clone.clonePrototype = function clonePrototype(parent) {
+  if (parent === null)
+    return null;
+
+  var c = function () {};
+  c.prototype = parent;
+  return new c();
+};
+
+// private utility functions
+
+function __objToStr(o) {
+  return Object.prototype.toString.call(o);
+};
+clone.__objToStr = __objToStr;
+
+function __isDate(o) {
+  return typeof o === 'object' && __objToStr(o) === '[object Date]';
+};
+clone.__isDate = __isDate;
+
+function __isArray(o) {
+  return typeof o === 'object' && __objToStr(o) === '[object Array]';
+};
+clone.__isArray = __isArray;
+
+function __isRegExp(o) {
+  return typeof o === 'object' && __objToStr(o) === '[object RegExp]';
+};
+clone.__isRegExp = __isRegExp;
+
+function __getRegExpFlags(re) {
+  var flags = '';
+  if (re.global) flags += 'g';
+  if (re.ignoreCase) flags += 'i';
+  if (re.multiline) flags += 'm';
+  return flags;
+};
+clone.__getRegExpFlags = __getRegExpFlags;
+
+return clone;
+})();
+
+if (typeof module === 'object' && module.exports) {
+  module.exports = clone;
+}
+
+}).call(this,require("buffer").Buffer)
+},{"buffer":3}],21:[function(require,module,exports){
+module.exports={"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],"hsv":[{"index":0,"rgb":[255,0,0]},{"index":0.169,"rgb":[253,255,2]},{"index":0.173,"rgb":[247,255,2]},{"index":0.337,"rgb":[0,252,4]},{"index":0.341,"rgb":[0,252,10]},{"index":0.506,"rgb":[1,249,255]},{"index":0.671,"rgb":[2,0,253]},{"index":0.675,"rgb":[8,0,253]},{"index":0.839,"rgb":[255,0,251]},{"index":0.843,"rgb":[255,0,245]},{"index":1,"rgb":[255,0,6]}],"hot":[{"index":0,"rgb":[0,0,0]},{"index":0.3,"rgb":[230,0,0]},{"index":0.6,"rgb":[255,210,0]},{"index":1,"rgb":[255,255,255]}],"cool":[{"index":0,"rgb":[0,255,255]},{"index":1,"rgb":[255,0,255]}],"spring":[{"index":0,"rgb":[255,0,255]},{"index":1,"rgb":[255,255,0]}],"summer":[{"index":0,"rgb":[0,128,102]},{"index":1,"rgb":[255,255,102]}],"autumn":[{"index":0,"rgb":[255,0,0]},{"index":1,"rgb":[255,255,0]}],"winter":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[0,255,128]}],"bone":[{"index":0,"rgb":[0,0,0]},{"index":0.376,"rgb":[84,84,116]},{"index":0.753,"rgb":[169,200,200]},{"index":1,"rgb":[255,255,255]}],"copper":[{"index":0,"rgb":[0,0,0]},{"index":0.804,"rgb":[255,160,102]},{"index":1,"rgb":[255,199,127]}],"greys":[{"index":0,"rgb":[0,0,0]},{"index":1,"rgb":[255,255,255]}],"yignbu":[{"index":0,"rgb":[8,29,88]},{"index":0.125,"rgb":[37,52,148]},{"index":0.25,"rgb":[34,94,168]},{"index":0.375,"rgb":[29,145,192]},{"index":0.5,"rgb":[65,182,196]},{"index":0.625,"rgb":[127,205,187]},{"index":0.75,"rgb":[199,233,180]},{"index":0.875,"rgb":[237,248,217]},{"index":1,"rgb":[255,255,217]}],"greens":[{"index":0,"rgb":[0,68,27]},{"index":0.125,"rgb":[0,109,44]},{"index":0.25,"rgb":[35,139,69]},{"index":0.375,"rgb":[65,171,93]},{"index":0.5,"rgb":[116,196,118]},{"index":0.625,"rgb":[161,217,155]},{"index":0.75,"rgb":[199,233,192]},{"index":0.875,"rgb":[229,245,224]},{"index":1,"rgb":[247,252,245]}],"yiorrd":[{"index":0,"rgb":[128,0,38]},{"index":0.125,"rgb":[189,0,38]},{"index":0.25,"rgb":[227,26,28]},{"index":0.375,"rgb":[252,78,42]},{"index":0.5,"rgb":[253,141,60]},{"index":0.625,"rgb":[254,178,76]},{"index":0.75,"rgb":[254,217,118]},{"index":0.875,"rgb":[255,237,160]},{"index":1,"rgb":[255,255,204]}],"bluered":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[255,0,0]}],"rdbu":[{"index":0,"rgb":[5,10,172]},{"index":0.35,"rgb":[106,137,247]},{"index":0.5,"rgb":[190,190,190]},{"index":0.6,"rgb":[220,170,132]},{"index":0.7,"rgb":[230,145,90]},{"index":1,"rgb":[178,10,28]}],"picnic":[{"index":0,"rgb":[0,0,255]},{"index":0.1,"rgb":[51,153,255]},{"index":0.2,"rgb":[102,204,255]},{"index":0.3,"rgb":[153,204,255]},{"index":0.4,"rgb":[204,204,255]},{"index":0.5,"rgb":[255,255,255]},{"index":0.6,"rgb":[255,204,255]},{"index":0.7,"rgb":[255,153,255]},{"index":0.8,"rgb":[255,102,204]},{"index":0.9,"rgb":[255,102,102]},{"index":1,"rgb":[255,0,0]}],"rainbow":[{"index":0,"rgb":[150,0,90]},{"index":0.125,"rgb":[0,0,200]},{"index":0.25,"rgb":[0,25,255]},{"index":0.375,"rgb":[0,152,255]},{"index":0.5,"rgb":[44,255,150]},{"index":0.625,"rgb":[151,255,0]},{"index":0.75,"rgb":[255,234,0]},{"index":0.875,"rgb":[255,111,0]},{"index":1,"rgb":[255,0,0]}],"portland":[{"index":0,"rgb":[12,51,131]},{"index":0.25,"rgb":[10,136,186]},{"index":0.5,"rgb":[242,211,56]},{"index":0.75,"rgb":[242,143,56]},{"index":1,"rgb":[217,30,30]}],"blackbody":[{"index":0,"rgb":[0,0,0]},{"index":0.2,"rgb":[230,0,0]},{"index":0.4,"rgb":[230,210,0]},{"index":0.7,"rgb":[255,255,255]},{"index":1,"rgb":[160,200,255]}],"earth":[{"index":0,"rgb":[0,0,130]},{"index":0.1,"rgb":[0,180,180]},{"index":0.2,"rgb":[40,210,40]},{"index":0.4,"rgb":[230,230,50]},{"index":0.6,"rgb":[120,70,20]},{"index":1,"rgb":[255,255,255]}],"electric":[{"index":0,"rgb":[0,0,0]},{"index":0.15,"rgb":[30,0,100]},{"index":0.4,"rgb":[120,0,100]},{"index":0.6,"rgb":[160,90,0]},{"index":0.8,"rgb":[230,200,0]},{"index":1,"rgb":[255,250,220]}], "alpha": [{"index":0, "rgb": [255,255,255,0]},{"index":0, "rgb": [255,255,255,1]}]};
+
+},{}],22:[function(require,module,exports){
+/*
+ * Ben Postlethwaite
+ * January 2013
+ * License MIT
+ */
+'use strict';
+
+var at = require('arraytools');
+var clone = require('clone');
+var colorScale = require('./colorScales');
+
+module.exports = function (spec) {
+
+    /*
+     * Default Options
+     */
+    var indicies, rgba, fromrgba, torgba,
+        nsteps, cmap, colormap, format,
+        nshades, colors, alpha, index, i,
+        r = [],
+        g = [],
+        b = [],
+        a = [];
+
+    if ( !at.isPlainObject(spec) ) spec = {};
+
+    nshades = spec.nshades || 72;
+    format = spec.format || 'hex';
+
+    colormap = spec.colormap;
+    if (!colormap) colormap = 'jet';
+
+    if (typeof colormap === 'string') {
+        colormap = colormap.toLowerCase();
+
+        if (!colorScale[colormap]) {
+            throw Error(colormap + ' not a supported colorscale');
+        }
+
+        cmap = clone(colorScale[colormap]);
+
+    } else if (Array.isArray(colormap)) {
+        cmap = clone(colormap);
+
+    } else {
+        throw Error('unsupported colormap option', colormap);
+    }
+
+    if (cmap.length > nshades) {
+        throw new Error(
+            colormap+' map requires nshades to be at least size '+cmap.length
+        );
+    }
+
+    if (!Array.isArray(spec.alpha)) {
+
+        if (typeof spec.alpha === 'number') {
+            alpha = [spec.alpha, spec.alpha];
+
+        } else {
+            alpha = [1, 1];
+        }
+
+    } else if (spec.alpha.length !== 2) {
+        alpha = [1, 1];
+
+    } else {
+        alpha = clone(spec.alpha);
+    }
+
+    /*
+     * map index points from 0->1 to 0 -> n-1
+     */
+    indicies = cmap.map(function(c) {
+        return Math.round(c.index * nshades);
+    });
+
+    /*
+     * Add alpha channel to the map
+     */
+    if (alpha[0] < 0) alpha[0] = 0;
+    if (alpha[1] < 0) alpha[0] = 0;
+    if (alpha[0] > 1) alpha[0] = 1;
+    if (alpha[1] > 1) alpha[0] = 1;
+
+    for (i = 0; i < indicies.length; ++i) {
+        index = cmap[i].index;
+        rgba = cmap[i].rgb;
+
+        // if user supplies their own map use it
+        if (rgba.length === 4 && rgba[3] >= 0 && rgba[3] <= 1) continue;
+        rgba[3] = alpha[0] + (alpha[1] - alpha[0])*index;
+    }
+
+    /*
+     * map increasing linear values between indicies to
+     * linear steps in colorvalues
+     */
+    for (i = 0; i < indicies.length-1; ++i) {
+        nsteps = indicies[i+1] - indicies[i];
+        fromrgba = cmap[i].rgb;
+        torgba = cmap[i+1].rgb;
+        r = r.concat(at.linspace(fromrgba[0], torgba[0], nsteps ) );
+        g = g.concat(at.linspace(fromrgba[1], torgba[1], nsteps ) );
+        b = b.concat(at.linspace(fromrgba[2], torgba[2], nsteps ) );
+        a = a.concat(at.linspace(fromrgba[3], torgba[3], nsteps ) );
+    }
+
+    r = r.map( Math.round );
+    g = g.map( Math.round );
+    b = b.map( Math.round );
+
+    colors = at.zip(r, g, b, a);
+
+    if (format === 'hex') colors = colors.map( rgb2hex );
+    if (format === 'rgbaString') colors = colors.map( rgbaStr );
+
+    return colors;
+};
+
+
+function rgb2hex (rgba) {
+    var dig, hex = '#';
+    for (var i = 0; i < 3; ++i) {
+        dig = rgba[i];
+        dig = dig.toString(16);
+        hex += ('00' + dig).substr( dig.length );
+    }
+    return hex;
+}
+
+function rgbaStr (rgba) {
+    return 'rgba(' + rgba.join(',') + ')';
+}
+
+},{"./colorScales":21,"arraytools":16,"clone":20}],23:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -1204,7 +3533,7 @@ module.exports = function () {
 module.exports.frames = frames;
 
 }).call(this,require('_process'))
-},{"_process":3}],15:[function(require,module,exports){
+},{"_process":7}],24:[function(require,module,exports){
 module.exports = getSize
 
 function getSize(element) {
@@ -1240,7 +3569,7 @@ function parse(prop) {
   return parseFloat(prop) || 0
 }
 
-},{}],16:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 'use strict';
 
 var matchOperatorsRe = /[|\\{}()[\]^$+*?.]/g;
@@ -1253,7 +3582,7 @@ module.exports = function (str) {
 	return str.replace(matchOperatorsRe, '\\$&');
 };
 
-},{}],17:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -1287,7 +3616,7 @@ module.exports = function (cb) {
 };
 
 }).call(this,require('_process'))
-},{"_process":3}],18:[function(require,module,exports){
+},{"_process":7}],27:[function(require,module,exports){
 /**
  * Real values fourier transform.
  *
@@ -1511,7 +3840,7 @@ function reverseBinPermute (N, dest, source) {
 
 	dest[nm1] = source[nm1];
 };
-},{}],19:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 module.exports = getCanvasContext
 function getCanvasContext (type, opts) {
   if (typeof type !== 'string') {
@@ -1549,7 +3878,14 @@ function getCanvasContext (type, opts) {
   return (gl || null) // ensure null on fail
 }
 
-},{}],20:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
+/** generate unique id for selector */
+var counter = Date.now() % 1e9;
+
+module.exports = function getUid(){
+	return (Math.random() * 1e9 >>> 0) + (counter++);
+};
+},{}],30:[function(require,module,exports){
 /**
  * @module  gl-spectrum
  */
@@ -1610,11 +3946,12 @@ function Component (options) {
 	if (!this.is2d) {
 		var gl = this.gl = this.context;
 
-		//TODO: find a place for user to init textures extensions
-		// var float = gl.getExtension('OES_texture_float');
-		// if (!float) throw Error('WebGL does not support floats.');
-		// var floatLinear = gl.getExtension('OES_texture_float_linear');
-		// if (!floatLinear) throw Error('WebGL does not support floats.');
+		if (this.float) {
+			var float = gl.getExtension('OES_texture_float');
+			if (!float) throw Error('WebGL does not support floats.');
+			var floatLinear = gl.getExtension('OES_texture_float_linear');
+			if (!floatLinear) throw Error('WebGL does not support floats.');
+		}
 
 		this.program = createProgram(gl, this.vert, this.frag);
 
@@ -1660,6 +3997,83 @@ Component.prototype.vert = "\n\tattribute vec2 position;\n\tvoid main () {\n\t\t
 
 
 Component.prototype.frag = "\n\tprecision mediump float;\n\tuniform vec4 viewport;\n\tvoid main () {\n\t\tgl_FragColor = vec4(gl_FragCoord.xy / viewport.zw, 1, 1);\n\t}\n";
+
+
+//enable floating-point textures
+Component.prototype.float = true;
+
+
+/**
+ * Bind texture unit
+ */
+Component.prototype.bindTexture = function (a, b) {
+	if (arguments.length === 2) {
+		var opts = {};
+		opts[a] = b;
+	}
+	else {
+		var opts = a || {};
+	}
+
+	var gl = this.context;
+
+	for (var name in opts) {
+		var texture = this[name + 'Texture'] = gl.createTexture();
+		var textureUnit = this[name + 'TextureUnit'] = opts[name].unit != null ? opts[name].unit : opts[name];
+
+		gl.useProgram(this.program);
+		var textureLocation = gl.getUniformLocation(this.program, name);
+
+		gl.activeTexture(gl.TEXTURE0 + textureUnit);
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+
+		var wrapS = opts[name].wrap && opts[name].wrap[0] || opts[name].wrapS || opts[name].wrap || gl.REPEAT;
+		var wrapT = opts[name].wrap && opts[name].wrap[1] || opts[name].wrapT || opts[name].wrap || gl.REPEAT;
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
+
+		var minFilter = opts[name].minFilter || gl.NEAREST;
+		var magFilter = opts[name].magFilter || gl.NEAREST;
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+
+		gl.uniform1i(textureLocation, textureUnit);
+	}
+
+	return this;
+};
+
+
+/**
+ * Set texture’s data
+ */
+Component.prototype.setTexture = function (a, b) {
+	if (arguments.length === 2) {
+		var opts = {};
+		opts[a] = b;
+	}
+	else {
+		var opts = a || {};
+	}
+
+	var gl = this.context;
+	for (var name in opts) {
+		var arr = opts[name] && opts[name].data || opts[name] || [];
+		var data = new Float32Array(arr);
+
+		var width = opts[name].width || opts[name].shape && opts[name].shape[0] || (opts[name].format === gl.ALPHA ? data.length : data.length / 4);
+		var height = opts[name].height || opts[name].shape && opts[name].shape[1] || 1;
+		var type = opts[name].type || (this.float ? gl.FLOAT : gl.UNSIGNED_BYTE);
+
+		var format = opts[name].format || (width * height === data.length ? gl.ALPHA : width * height * 3 === data.length ? gl.RGB : width * height * 4 === data.length ? gl.RGBA : gl.LUMINANCE);
+
+		gl.activeTexture(gl.TEXTURE0 + this[name + 'TextureUnit']);
+		gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, type, data);
+	}
+
+	return this;
+};
+
 
 /**
  * Do resize routine
@@ -1717,21 +4131,6 @@ Component.prototype.render = function () {
 };
 
 
-//create texture
-function createTexture (gl) {
-	var texture = gl.createTexture();
-
-	gl.activeTexture(gl.TEXTURE0);
-
-	gl.bindTexture(gl.TEXTURE_2D, texture);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-
-	return texture;
-}
-
 //create program (2 shaders)
 function createProgram (gl, vSrc, fSrc) {
 	var fShader = gl.createShader(gl.FRAGMENT_SHADER);
@@ -1767,7 +4166,7 @@ function createProgram (gl, vSrc, fSrc) {
 	return program;
 }
 
-},{"canvas-fit":11,"events":2,"get-canvas-context":19,"inherits":23,"is-browser":25,"raf-loop":36,"xtend/mutable":51}],21:[function(require,module,exports){
+},{"canvas-fit":17,"events":5,"get-canvas-context":28,"inherits":33,"is-browser":35,"raf-loop":47,"xtend/mutable":62}],31:[function(require,module,exports){
 module.exports = asString
 module.exports.add = append
 
@@ -1807,13 +4206,13 @@ function makeArray(arr) {
   return Array.isArray(arr) ? arr : [arr]
 }
 
-},{}],22:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 'use strict';
 var ansiRegex = require('ansi-regex');
 var re = new RegExp(ansiRegex().source); // remove the `g` flag
 module.exports = re.test.bind(re);
 
-},{"ansi-regex":9}],23:[function(require,module,exports){
+},{"ansi-regex":13}],33:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -1838,7 +4237,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],24:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -1862,9 +4261,9 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],25:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 module.exports = true;
-},{}],26:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 (function (process){
 'use strict';
 var ansiEscapes = require('ansi-escapes');
@@ -1898,7 +4297,7 @@ module.exports.stderr = main(process.stderr);
 module.exports.create = main;
 
 }).call(this,require('_process'))
-},{"_process":3,"ansi-escapes":8,"cli-cursor":13}],27:[function(require,module,exports){
+},{"_process":7,"ansi-escapes":12,"cli-cursor":19}],37:[function(require,module,exports){
 
 /**
  * Expose `render()`.`
@@ -2049,7 +4448,22 @@ function escape(html) {
     .replace(/>/g, '&gt;');
 }
 
-},{}],28:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
+/**
+ * Clamp value.
+ * Detects proper clamp min/max.
+ *
+ * @param {number} a Current value to cut off
+ * @param {number} min One side limit
+ * @param {number} max Other side limit
+ *
+ * @return {number} Clamped value
+ */
+
+module.exports = require('./wrap')(function(a, min, max){
+	return max > min ? Math.max(Math.min(a,max),min) : Math.max(Math.min(a,min),max);
+});
+},{"./wrap":43}],39:[function(require,module,exports){
 /**
  * @module  mumath/closest
  */
@@ -2066,7 +4480,7 @@ module.exports = function closest (num, arr) {
 	}
 	return curr;
 }
-},{}],29:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 /**
  * Base 10 logarithm
  *
@@ -2075,7 +4489,7 @@ module.exports = function closest (num, arr) {
 module.exports = require('./wrap')(function (a) {
 	return Math.log(a) / Math.log(10);
 });
-},{"./wrap":32}],30:[function(require,module,exports){
+},{"./wrap":43}],41:[function(require,module,exports){
 /**
  * @module mumath/order
  */
@@ -2084,7 +4498,7 @@ module.exports = require('./wrap')(function (n) {
 	var order = Math.floor(Math.log(n) / Math.LN10 + 0.000000001);
 	return Math.pow(10,order);
 });
-},{"./wrap":32}],31:[function(require,module,exports){
+},{"./wrap":43}],42:[function(require,module,exports){
 /**
  * Whether element is between left & right including
  *
@@ -2103,7 +4517,7 @@ module.exports = require('./wrap')(function(a, left, right){
 	if (a <= right && a >= left) return true;
 	return false;
 });
-},{"./wrap":32}],32:[function(require,module,exports){
+},{"./wrap":43}],43:[function(require,module,exports){
 /**
  * Get fn wrapped with array/object attrs recognition
  *
@@ -2145,7 +4559,7 @@ module.exports = function(fn){
 		}
 	};
 };
-},{}],33:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 'use strict';
 module.exports = function (fn, errMsg) {
 	if (typeof fn !== 'function') {
@@ -2178,7 +4592,7 @@ module.exports = function (fn, errMsg) {
 	return onetime;
 };
 
-},{}],34:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 (function (process){
 // Generated by CoffeeScript 1.7.1
 (function() {
@@ -2214,7 +4628,7 @@ module.exports = function (fn, errMsg) {
 }).call(this);
 
 }).call(this,require('_process'))
-},{"_process":3}],35:[function(require,module,exports){
+},{"_process":7}],46:[function(require,module,exports){
 /**
  * @module  plot-grid
  */
@@ -2225,10 +4639,11 @@ var lg = require('mumath/lg');
 var Emitter = require('events').EventEmitter;
 var inherits = require('inherits');
 var sf = 0;
-var className = ((require('insert-css')("._016038c6 {\r\n\tposition: relative;\r\n}\r\n\r\n._016038c6 .grid {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tfont-family: sans-serif;\r\n}\r\n._016038c6 .grid-line {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\twidth: 0;\r\n\theight: 0;\r\n\tcolor: rgba(127,127,127,.3);\r\n}\r\n._016038c6 .grid-line[hidden] {\r\n\tdisplay: none;\r\n}\r\n\r\n._016038c6 .grid-line-x {\r\n\tborder-left: 1px dotted;\r\n\tmargin-left: -1px;\r\n\theight: 100%;\r\n}\r\n\r\n._016038c6 .grid-line-y {\r\n\tmargin-top: -1px;\r\n\tborder-bottom: 1px dotted;\r\n\twidth: 100%;\r\n\ttop: auto;\r\n}\r\n\r\n._016038c6 .grid-axis {\r\n\tposition: absolute;\r\n}\r\n._016038c6 .grid-axis-x {\r\n\ttop: auto;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tborder-bottom: 2px solid;\r\n\tmargin-bottom: -.5rem;\r\n}\r\n._016038c6 .grid-axis-y {\r\n\tborder-left: 2px solid;\r\n\tright: auto;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -1px;\r\n    margin-left: -.5rem;\r\n}\r\n\r\n._016038c6 .grid-label {\r\n\tposition: absolute;\r\n\ttop: auto;\r\n\tleft: auto;\r\n\tmin-height: 1rem;\r\n\tfont-size: .8rem;\r\n}\r\n._016038c6 .grid-label-x {\r\n\tbottom: auto;\r\n\ttop: 100%;\r\n\tmargin-top: 1.5rem;\r\n\twidth: 2rem;\r\n\tmargin-left: -1rem;\r\n\ttext-align: center;\r\n}\r\n._016038c6 .grid-label-x:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\twidth: 0;\r\n\tborder-left: 2px solid;\r\n\ttop: -1rem;\r\n\tmargin-left: -1px;\r\n\tmargin-top: -2px;\r\n\tleft: 1rem;\r\n}\r\n\r\n._016038c6 .grid-label-y {\r\n    right: 100%;\r\n    margin-right: 1.5rem;\r\n    margin-top: -.5rem;\r\n}\r\n._016038c6 .grid-label-y:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\theight: 0;\r\n\tborder-top: 2px solid;\r\n\tright: -1rem;\r\n\ttop: .4rem;\r\n\tmargin-right: -1px;\r\n}\r\n") || true) && "_016038c6");
+var className = ((require('insert-css')("._6bad5a5e {\r\n\tposition: relative;\r\n}\r\n\r\n._6bad5a5e .grid {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tfont-family: sans-serif;\r\n}\r\n\r\n._6bad5a5e .grid-lines {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\toverflow: hidden;\r\n}\r\n\r\n._6bad5a5e .grid-line {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\twidth: .5rem;\r\n\theight: .5rem;\r\n\tcolor: rgba(127,127,127,.3);\r\n}\r\n._6bad5a5e .grid-line[hidden] {\r\n\tdisplay: none;\r\n}\r\n._6bad5a5e .grid-line:hover {\r\n\tcolor: rgba(127,127,127,.5);\r\n}\r\n\r\n._6bad5a5e .grid-line-x {\r\n\theight: 100%;\r\n\twidth: 0;\r\n\tborder-left: 1px dotted;\r\n\tmargin-left: -1px;\r\n}\r\n._6bad5a5e .grid-line-x:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -.25rem;\r\n}\r\n._6bad5a5e .grid-line-x.grid-line-min {\r\n\tmargin-left: 0px;\r\n}\r\n\r\n._6bad5a5e .grid-line-y {\r\n\twidth: 100%;\r\n\theight: 0;\r\n\tmargin-top: -1px;\r\n\tborder-top: 1px dotted;\r\n}\r\n._6bad5a5e .grid-line-y:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\tleft: 0;\r\n\tright: 0;\r\n\ttop: -.25rem;\r\n}\r\n._6bad5a5e .grid-line-y.grid-line-max {\r\n\tmargin-top: 0px;\r\n}\r\n\r\n._6bad5a5e .grid-axis {\r\n\tposition: absolute;\r\n}\r\n._6bad5a5e .grid-axis-x {\r\n\ttop: auto;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tborder-bottom: 2px solid;\r\n\tmargin-bottom: -.5rem;\r\n}\r\n._6bad5a5e .grid-axis-y {\r\n\tborder-left: 2px solid;\r\n\tright: auto;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -1px;\r\n    margin-left: -.5rem;\r\n}\r\n\r\n._6bad5a5e .grid-label {\r\n\tposition: absolute;\r\n\ttop: auto;\r\n\tleft: auto;\r\n\tmin-height: 1rem;\r\n\tfont-size: .8rem;\r\n}\r\n._6bad5a5e .grid-label-x {\r\n\tbottom: auto;\r\n\ttop: 100%;\r\n\tmargin-top: 1.5rem;\r\n\twidth: 2rem;\r\n\tmargin-left: -1rem;\r\n\ttext-align: center;\r\n}\r\n._6bad5a5e .grid-label-x:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\twidth: 0;\r\n\tborder-left: 2px solid;\r\n\ttop: -1rem;\r\n\tmargin-left: -1px;\r\n\tmargin-top: -2px;\r\n\tleft: 1rem;\r\n}\r\n\r\n._6bad5a5e .grid-label-y {\r\n    right: 100%;\r\n    margin-right: 1.5rem;\r\n    margin-top: -.5rem;\r\n}\r\n._6bad5a5e .grid-label-y:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\theight: 0;\r\n\tborder-top: 2px solid;\r\n\tright: -1rem;\r\n\ttop: .4rem;\r\n\tmargin-right: -1px;\r\n}\r\n") || true) && "_6bad5a5e");
 var closestNumber = require('mumath/closest');
 var mag = require('mumath/order');
 var within = require('mumath/within');
+var uid = require('get-uid');
 
 
 module.exports = Grid;
@@ -2241,6 +4656,8 @@ function Grid (options) {
 
 	extend(this, options);
 
+	this.id = uid();
+
 	if (!isBrowser) return;
 
 	//obtian container
@@ -2252,8 +4669,14 @@ function Grid (options) {
 	this.grid.classList.add('grid');
 	this.container.appendChild(this.grid);
 
+	//ensure lines values
 	this.lines = (options.lines || []).map(function (lines) { return lines && extend(this$1.defaultLines, lines); });
 	this.axes = (options.axes || []).map(function (axis) { return axis && extend(this$1.defaultAxis, axis); });
+
+	//create lines container
+	this.linesContainer = document.createElement('div');
+	this.linesContainer.classList.add('grid-lines');
+	this.grid.appendChild(this.linesContainer);
 
 	this.update(options);
 }
@@ -2274,25 +4697,27 @@ Grid.prototype.defaultLines = {
 	min: 0,
 	max: 100,
 	//detected from range
-	values: null,
+	values: undefined,
 	//copied from values
-	titles: null
+	titles: undefined
 };
 
 Grid.prototype.defaultAxis = {
 	name: '',
 	//detected from range
-	values: null,
+	values: undefined,
 	//copied from values
-	labels: null,
+	labels: undefined,
 	//copied from labels
-	titles: null
+	titles: undefined
 };
 
 Grid.prototype.update = function (options) {
 	options = options || {};
 
 	var grid = this.grid;
+	var linesContainer = this.linesContainer;
+	var id = this.id;
 
 	//set viewport
 	if (options.viewport) this.viewport = options.viewport;
@@ -2307,10 +4732,10 @@ Grid.prototype.update = function (options) {
 
 	if (!viewport) viewport = [0,0,w,h];
 
-	this.grid.style.left = viewport[0] + (typeof viewport[0] === 'number' ? 'px' : '');
-	this.grid.style.top = viewport[1] + (typeof viewport[1] === 'number' ? 'px' : '');
-	this.grid.style.width = viewport[2] + (typeof viewport[2] === 'number' ? 'px' : '');
-	this.grid.style.height = viewport[3] + (typeof viewport[3] === 'number' ? 'px' : '');
+	grid.style.left = viewport[0] + (typeof viewport[0] === 'number' ? 'px' : '');
+	grid.style.top = viewport[1] + (typeof viewport[1] === 'number' ? 'px' : '');
+	grid.style.width = viewport[2] + (typeof viewport[2] === 'number' ? 'px' : '');
+	grid.style.height = viewport[3] + (typeof viewport[3] === 'number' ? 'px' : '');
 
 	//hide all lines first
 	var lines = grid.querySelectorAll('.grid-line');
@@ -2327,7 +4752,11 @@ Grid.prototype.update = function (options) {
 		if (!lines) return;
 
 		//temp object keeping state of current lines run
-		var stats = {};
+		var stats = {
+			linesContainer: linesContainer,
+			idx: idx,
+			id: id
+		};
 
 		if (options.lines) lines = extend(this.lines[idx], options.lines[idx]);
 		stats.lines = lines;
@@ -2339,7 +4768,7 @@ Grid.prototype.update = function (options) {
 
 		//detect steps, if not defined, as one per each 50px
 		var values = [];
-		var intersteps = (lines.orientation === 'x' ? (typeof viewport[2] === 'number' ? viewport[2] : this.grid.clientWidth) : (typeof viewport[3] === 'number' ? viewport[3] : this.grid.clientHeight)) / 50;
+		var intersteps = (lines.orientation === 'x' ? (typeof viewport[2] === 'number' ? viewport[2] : linesContainer.clientWidth) : (typeof viewport[3] === 'number' ? viewport[3] : linesContainer.clientHeight)) / 50;
 		if (intersteps < 1) {
 			values = [linesMin, linesMax];
 		}
@@ -2377,23 +4806,25 @@ Grid.prototype.update = function (options) {
 
 		//define titles
 		var titles = lines.titles instanceof Function ? values.map(function (v, i) { return lines.titles(v, i, stats); }, this) :
-			lines.titles || values.slice().map(function (value) {
+			lines.titles === undefined ? values.slice().map(function (value) {
 			return value.toLocaleString();
-		});
+		}) : lines.titles;
 		stats.titles = titles;
 
 		//draw lines
 		var offsets = values.map(function (value, i) {
-			var line = grid.querySelector(("#grid-line-" + (lines.orientation) + "-" + (value|0) + "-" + idx));
+			var line = linesContainer.querySelector(("#grid-line-" + (lines.orientation) + "-" + (value|0) + "-" + idx + "-" + id));
 			var ratio;
 			if (!line) {
 				line = document.createElement('span');
-				line.id = "grid-line-" + (lines.orientation) + "-" + (value|0) + "-" + idx;
+				line.id = "grid-line-" + (lines.orientation) + "-" + (value|0) + "-" + idx + "-" + id;
 				line.classList.add('grid-line');
 				line.classList.add(("grid-line-" + (lines.orientation)));
+				if (value === linesMin) line.classList.add('grid-line-min');
+				if (value === linesMax) line.classList.add('grid-line-max');
 				line.setAttribute('data-value', value);
-				line.setAttribute('title', titles[i]);
-				grid.appendChild(line);
+				titles && line.setAttribute('title', titles[i]);
+				linesContainer.appendChild(line);
 				if (!lines.logarithmic) {
 					ratio = (value - linesMin) / (linesMax - linesMin);
 				}
@@ -2442,9 +4873,9 @@ Grid.prototype.update = function (options) {
 		stats.axisValues = axisValues;
 
 		//define titles
-		var axisTitles = axis.titles instanceof Function ? axisValues.map(function (v, i) { return axis.titles(v, i, stats); }, this) : axis.titles ? axis.titles : axisValues === values ? titles : axisValues.slice().map(function (value) {
+		var axisTitles = axis.titles instanceof Function ? axisValues.map(function (v, i) { return axis.titles(v, i, stats); }, this) : axis.titles ? axis.titles : axisValues === values ? titles : axis.titles === undefined ? axisValues.slice().map(function (value) {
 			return value.toLocaleString();
-		});
+		}) : axis.titles;
 		stats.axisTitles = axisTitles;
 
 		//define labels
@@ -2453,10 +4884,10 @@ Grid.prototype.update = function (options) {
 
 
 		//put axis properly
-		var axisEl = grid.querySelector(("#grid-axis-" + (lines.orientation)));
+		var axisEl = grid.querySelector(("#grid-axis-" + (lines.orientation) + "-" + idx + "-" + id));
 		if (!axisEl) {
 			axisEl = document.createElement('span');
-			axisEl.id = "grid-axis-" + (lines.orientation) + "-" + idx;
+			axisEl.id = "grid-axis-" + (lines.orientation) + "-" + idx + "-" + id;
 			axisEl.classList.add('grid-axis');
 			axisEl.classList.add(("grid-axis-" + (lines.orientation)));
 			axisEl.setAttribute('data-name', axis.name);
@@ -2469,15 +4900,15 @@ Grid.prototype.update = function (options) {
 		axisValues.forEach(function (value, i) {
 			if (value == null || labels[i] == null) return;
 
-			var label = grid.querySelector(("#grid-label-" + (lines.orientation) + "-" + (value|0) + "-" + idx));
+			var label = grid.querySelector(("#grid-label-" + (lines.orientation) + "-" + (value|0) + "-" + idx + "-" + id));
 			if (!label) {
 				label = document.createElement('label');
-				label.id = "grid-label-" + (lines.orientation) + "-" + (value|0) + "-" + idx;
+				label.id = "grid-label-" + (lines.orientation) + "-" + (value|0) + "-" + idx + "-" + id;
 				label.classList.add('grid-label');
 				label.classList.add(("grid-label-" + (lines.orientation)));
 				label.setAttribute('data-value', value);
 				label.setAttribute('for', ("grid-line-" + (lines.orientation)));
-				label.setAttribute('title', axisTitles[i]);
+				axisTitles && label.setAttribute('title', axisTitles[i]);
 				label.innerHTML = labels[i];
 				grid.appendChild(label);
 				if (lines.orientation === 'x') {
@@ -2501,7 +4932,7 @@ Grid.prototype.update = function (options) {
 
 	return this;
 };
-},{"events":2,"inherits":23,"insert-css":24,"is-browser":25,"mumath/closest":28,"mumath/lg":29,"mumath/order":30,"mumath/within":31,"xtend":50}],36:[function(require,module,exports){
+},{"events":5,"get-uid":29,"inherits":33,"insert-css":34,"is-browser":35,"mumath/closest":39,"mumath/lg":40,"mumath/order":41,"mumath/within":42,"xtend":61}],47:[function(require,module,exports){
 var inherits = require('inherits')
 var EventEmitter = require('events').EventEmitter
 var now = require('right-now')
@@ -2546,7 +4977,7 @@ Engine.prototype.tick = function() {
     this.emit('tick', dt)
     this.last = time
 }
-},{"events":2,"inherits":23,"raf":37,"right-now":39}],37:[function(require,module,exports){
+},{"events":5,"inherits":33,"raf":48,"right-now":50}],48:[function(require,module,exports){
 (function (global){
 var now = require('performance-now')
   , root = typeof window === 'undefined' ? global : window
@@ -2622,7 +5053,7 @@ module.exports.polyfill = function() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"performance-now":34}],38:[function(require,module,exports){
+},{"performance-now":45}],49:[function(require,module,exports){
 (function (process){
 'use strict';
 var onetime = require('onetime');
@@ -2635,7 +5066,7 @@ module.exports = onetime(function () {
 });
 
 }).call(this,require('_process'))
-},{"_process":3,"exit-hook":17,"onetime":33}],39:[function(require,module,exports){
+},{"_process":7,"exit-hook":26,"onetime":44}],50:[function(require,module,exports){
 (function (global){
 module.exports =
   global.performance &&
@@ -2646,7 +5077,7 @@ module.exports =
   }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],40:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 var resolve = require('soundcloud-resolve')
 var fonts = require('google-fonts')
 var minstache = require('minstache')
@@ -2711,7 +5142,7 @@ function badge(options, callback) {
   return div
 }
 
-},{"fs":1,"google-fonts":21,"insert-css":41,"minstache":27,"soundcloud-resolve":42}],41:[function(require,module,exports){
+},{"fs":1,"google-fonts":31,"insert-css":52,"minstache":37,"soundcloud-resolve":53}],52:[function(require,module,exports){
 var inserted = [];
 
 module.exports = function (css) {
@@ -2730,7 +5161,7 @@ module.exports = function (css) {
     }
 };
 
-},{}],42:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 var qs  = require('querystring')
 var xhr = require('xhr')
 
@@ -2763,7 +5194,7 @@ function resolve(id, goal, callback) {
   })
 }
 
-},{"querystring":6,"xhr":47}],43:[function(require,module,exports){
+},{"querystring":10,"xhr":58}],54:[function(require,module,exports){
 'use strict';
 var ansiRegex = require('ansi-regex')();
 
@@ -2771,7 +5202,7 @@ module.exports = function (str) {
 	return typeof str === 'string' ? str.replace(ansiRegex, '') : str;
 };
 
-},{"ansi-regex":9}],44:[function(require,module,exports){
+},{"ansi-regex":13}],55:[function(require,module,exports){
 (function (process){
 'use strict';
 var argv = process.argv;
@@ -2825,7 +5256,7 @@ module.exports = (function () {
 })();
 
 }).call(this,require('_process'))
-},{"_process":3}],45:[function(require,module,exports){
+},{"_process":7}],56:[function(require,module,exports){
 (function (process){
 /**
  * Simple node/browser test runner
@@ -3489,7 +5920,7 @@ test.test = test;
 
 module.exports = test;
 }).call(this,require('_process'))
-},{"_process":3,"ansi-escapes":8,"chalk":12,"elegant-spinner":14,"events":2,"inherits":23,"is-browser":25,"log-update":26,"performance-now":34,"xtend/mutable":51}],46:[function(require,module,exports){
+},{"_process":7,"ansi-escapes":12,"chalk":18,"elegant-spinner":23,"events":5,"inherits":33,"is-browser":35,"log-update":36,"performance-now":45,"xtend/mutable":62}],57:[function(require,module,exports){
 var AudioContext = window.AudioContext || window.webkitAudioContext
 
 module.exports = WebAudioAnalyser
@@ -3571,7 +6002,7 @@ WebAudioAnalyser.prototype.frequencies = function(output, channel) {
   return output
 }
 
-},{}],47:[function(require,module,exports){
+},{}],58:[function(require,module,exports){
 var window = require("global/window")
 var once = require("once")
 
@@ -3677,7 +6108,7 @@ function createXHR(options, callback) {
 
 function noop() {}
 
-},{"global/window":48,"once":49}],48:[function(require,module,exports){
+},{"global/window":59,"once":60}],59:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
     module.exports = window
@@ -3688,7 +6119,7 @@ if (typeof window !== "undefined") {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],49:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 module.exports = once
 
 once.proto = once(function () {
@@ -3709,7 +6140,7 @@ function once (fn) {
   }
 }
 
-},{}],50:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -3732,7 +6163,7 @@ function extend() {
     return target
 }
 
-},{}],51:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -3753,7 +6184,7 @@ function extend(target) {
     return target
 }
 
-},{}],52:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 var test = require('tst');
 var Spectrum = require('./');
 // var Formant = require('audio-formant');
@@ -3769,15 +6200,16 @@ var Analyser = require('web-audio-analyser');
 //stream soundcloud
 var audio = new Audio;
 var badge = SCBadge({
-	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14'
-	, song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016'
-	, dark: false
-	, getFonts: false
+	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
+	// , song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016'
+	song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	dark: false,
+	getFonts: false
 }, function(err, src, data, div) {
 	if (err) throw err;
 
 	//TODO: read url from href here
-	audio.src = src;//'https://api.soundcloud.com/tracks/263762161/stream?client_id=6b7ae5b9df6a0eb3fcca34cc3bb0ef14';
+	audio.src = src;
 	audio.crossOrigin = 'Anonymous';
 	audio.addEventListener('canplay', function() {
 		audio.play();
@@ -3796,7 +6228,7 @@ var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(50 * Math.PI * 2 * (i / rate));
+	sine[i] = Math.sin(1000 * Math.PI * 2 * (i / rate));
 	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
@@ -3805,30 +6237,51 @@ for (var i = 0; i < N; i++) {
 if (isBrowser) {
 	document.body.style.margin = '0';
 	document.body.style.boxSizing = 'border-box';
+
+}
+
+function createColormapSelector (spectrum) {
+	//append style switcher
+	var switcher = document.createElement('select');
+	switcher.classList.add('.colormap');
+	switcher.style.position = 'fixed';
+	switcher.style.bottom = '1rem';
+	switcher.style.left = '1rem';
+	switcher.style.width = '4rem';
+	switcher.style.margin = '0 auto';
+	switcher.style.background = 'rgba(0,0,0,.95)';
+	switcher.style.color = 'white';
+	switcher.style.border = '0';
+	switcher.innerHTML = "\n\t\t<option value=\"jet\">jet</option>\n\t\t<option value=\"hsv\">hsv</option>\n\t\t<option value=\"hot\">hot</option>\n\t\t<option value=\"cool\">cool</option>\n\t\t<option value=\"spring\">spring</option>\n\t\t<option value=\"summer\">summer</option>\n\t\t<option value=\"autumn\">autumn</option>\n\t\t<option value=\"winter\">winter</option>\n\t\t<option value=\"bone\">bone</option>\n\t\t<option value=\"copper\">copper</option>\n\t\t<option value=\"greys\" selected>greys</option>\n\t\t<option value=\"yignbu\">yignbu</option>\n\t\t<option value=\"greens\">greens</option>\n\t\t<option value=\"yiorrd\">yiorrd</option>\n\t\t<option value=\"bluered\">bluered</option>\n\t\t<option value=\"rdbu\">rdbu</option>\n\t\t<option value=\"picnic\">picnic</option>\n\t\t<option value=\"rainbow\">rainbow</option>\n\t\t<option value=\"portland\">portland</option>\n\t\t<option value=\"blackbody\">blackbody</option>\n\t\t<option value=\"earth\">earth</option>\n\t\t<option value=\"electric\">electric</option>\n\t\t<!--<option value=\"alpha\">alpha</option>-->\n\t";
+	switcher.addEventListener('change', function () {
+		spectrum.setColormap(switcher.value);
+	});
+	document.body.appendChild(switcher);
 }
 
 
-
-test('linear classics', function () {
+test.only('linear classics', function () {
 	// var frequencies = new Float32Array(ft(sine));
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 
 	var spectrum = new Spectrum({
-		gridAxes: false,
 		frequencies: frequencies,
-		minFrequency: 40
-		// logarithmic: false
+		minFrequency: 40,
+		logarithmic: true,
+		smoothing: .8
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
 	}).on('render', function () {
 		analyser.analyser.getFloatFrequencyData(frequencies);
 		frequencies = frequencies.map(function (v) {
-			return (100 + v) / 100;
+			return Math.max((100 + v) / 100, 0);
 		});
 		spectrum.setFrequencies(frequencies);
 	});
+
+	createColormapSelector(spectrum);
 });
 
 test('log scale', function () {
@@ -3883,4 +6336,4 @@ test('line');
 test('oscilloscope');
 
 
-},{"./":7,"fourier-transform":18,"is-browser":25,"soundcloud-badge":40,"tst":45,"web-audio-analyser":46}]},{},[52]);
+},{"./":11,"fourier-transform":27,"is-browser":35,"soundcloud-badge":51,"tst":56,"web-audio-analyser":57}]},{},[63]);
