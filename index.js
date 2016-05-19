@@ -161,6 +161,7 @@ Spectrum.prototype.frag = `
 	precision mediump float;
 
 	uniform sampler2D frequencies;
+	uniform sampler2D colormap;
 	uniform vec4 viewport;
 	uniform float kernel[7];
 	uniform float kernelWeight;
@@ -170,9 +171,9 @@ Spectrum.prototype.frag = `
 	uniform float maxDecibels;
 	uniform float minDecibels;
 	uniform float sampleRate;
-	uniform sampler2D colormap;
 
 	float frequency;
+	varying vec2 slope;
 
 	const float log10 = log(10.);
 	const float pi = ${Math.PI};
@@ -228,10 +229,17 @@ Spectrum.prototype.frag = `
 		vec2 p2 = vec2(coord.x, magnitude(coord.x + bin.x*.5));
 		vec2 p1 = vec2(coord.x - bin.x, magnitude(coord.x - bin.x*.5));
 
-		float vertDist = abs(coord.y - magnitude(coord.x));
+		float dist = coord.y - magnitude(coord.x);
+		float vertDist = abs(dist);
 		float normalDist = distanceToLine(p2, p1, coord);
+		float mixDist = normalDist * .95 + vertDist * .05;
 
-		float intensity = 1. - smoothstep(.000, .003, normalDist * .95 + vertDist * .05 );
+		float intensity = 1. - smoothstep(.000, .003, mixDist);
+		if (dist < 0.) {
+			intensity += coord.y;
+			intensity += coord.x * .1;
+		}
+
 
 		gl_FragColor = vec4(vec3(intensity), 1);
 
