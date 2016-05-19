@@ -42,8 +42,8 @@ function Spectrum (options) {
 		this.bindTexture('frequencies', {
 			unit: this.frequenciesTextureUnit,
 			wrap: gl.CLAMP_TO_EDGE,
-			magFilter: gl.NEAREST,
-			minFilter: gl.NEAREST
+			magFilter: gl.LINEAR,
+			minFilter: gl.LINEAR
 		});
 		this.setTexture('frequencies', {
 			data: this.frequencies,
@@ -162,7 +162,7 @@ Spectrum.prototype.frag = `
 
 	uniform sampler2D frequencies;
 	uniform vec4 viewport;
-	uniform float kernel[5];
+	uniform float kernel[7];
 	uniform float kernelWeight;
 	uniform int logarithmic;
 	uniform float maxFrequency;
@@ -198,8 +198,6 @@ Spectrum.prototype.frag = `
 
 		ratio = left + ratio * (right - left);
 
-		// ratio = .01 * floor(ratio / .01);
-
 		return ratio;
 	}
 
@@ -214,11 +212,13 @@ Spectrum.prototype.frag = `
 	float magnitude (float nf) {
 		vec2 bin = vec2(1. / viewport.zw);
 
-		return (kernel[0] * texture2D(frequencies, vec2(f(nf - 2. * bin.x), 0)).w +
-			kernel[1] * texture2D(frequencies, vec2(f(nf - bin.x), 0)).w +
-			kernel[2] * texture2D(frequencies, vec2(f(nf), 0)).w +
-			kernel[3] * texture2D(frequencies, vec2(f(nf + bin.x), 0)).w +
-			kernel[4] * texture2D(frequencies, vec2(f(nf + 2. * bin.x), 0)).w) / kernelWeight;
+		return (kernel[0] * texture2D(frequencies, vec2(f(nf - 3. * bin.x), 0)).w +
+			kernel[1] * texture2D(frequencies, vec2(f(nf - 2. * bin.x), 0)).w +
+			kernel[2] * texture2D(frequencies, vec2(f(nf - bin.x), 0)).w +
+			kernel[3] * texture2D(frequencies, vec2(f(nf), 0)).w +
+			kernel[4] * texture2D(frequencies, vec2(f(nf + bin.x), 0)).w +
+			kernel[5] * texture2D(frequencies, vec2(f(nf + 2. * bin.x), 0)).w +
+			kernel[6] * texture2D(frequencies, vec2(f(nf + 3. * bin.x), 0)).w) / kernelWeight;
 	}
 
 	void main () {
@@ -231,7 +231,7 @@ Spectrum.prototype.frag = `
 		float vertDist = abs(coord.y - magnitude(coord.x));
 		float normalDist = distanceToLine(p2, p1, coord);
 
-		float intensity = 1. - smoothstep(.0007, .0013, vertDist);
+		float intensity = 1. - smoothstep(.000, .003, normalDist * .95 + vertDist * .05 );
 
 		gl_FragColor = vec4(vec3(intensity), 1);
 
@@ -271,7 +271,7 @@ Spectrum.prototype.colormapTextureUnit = 1;
 
 
 //5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [0, 0, 1, 0, 0];
+Spectrum.prototype.kernel = [1, 2, 3, 4, 3, 2, 1];
 
 
 /**
