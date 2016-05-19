@@ -6253,7 +6253,7 @@ function createColormapSelector (spectrum) {
 	switcher.style.color = 'white';
 	switcher.style.border = '0';
 	switcher.innerHTML = "\n\t\t<option value=\"jet\">jet</option>\n\t\t<option value=\"hsv\">hsv</option>\n\t\t<option value=\"hot\">hot</option>\n\t\t<option value=\"cool\">cool</option>\n\t\t<option value=\"spring\">spring</option>\n\t\t<option value=\"summer\">summer</option>\n\t\t<option value=\"autumn\">autumn</option>\n\t\t<option value=\"winter\">winter</option>\n\t\t<option value=\"bone\">bone</option>\n\t\t<option value=\"copper\">copper</option>\n\t\t<option value=\"greys\" selected>greys</option>\n\t\t<option value=\"yignbu\">yignbu</option>\n\t\t<option value=\"greens\">greens</option>\n\t\t<option value=\"yiorrd\">yiorrd</option>\n\t\t<option value=\"bluered\">bluered</option>\n\t\t<option value=\"rdbu\">rdbu</option>\n\t\t<option value=\"picnic\">picnic</option>\n\t\t<option value=\"rainbow\">rainbow</option>\n\t\t<option value=\"portland\">portland</option>\n\t\t<option value=\"blackbody\">blackbody</option>\n\t\t<option value=\"earth\">earth</option>\n\t\t<option value=\"electric\">electric</option>\n\t\t<!--<option value=\"alpha\">alpha</option>-->\n\t";
-	switcher.addEventListener('change', function () {
+	switcher.addEventListener('input', function () {
 		spectrum.setColormap(switcher.value);
 	});
 	document.body.appendChild(switcher);
