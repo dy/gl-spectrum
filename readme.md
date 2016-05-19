@@ -32,6 +32,7 @@ var spectrum = new Spectrum({
 	grid: true,
 	gridAxes: false,
 
+	//name or array of colors
 	colormap: 'jet',
 
 	//WIP shadow frequencies
@@ -42,6 +43,7 @@ var spectrum = new Spectrum({
 });
 
 spectrum.setFrequencies(frequencies);
+spectrum.setColormap(colors);
 ```
 
 ## Related
