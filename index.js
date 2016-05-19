@@ -38,18 +38,6 @@ function Spectrum (options) {
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
-		//setup frequencies texture
-		this.bindTexture('frequencies', {
-			unit: this.frequenciesTextureUnit,
-			wrap: gl.CLAMP_TO_EDGE,
-			magFilter: gl.LINEAR,
-			minFilter: gl.LINEAR
-		});
-		this.setTexture('frequencies', {
-			data: this.frequencies,
-			format: gl.ALPHA
-		});
-
 		//setup kernel
 		var kernelLocation = gl.getUniformLocation(this.program, 'kernel[0]');
 		var kernelWeightLocation = gl.getUniformLocation(this.program, 'kernelWeight');
@@ -69,6 +57,18 @@ function Spectrum (options) {
 		gl.uniform1f(maxDecibelsLocation, this.maxDecibels);
 		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
 		gl.uniform1f(sampleRateLocation, this.sampleRate);
+
+		//setup frequencies texture
+		this.bindTexture('frequencies', {
+			unit: this.frequenciesTextureUnit,
+			wrap: gl.CLAMP_TO_EDGE,
+			magFilter: gl.LINEAR,
+			minFilter: gl.LINEAR
+		});
+		this.setTexture('frequencies', {
+			data: this.frequencies,
+			format: gl.ALPHA
+		});
 
 		//setup colormap
 		if (this.colormap) {
@@ -153,6 +153,32 @@ function Spectrum (options) {
 
 inherits(Spectrum, Component);
 
+/*
+Spectrum.prototype.vert = `
+	precision mediump float;
+
+	attribute vec2 position;
+	uniform sampler2D frequencies;
+	const float step = 1. / 4096.;
+
+	varying float average;
+	varying float peak;
+
+	void main () {
+		float sum = 0., value, _peak = 0.;
+
+		for (float i = 0.; i < 1.; i+= step) {
+			value = texture2D(frequencies, vec2(i, 0)).w;
+			sum += value;
+			_peak = max(value, _peak);
+		}
+		peak = _peak;
+		average = sum * step;
+
+		gl_Position = vec4(position, 0, 1);
+	}
+`;
+*/
 
 /**
  * Here we might have to do kernel averaging for some
@@ -173,7 +199,9 @@ Spectrum.prototype.frag = `
 	uniform float sampleRate;
 
 	float frequency;
-	varying vec2 slope;
+
+	// varying float average;
+	// varying float peak;
 
 	const float log10 = log(10.);
 	const float pi = ${Math.PI};
@@ -182,8 +210,6 @@ Spectrum.prototype.frag = `
 	float lg (float a) {
 		return log(a) / log10;
 	}
-
-	//TODO: make log light
 
 	//return frequency coordinate from screen position
 	float f (float ratio) {
@@ -236,10 +262,8 @@ Spectrum.prototype.frag = `
 
 		float intensity = 1. - smoothstep(.000, .003, mixDist);
 		if (dist < 0.) {
-			intensity += coord.y;
-			intensity += coord.x * .1;
+			intensity += -.17*log(1. - coord.y) * .6 + (coord.y) * .4 + (coord.x * .1);
 		}
-
 
 		gl_FragColor = vec4(vec3(intensity), 1);
 
