@@ -69,34 +69,13 @@ function Spectrum (options) {
 			data: this.frequencies,
 			format: gl.ALPHA
 		});
-
-		//setup colormap
-		if (this.colormap) {
-			//named colormap
-			if (typeof this.colormap === 'string') {
-				this.colormap = new Float32Array(flatten(colormap({
-					colormap: this.colormap,
-					nshades: 128,
-					format: 'rgba',
-					alpha: 1
-				})).map((v,i) => !((i + 1) % 4) ? v : v/255));
-			}
-			//custom array
-			else {
-				this.colormap = new Float32Array(this.colormap);
-			}
-			this.bindTexture({colormap: {
-				unit: this.colormapTextureUnit,
-				magFilter: gl.NEAREST,
-				minFilter: gl.NEAREST,
-				wrap: gl.CLAMP_TO_EDGE,
-			}});
-			this.setTexture('colormap', {
-				data: this.colormap,
-				width: 128,
-				format: gl.RGBA
-			});
-		}
+		this.bindTexture({colormap: {
+			unit: this.colormapTextureUnit,
+			magFilter: gl.NEAREST,
+			minFilter: gl.NEAREST,
+			wrap: gl.CLAMP_TO_EDGE,
+		}});
+		this.setColormap(this.colormap);
 	}
 	else {
 
@@ -240,8 +219,7 @@ Spectrum.prototype.frag = `
 		intensity += (1. - step(0., dist)) * (-.8*log(1. - coord.y) * .5 + coord.y * .5);
 		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
-		gl_FragColor = vec4(vec3(intensity), 1);
-
+		// gl_FragColor = vec4(vec3(intensity), 1);
 		gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
 	}
 `;
@@ -273,8 +251,14 @@ Spectrum.prototype.orientation = 'horizontal';
 Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
-Spectrum.prototype.colormap = 'yignbu';
+Spectrum.prototype.colormap = 'greys';
 Spectrum.prototype.colormapTextureUnit = 1;
+
+//TODO bars, line, dots
+Spectrum.prototype.style = 'bars';
+
+//TODO implement shadow frequencies, like averaged/max values
+Spectrum.prototype.shadow;
 
 
 //5-items linear kernel for smoothing frequencies
@@ -306,6 +290,33 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 		data: bigger,
 		format: gl.ALPHA
 	});
+};
+
+
+/**
+ * Reset colormap
+ */
+Spectrum.prototype.setColormap = function (cm) {
+	//named colormap
+	if (typeof cm === 'string') {
+		this.colormap = new Float32Array(flatten(colormap({
+			colormap: cm,
+			nshades: 128,
+			format: 'rgba',
+			alpha: 1
+		})).map((v,i) => !((i + 1) % 4) ? v : v/255));
+	}
+	//custom array
+	else {
+		this.colormap = new Float32Array(cm);
+	}
+	this.setTexture('colormap', {
+		data: this.colormap,
+		width: 128,
+		format: this.context.RGBA
+	});
+
+	return this;
 };
 
 

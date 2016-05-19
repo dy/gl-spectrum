@@ -50,8 +50,51 @@ for (var i = 0; i < N; i++) {
 if (isBrowser) {
 	document.body.style.margin = '0';
 	document.body.style.boxSizing = 'border-box';
+
 }
 
+function createColormapSelector (spectrum) {
+	//append style switcher
+	var switcher = document.createElement('select');
+	switcher.classList.add('.colormap');
+	switcher.style.position = 'fixed';
+	switcher.style.bottom = '1rem';
+	switcher.style.left = '1rem';
+	switcher.style.width = '4rem';
+	switcher.style.margin = '0 auto';
+	switcher.style.background = 'rgba(0,0,0,.95)';
+	switcher.style.color = 'white';
+	switcher.style.border = '0';
+	switcher.innerHTML = `
+		<option value="jet">jet</option>
+		<option value="hsv">hsv</option>
+		<option value="hot">hot</option>
+		<option value="cool">cool</option>
+		<option value="spring">spring</option>
+		<option value="summer">summer</option>
+		<option value="autumn">autumn</option>
+		<option value="winter">winter</option>
+		<option value="bone">bone</option>
+		<option value="copper">copper</option>
+		<option value="greys" selected>greys</option>
+		<option value="yignbu">yignbu</option>
+		<option value="greens">greens</option>
+		<option value="yiorrd">yiorrd</option>
+		<option value="bluered">bluered</option>
+		<option value="rdbu">rdbu</option>
+		<option value="picnic">picnic</option>
+		<option value="rainbow">rainbow</option>
+		<option value="portland">portland</option>
+		<option value="blackbody">blackbody</option>
+		<option value="earth">earth</option>
+		<option value="electric">electric</option>
+		<!--<option value="alpha">alpha</option>-->
+	`;
+	switcher.addEventListener('change', function () {
+		spectrum.setColormap(switcher.value);
+	});
+	document.body.appendChild(switcher);
+}
 
 
 test.only('linear classics', function () {
@@ -74,6 +117,8 @@ test.only('linear classics', function () {
 		});
 		spectrum.setFrequencies(frequencies);
 	});
+
+	createColormapSelector(spectrum);
 });
 
 test('log scale', function () {
