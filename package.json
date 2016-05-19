@@ -1,7 +1,7 @@
 {
   "name": "gl-spectrum",
   "version": "1.1.0",
-  "description": "Display spectrum data",
+  "description": "Display spectrum data with webgl",
   "main": "index.js",
   "dependencies": {
     "array-flatten": "^2.1.0",

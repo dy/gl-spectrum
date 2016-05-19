@@ -90,7 +90,7 @@ function createColormapSelector (spectrum) {
 		<option value="electric">electric</option>
 		<!--<option value="alpha">alpha</option>-->
 	`;
-	switcher.addEventListener('change', function () {
+	switcher.addEventListener('input', function () {
 		spectrum.setColormap(switcher.value);
 	});
 	document.body.appendChild(switcher);

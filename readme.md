@@ -32,22 +32,13 @@ var spectrum = new Spectrum({
 	grid: true,
 	gridAxes: false,
 
-	//colormap texture
-	colormap: [],
+	colormap: 'jet',
 
-	//line fn: covers lineWidth, glow and color. And bg?
-	line: [],
-
-	bins: 400,
-
-	//shadow frequencies
+	//WIP shadow frequencies
 	shadow: [],
 
-	//masking texture (one dot): replaces dots, glow, bin width/radius,
-	mask: 'bar',
-
-	//'repeat' for dots-like, 'stretch' for bars
-	maskType: 'repeat'
+	//WIP
+	style: 'line'
 });
 
 spectrum.setFrequencies(frequencies);
