@@ -25,7 +25,8 @@ var audio = new Audio;
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	// , song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016'
-	song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
 	dark: false,
 	getFonts: false
 }, function(err, src, data, div) {
@@ -63,6 +64,92 @@ if (isBrowser) {
 	document.body.style.fontFamily = 'sans-serif';
 
 }
+
+
+test.only('line webgl', function () {
+	// var frequencies = new Float32Array(ft(sine));
+	// var frequencies = new Float32Array(1024).fill(0.5);
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+
+	var busy = false;
+
+	var spectrum = new Spectrum({
+		frequencies: frequencies,
+		minFrequency: 40,
+		logarithmic: true,
+		smoothing: .5
+		// viewport: function (w, h) {
+		// 	return [50,20,w-70,h-60];
+		// }
+	}).on('render', function () {
+		stats.end();
+		stats.begin();
+		analyser.analyser.getFloatFrequencyData(frequencies);
+		frequencies = frequencies.map(function (v) {
+			return Math.max((100 + v) / 100, 0);
+		});
+
+		spectrum.setFrequencies(frequencies);
+	});
+
+	createColormapSelector(spectrum);
+});
+
+test.skip('bars 2d', function () {
+	// var frequencies = new Float32Array(ft(sine));
+	// var frequencies = new Float32Array(1024).fill(0.5);
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+
+	var spectrum = new Spectrum({
+		style: 'bars',
+		grid: false,
+		colormap: [255,255,255,1, 255,0,0,1],
+		logarithmic: true
+	}).on('render', function () {
+		stats.end();
+		stats.begin();
+		analyser.analyser.getFloatFrequencyData(frequencies);
+		frequencies = frequencies.map(function (v) {
+			return Math.max((100 + v) / 100, 0);
+		});
+		spectrum.setFrequencies(frequencies);
+	});
+
+	createColormapSelector(spectrum);
+});
+
+test.skip('node', function () {
+
+});
+
+
+test.skip('viewport', function () {
+
+});
+
+
+test('clannels');
+
+test('classic');
+
+test('bars');
+
+test('bars line');
+
+test('dots');
+
+test('dots line');
+
+test('colormap (heatmap)');
+
+test('multilayered (max values)');
+
+test('line');
+
+test('oscilloscope');
+
+
+
 
 function createColormapSelector (spectrum) {
 	//append style switcher
@@ -124,82 +211,3 @@ function createColormapSelector (spectrum) {
 	});
 	document.body.appendChild(checkbox);
 }
-
-
-test.only('linear classics', function () {
-	// var frequencies = new Float32Array(ft(sine));
-	// var frequencies = new Float32Array(1024).fill(0.5);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
-
-	var spectrum = new Spectrum({
-		frequencies: frequencies,
-		minFrequency: 40,
-		logarithmic: true,
-		smoothing: .8
-		// viewport: function (w, h) {
-		// 	return [50,20,w-70,h-60];
-		// }
-	}).on('render', function () {
-		stats.end();
-		stats.begin();
-		analyser.analyser.getFloatFrequencyData(frequencies);
-		frequencies = frequencies.map(function (v) {
-			return Math.max((100 + v) / 100, 0);
-		});
-		spectrum.setFrequencies(frequencies);
-	});
-
-	createColormapSelector(spectrum);
-});
-
-test('log scale', function () {
-
-});
-
-test.skip('streaming', function () {
-	var spectrum = new Spectrum({
-
-	});
-
-	Formant([1/1000, 1, 1, 0.5])
-	.on('data', function (buffer) {
-		spectrum.setFrequencies(buffer)
-	})
-	.pipe(Slice(1))
-	.pipe(Sink());
-});
-
-test.skip('2d', function () {
-
-});
-
-test.skip('node', function () {
-
-});
-
-
-test.skip('viewport', function () {
-
-});
-
-
-test('clannels');
-
-test('classic');
-
-test('bars');
-
-test('bars line');
-
-test('dots');
-
-test('dots line');
-
-test('colormap (heatmap)');
-
-test('multilayered (max values)');
-
-test('line');
-
-test('oscilloscope');
-

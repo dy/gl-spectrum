@@ -24,12 +24,13 @@ function Spectrum (options) {
 
 	var that = this;
 
+	options = options || {};
+
 	Component.call(this, options);
 
 	if (isBrowser) {
 		this.container.classList.add('gl-spectrum');
 	}
-
 
 	//setup grid (have to go before context setup)
 	if (this.grid) {
@@ -89,7 +90,7 @@ function Spectrum (options) {
 
 	//setup context
 	if (!this.is2d) {
-		var gl = this.context;
+		var gl = this.gl;
 
 		var float = gl.getExtension('OES_texture_float');
 		if (!float) throw Error('WebGL does not support floats.');
@@ -103,8 +104,6 @@ function Spectrum (options) {
 		gl.uniform1f(kernelWeightLocation, this.kernel.reduce((prev, curr) => prev + curr, 0));
 
 		//setup params
-		var logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
-		gl.uniform1i(logarithmicLocation, this.logarithmic ? 1 : 0);
 		var minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
 		gl.uniform1f(minFrequencyLocation, this.minFrequency);
 		var maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
@@ -116,16 +115,12 @@ function Spectrum (options) {
 		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
 		gl.uniform1f(sampleRateLocation, this.sampleRate);
 
-		//setup frequencies texture
+		//setup frequencies and colormap textures
 		this.bindTexture('frequencies', {
 			unit: this.frequenciesTextureUnit,
 			wrap: gl.CLAMP_TO_EDGE,
 			magFilter: gl.LINEAR,
 			minFilter: gl.LINEAR
-		});
-		this.setTexture('frequencies', {
-			data: this.frequencies,
-			format: gl.ALPHA
 		});
 		this.bindTexture({colormap: {
 			unit: this.colormapTextureUnit,
@@ -133,11 +128,10 @@ function Spectrum (options) {
 			minFilter: gl.NEAREST,
 			wrap: gl.CLAMP_TO_EDGE,
 		}});
-		this.setColormap(this.colormap);
 	}
-	else {
 
-	}
+	this.setFrequencies(this.frequencies);
+	this.setColormap(this.colormap);
 }
 
 inherits(Spectrum, Component);
@@ -154,30 +148,14 @@ Spectrum.prototype.frag = `
 	uniform vec4 viewport;
 	uniform float kernel[5];
 	uniform float kernelWeight;
-	uniform int logarithmic;
 	uniform float maxFrequency;
 	uniform float minFrequency;
 	uniform float maxDecibels;
 	uniform float minDecibels;
 	uniform float sampleRate;
 
-	float frequency;
-
-	const float log10 = log(10.);
-	const float pi = ${Math.PI};
-	const float pi2 = ${Math.PI*2};
-
-	float lg (float a) {
-		return log(a) / log10;
-	}
-
 	//return frequency coordinate from screen position
 	float f (float ratio) {
-		if (logarithmic == 1) {
-			float frequency = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );
-			ratio = (frequency - minFrequency) / (maxFrequency - minFrequency);
-		}
-
 		//map the freq range to visible range
 		float halfRate = sampleRate * 0.5;
 		float left = minFrequency / halfRate;
@@ -221,7 +199,6 @@ Spectrum.prototype.frag = `
 		intensity += (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
 		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
-		// gl_FragColor = vec4(vec3(intensity), 1);
 		gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
 	}
 `;
@@ -257,29 +234,25 @@ Spectrum.prototype.colormap = 'greys';
 Spectrum.prototype.colormapTextureUnit = 1;
 Spectrum.prototype.inverse = false;
 
-//TODO bars, line, dots
-Spectrum.prototype.style = 'bars';
+//masking texture shapes data into bars/dots
+Spectrum.prototype.mask = undefined;
 
 //TODO implement shadow frequencies, like averaged/max values
-Spectrum.prototype.shadow;
-
+Spectrum.prototype.shadow = [];
 
 //5-items linear kernel for smoothing frequencies
 Spectrum.prototype.kernel = [2, 3, 4, 3, 2];
 
 
 /**
- * Set frequencies texture taking into account smoothing
+ * Set frequencies taking into account smoothing, logarithmic and grouping params
  */
 Spectrum.prototype.setFrequencies = function (frequencies) {
 	if (!frequencies) return this;
-	if (!this.frequencies) return this.setTexture('frequencies', {
-		data: frequencies,
-		format: gl.ALPHA
-	});
 
-	var gl = this.context;
+	var gl = this.gl;
 
+	//choose bigger data
 	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
 	var shorter = bigger === frequencies ? this.frequencies : frequencies;
 
@@ -289,8 +262,25 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 		bigger[i] = clamp(bigger[i] * smoothing + shorter[Math.floor(shorter.length * (i / bigger.length))] * (1 - smoothing), 0, 1);
 	}
 
+	this.frequencies = bigger;
+
+	//create log mapped frequencies
+	var minF = this.minFrequency, maxF = this.maxFrequency;
+	this.logFrequencies = bigger.map((mag, i, frequencies) => {
+		var ratio = (i + .5) / frequencies.length;
+		var frequency = Math.pow(10., lg(minF) + ratio * (lg(maxF) - lg(minF)) );
+		ratio = (frequency - minF) / (maxF - minF);
+
+		//apply linear interpolation
+		var left = frequencies[Math.floor(ratio * frequencies.length)];
+		var right = frequencies[Math.ceil(ratio * frequencies.length)];
+		var fract = (ratio * frequencies.length) % 1;
+
+		return left * (1 - fract) + right * fract;
+	});
+
 	return this.setTexture('frequencies', {
-		data: bigger,
+		data: this.logarithmic ? this.logFrequencies : this.frequencies,
 		format: gl.ALPHA
 	});
 };
@@ -331,7 +321,7 @@ Spectrum.prototype.setColormap = function (cm) {
 	this.setTexture('colormap', {
 		data: this.colormap,
 		width: 128,
-		format: this.context.RGBA
+		format: this.gl.RGBA
 	});
 
 	//set grid color to colormap’s color
@@ -346,15 +336,32 @@ Spectrum.prototype.setColormap = function (cm) {
  * Render main loop
  */
 Spectrum.prototype.render = function () {
-	var gl = this.gl;
-
 	if (!this.is2d) {
 		Component.prototype.render.call(this);
 	}
 
 	else {
+		//TODO: 2d rendering?
+		var context = this.context;
+		var colormap = this.colormap;
 
+		context.fillStyle = 'rgba(' + colormap.slice(0,4).join(',') + ')';
+		context.fillRect.apply(context, this.viewport);
+
+		//calculate per-bar averages
+		var bars = [];
+		for (var i = 0; i < this.frequencies.length; i++) {
+
+		}
 	}
 
 	return this;
 };
+
+
+/**
+ * Generate mask
+ */
+Spectrum.prototype.mask = function () {
+
+}

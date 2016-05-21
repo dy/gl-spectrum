@@ -32,7 +32,8 @@ var spectrum = new Spectrum({
 	grid: true,
 	gridAxes: false,
 
-	//name or array of colors
+	//colormap name or array of colors
+	//e. g. [[255, 255, 255, 1], [255, 0, 0, 1]]
 	colormap: 'jet',
 
 	//inverse colormap
@@ -41,8 +42,8 @@ var spectrum = new Spectrum({
 	//WIP shadow frequencies
 	shadow: [],
 
-	//WIP
-	style: 'line'
+	//type of masking
+	mask: 'bars'
 });
 
 spectrum.setFrequencies(frequencies);
