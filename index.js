@@ -64,7 +64,8 @@ function Spectrum (options) {
 				titles: null,
 				style: {
 					borderLeftStyle: 'solid',
-					pointerEvents: 'none'
+					pointerEvents: 'none',
+					opacity: '0.08'
 				}
 			} : null],
 			axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.gridAxes) && [{
@@ -162,9 +163,6 @@ Spectrum.prototype.frag = `
 
 	float frequency;
 
-	// varying float average;
-	// varying float peak;
-
 	const float log10 = log(10.);
 	const float pi = ${Math.PI};
 	const float pi2 = ${Math.PI*2};
@@ -219,8 +217,8 @@ Spectrum.prototype.frag = `
 		float vertDist = abs(dist);
 
 		float intensity = 0.;
-		intensity += 1. - smoothstep(.0, .0032, vertDist);
-		intensity += (1. - step(0., dist)) * (-.8*log(1. - coord.y) * .5 + coord.y * .5);
+		intensity += (1. - smoothstep(.0, .0032, vertDist));
+		intensity += (1. - step(0., dist)) * (-.8*log(1. - coord.y) * .48 + coord.y * .48 + .1);
 		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
 		// gl_FragColor = vec4(vec3(intensity), 1);
