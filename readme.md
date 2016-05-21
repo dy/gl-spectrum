@@ -51,8 +51,8 @@ var spectrum = new Spectrum({
 	//type of masking
 	mask: 'bars',
 
-	//perform loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
-	weighting: 'z'
+	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
+	weighting: 'itu'
 });
 
 //pass db frequencies in -100...0 range

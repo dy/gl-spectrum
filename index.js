@@ -153,7 +153,7 @@ Spectrum.prototype.gridAxes = false;
 
 Spectrum.prototype.logarithmic = true;
 
-Spectrum.prototype.weighting = 'z';
+Spectrum.prototype.weighting = 'itu';
 
 //TODO
 Spectrum.prototype.orientation = 'horizontal';
@@ -258,12 +258,12 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 
 	//prepare renderable frequencies
-	this._frequencies = bigger.slice();
+	this._frequencies = this.frequencies.slice();
 
 	//apply a-weighting
 	if (weighting[this.weighting]) {
 		var w = weighting[this.weighting];
-		this._frequencies = this._frequencies.map((m, i, data) => m * w(i * l));
+		this._frequencies = this._frequencies.map((mag, i, data) => mag + 20 * Math.log(w(i * l)) / Math.log(10));
 	}
 
 	//subview freqs - min/max f, log mapping, db limiting
