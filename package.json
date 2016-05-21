@@ -4,6 +4,7 @@
   "description": "Display spectrum data with webgl",
   "main": "index.js",
   "dependencies": {
+    "a-weighting": "^1.0.0",
     "array-flatten": "^2.1.0",
     "canvas-fit": "^1.5.0",
     "colormap": "^2.1.2",

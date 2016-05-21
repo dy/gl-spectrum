@@ -16,6 +16,7 @@ var spectrum = new Spectrum({
 	canvas: canvas,
 	context: 'webgl',
 
+	//array with frequencies, where each frequency is 0..1 value
 	frequencies: frequenciesData,
 
 	maxDecibels: 0,
@@ -25,10 +26,13 @@ var spectrum = new Spectrum({
 	minFrequency: 20,
 
 	sampleRate: 44100,
+
+	//show logarithmic frequencies
 	logarithmic: true,
 
 	smoothing: 0.5,
 
+	//draw frequency/decibels grid
 	grid: true,
 	gridAxes: false,
 
@@ -36,14 +40,20 @@ var spectrum = new Spectrum({
 	//e. g. [[255, 255, 255, 1], [255, 0, 0, 1]]
 	colormap: 'jet',
 
-	//inverse colormap
+	//inverse colors
 	inverse: false,
+
+	//TODO: 0 - bottom, .5 - center, 1 - top
+	position: 0,
 
 	//WIP shadow frequencies
 	shadow: [],
 
 	//type of masking
-	mask: 'bars'
+	mask: 'bars',
+
+	//perform loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
+	weighting: 'z'
 });
 
 spectrum.setFrequencies(frequencies);
@@ -54,3 +64,4 @@ spectrum.setColormap(colors);
 
 * [colormap](https://github.com/bpostlethwaite/colormap) — list of js color maps.
 * [cli-visualizer](https://github.com/dpayne/cli-visualizer) — C++ spectrum visualizer.
+* []

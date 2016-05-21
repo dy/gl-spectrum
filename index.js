@@ -11,6 +11,7 @@ var createGrid = require('plot-grid');
 var colormap = require('colormap');
 var flatten = require('array-flatten');
 var clamp = require('mumath/clamp');
+var weighting = require('a-weighting');
 
 module.exports = Spectrum;
 
@@ -31,6 +32,7 @@ function Spectrum (options) {
 	if (isBrowser) {
 		this.container.classList.add('gl-spectrum');
 	}
+
 
 	//setup grid (have to go before context setup)
 	if (this.grid) {
@@ -87,7 +89,6 @@ function Spectrum (options) {
 	}));
 
 
-
 	//setup context
 	if (!this.is2d) {
 		var gl = this.gl;
@@ -104,10 +105,6 @@ function Spectrum (options) {
 		gl.uniform1f(kernelWeightLocation, this.kernel.reduce((prev, curr) => prev + curr, 0));
 
 		//setup params
-		var minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
-		gl.uniform1f(minFrequencyLocation, this.minFrequency);
-		var maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
-		gl.uniform1f(maxFrequencyLocation, this.maxFrequency);
 		var minDecibelsLocation = gl.getUniformLocation(this.program, 'minDecibels');
 		gl.uniform1f(minDecibelsLocation, this.minDecibels);
 		var maxDecibelsLocation = gl.getUniformLocation(this.program, 'maxDecibels');
@@ -137,6 +134,48 @@ function Spectrum (options) {
 inherits(Spectrum, Component);
 
 
+//evenly distributed within indicated diapasone
+Spectrum.prototype.frequencies = new Float32Array(1024);
+
+//index of frequencies texture
+Spectrum.prototype.frequenciesTextureUnit = 0;
+
+Spectrum.prototype.maxDecibels = 0;
+Spectrum.prototype.minDecibels = -100;
+
+Spectrum.prototype.maxFrequency = 20000;
+Spectrum.prototype.minFrequency = 20;
+
+Spectrum.prototype.smoothing = 0.5;
+
+Spectrum.prototype.grid = true;
+Spectrum.prototype.gridAxes = false;
+
+Spectrum.prototype.logarithmic = true;
+
+Spectrum.prototype.weighting = 'z';
+
+//TODO
+Spectrum.prototype.orientation = 'horizontal';
+
+//required to detect frequency resolution
+Spectrum.prototype.sampleRate = 44100;
+
+//colors to map spectrum against
+Spectrum.prototype.colormap = 'greys';
+Spectrum.prototype.colormapTextureUnit = 1;
+Spectrum.prototype.inverse = false;
+
+//masking texture shapes data into bars/dots
+Spectrum.prototype.mask = undefined;
+
+//TODO implement shadow frequencies, like averaged/max values
+Spectrum.prototype.shadow = [];
+
+//5-items linear kernel for smoothing frequencies
+Spectrum.prototype.kernel = [2, 3, 4, 3, 2];
+
+
 /**
  * Here we might have to do kernel averaging for some
  */
@@ -148,36 +187,22 @@ Spectrum.prototype.frag = `
 	uniform vec4 viewport;
 	uniform float kernel[5];
 	uniform float kernelWeight;
-	uniform float maxFrequency;
-	uniform float minFrequency;
 	uniform float maxDecibels;
 	uniform float minDecibels;
 	uniform float sampleRate;
-
-	//return frequency coordinate from screen position
-	float f (float ratio) {
-		//map the freq range to visible range
-		float halfRate = sampleRate * 0.5;
-		float left = minFrequency / halfRate;
-		float right = maxFrequency / halfRate;
-
-		ratio = left + ratio * (right - left);
-
-		return ratio;
-	}
 
 	//return [weighted] magnitude of [normalized] frequency
 	float magnitude (float nf) {
 		vec2 bin = vec2(1. / viewport.zw);
 
-		return texture2D(frequencies, vec2(f(nf), 0)).w;
+		return texture2D(frequencies, vec2((nf), 0)).w;
 
 		return (
-			kernel[0] * texture2D(frequencies, vec2(f(nf - 2. * bin.x), 0)).w +
-			kernel[1] * texture2D(frequencies, vec2(f(nf - bin.x), 0)).w +
-			kernel[2] * texture2D(frequencies, vec2(f(nf), 0)).w +
-			kernel[3] * texture2D(frequencies, vec2(f(nf + bin.x), 0)).w +
-			kernel[4] * texture2D(frequencies, vec2(f(nf + 2. * bin.x), 0)).w) / kernelWeight;
+			kernel[0] * texture2D(frequencies, vec2((nf - 2. * bin.x), 0)).w +
+			kernel[1] * texture2D(frequencies, vec2((nf - bin.x), 0)).w +
+			kernel[2] * texture2D(frequencies, vec2((nf), 0)).w +
+			kernel[3] * texture2D(frequencies, vec2((nf + bin.x), 0)).w +
+			kernel[4] * texture2D(frequencies, vec2((nf + 2. * bin.x), 0)).w) / kernelWeight;
 	}
 
 	void main () {
@@ -204,44 +229,7 @@ Spectrum.prototype.frag = `
 `;
 
 
-//evenly distributed within indicated diapasone
-Spectrum.prototype.frequencies = new Float32Array(1024);
 
-//index of frequencies texture
-Spectrum.prototype.frequenciesTextureUnit = 0;
-
-Spectrum.prototype.maxDecibels = 0;
-Spectrum.prototype.minDecibels = -100;
-
-Spectrum.prototype.maxFrequency = 20000;
-Spectrum.prototype.minFrequency = 20;
-
-Spectrum.prototype.smoothing = 0.5;
-
-Spectrum.prototype.grid = true;
-Spectrum.prototype.gridAxes = false;
-
-Spectrum.prototype.logarithmic = true;
-
-//TODO
-Spectrum.prototype.orientation = 'horizontal';
-
-//required to detect frequency resolution
-Spectrum.prototype.sampleRate = 44100;
-
-//colors to map spectrum against
-Spectrum.prototype.colormap = 'greys';
-Spectrum.prototype.colormapTextureUnit = 1;
-Spectrum.prototype.inverse = false;
-
-//masking texture shapes data into bars/dots
-Spectrum.prototype.mask = undefined;
-
-//TODO implement shadow frequencies, like averaged/max values
-Spectrum.prototype.shadow = [];
-
-//5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [2, 3, 4, 3, 2];
 
 
 /**
@@ -264,23 +252,42 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 	this.frequencies = bigger;
 
-	//create log mapped frequencies
+	var halfRate = this.sampleRate * 0.5;
+
+	//apply a-weighting
+	var l = halfRate / this.frequencies.length;
+
+	if (weighting[this.weighting]) {
+		var w = weighting[this.weighting];
+		this.frequencies = this.frequencies.map((m, i, data) => m * w(i * l));
+	}
+
+	//subview freqs - min/max f, log mapping
 	var minF = this.minFrequency, maxF = this.maxFrequency;
-	this.logFrequencies = bigger.map((mag, i, frequencies) => {
+	this.frequencies = this.frequencies.map((mag, i, frequencies) => {
 		var ratio = (i + .5) / frequencies.length;
-		var frequency = Math.pow(10., lg(minF) + ratio * (lg(maxF) - lg(minF)) );
-		ratio = (frequency - minF) / (maxF - minF);
+
+		if (this.logarithmic) {
+			var frequency = Math.pow(10., lg(minF) + ratio * (lg(maxF) - lg(minF)) );
+			ratio = (frequency - minF) / (maxF - minF);
+		}
+
+		var leftF = minF / halfRate;
+		var rightF = maxF / halfRate;
+
+		ratio = leftF + ratio * (rightF - leftF);
 
 		//apply linear interpolation
+		//TODO: implement here another interpolation: hi-f gets lost
 		var left = frequencies[Math.floor(ratio * frequencies.length)];
 		var right = frequencies[Math.ceil(ratio * frequencies.length)];
 		var fract = (ratio * frequencies.length) % 1;
 
 		return left * (1 - fract) + right * fract;
-	});
+	}, this);
 
 	return this.setTexture('frequencies', {
-		data: this.logarithmic ? this.logFrequencies : this.frequencies,
+		data: this.frequencies,
 		format: gl.ALPHA
 	});
 };
