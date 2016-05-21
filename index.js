@@ -218,7 +218,7 @@ Spectrum.prototype.frag = `
 
 		float intensity = 0.;
 		intensity += (1. - smoothstep(.0, .0032, vertDist));
-		intensity += (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .7)*.4 + .1);
+		intensity += (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
 		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
 		// gl_FragColor = vec4(vec3(intensity), 1);
