@@ -30,58 +30,8 @@ function Spectrum (options) {
 		this.container.classList.add('gl-spectrum');
 	}
 
-	if (!this.is2d) {
-		var gl = this.context;
 
-		var float = gl.getExtension('OES_texture_float');
-		if (!float) throw Error('WebGL does not support floats.');
-		var floatLinear = gl.getExtension('OES_texture_float_linear');
-		if (!floatLinear) throw Error('WebGL does not support floats.');
-
-		//setup kernel
-		var kernelLocation = gl.getUniformLocation(this.program, 'kernel[0]');
-		var kernelWeightLocation = gl.getUniformLocation(this.program, 'kernelWeight');
-		gl.uniform1fv(kernelLocation, this.kernel);
-		gl.uniform1f(kernelWeightLocation, this.kernel.reduce((prev, curr) => prev + curr, 0));
-
-		//setup params
-		var logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
-		gl.uniform1i(logarithmicLocation, this.logarithmic ? 1 : 0);
-		var minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
-		gl.uniform1f(minFrequencyLocation, this.minFrequency);
-		var maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
-		gl.uniform1f(maxFrequencyLocation, this.maxFrequency);
-		var minDecibelsLocation = gl.getUniformLocation(this.program, 'minDecibels');
-		gl.uniform1f(minDecibelsLocation, this.minDecibels);
-		var maxDecibelsLocation = gl.getUniformLocation(this.program, 'maxDecibels');
-		gl.uniform1f(maxDecibelsLocation, this.maxDecibels);
-		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
-		gl.uniform1f(sampleRateLocation, this.sampleRate);
-
-		//setup frequencies texture
-		this.bindTexture('frequencies', {
-			unit: this.frequenciesTextureUnit,
-			wrap: gl.CLAMP_TO_EDGE,
-			magFilter: gl.LINEAR,
-			minFilter: gl.LINEAR
-		});
-		this.setTexture('frequencies', {
-			data: this.frequencies,
-			format: gl.ALPHA
-		});
-		this.bindTexture({colormap: {
-			unit: this.colormapTextureUnit,
-			magFilter: gl.NEAREST,
-			minFilter: gl.NEAREST,
-			wrap: gl.CLAMP_TO_EDGE,
-		}});
-		this.setColormap(this.colormap);
-	}
-	else {
-
-	}
-
-	//setup grid
+	//setup grid (have to go before context setup)
 	if (this.grid) {
 		this.grid = createGrid({
 			container: this.container,
@@ -133,6 +83,60 @@ function Spectrum (options) {
 	this.on('resize', (vp) => this.grid.update({
 		viewport: vp
 	}));
+
+
+
+	//setup context
+	if (!this.is2d) {
+		var gl = this.context;
+
+		var float = gl.getExtension('OES_texture_float');
+		if (!float) throw Error('WebGL does not support floats.');
+		var floatLinear = gl.getExtension('OES_texture_float_linear');
+		if (!floatLinear) throw Error('WebGL does not support floats.');
+
+		//setup kernel
+		var kernelLocation = gl.getUniformLocation(this.program, 'kernel[0]');
+		var kernelWeightLocation = gl.getUniformLocation(this.program, 'kernelWeight');
+		gl.uniform1fv(kernelLocation, this.kernel);
+		gl.uniform1f(kernelWeightLocation, this.kernel.reduce((prev, curr) => prev + curr, 0));
+
+		//setup params
+		var logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
+		gl.uniform1i(logarithmicLocation, this.logarithmic ? 1 : 0);
+		var minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
+		gl.uniform1f(minFrequencyLocation, this.minFrequency);
+		var maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
+		gl.uniform1f(maxFrequencyLocation, this.maxFrequency);
+		var minDecibelsLocation = gl.getUniformLocation(this.program, 'minDecibels');
+		gl.uniform1f(minDecibelsLocation, this.minDecibels);
+		var maxDecibelsLocation = gl.getUniformLocation(this.program, 'maxDecibels');
+		gl.uniform1f(maxDecibelsLocation, this.maxDecibels);
+		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
+		gl.uniform1f(sampleRateLocation, this.sampleRate);
+
+		//setup frequencies texture
+		this.bindTexture('frequencies', {
+			unit: this.frequenciesTextureUnit,
+			wrap: gl.CLAMP_TO_EDGE,
+			magFilter: gl.LINEAR,
+			minFilter: gl.LINEAR
+		});
+		this.setTexture('frequencies', {
+			data: this.frequencies,
+			format: gl.ALPHA
+		});
+		this.bindTexture({colormap: {
+			unit: this.colormapTextureUnit,
+			magFilter: gl.NEAREST,
+			minFilter: gl.NEAREST,
+			wrap: gl.CLAMP_TO_EDGE,
+		}});
+		this.setColormap(this.colormap);
+	}
+	else {
+
+	}
 }
 
 inherits(Spectrum, Component);
@@ -315,6 +319,10 @@ Spectrum.prototype.setColormap = function (cm) {
 		width: 128,
 		format: this.context.RGBA
 	});
+
+	//set grid color to colormap’s color
+	var gridColor = this.colormap.slice(-4).map((v) => v*255);
+	this.grid.linesContainer.style.color = `rgba(${gridColor})`;
 
 	return this;
 };

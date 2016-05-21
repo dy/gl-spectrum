@@ -16,7 +16,8 @@ stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
 document.body.appendChild( stats.dom );
 stats.begin();
 stats.dom.style.left = 'auto';
-stats.dom.style.right = '0';
+stats.dom.style.right = '1rem';
+stats.dom.style.top = '1rem';
 
 
 //stream soundcloud
