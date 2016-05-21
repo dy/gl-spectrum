@@ -218,7 +218,7 @@ Spectrum.prototype.frag = `
 
 		float intensity = 0.;
 		intensity += (1. - smoothstep(.0, .0032, vertDist));
-		intensity += (1. - step(0., dist)) * (-.8*log(1. - coord.y) * .48 + coord.y * .48 + .1);
+		intensity += (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .7)*.4 + .1);
 		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
 		// gl_FragColor = vec4(vec3(intensity), 1);
@@ -255,6 +255,7 @@ Spectrum.prototype.sampleRate = 44100;
 //colors to map spectrum against
 Spectrum.prototype.colormap = 'greys';
 Spectrum.prototype.colormapTextureUnit = 1;
+Spectrum.prototype.inverse = false;
 
 //TODO bars, line, dots
 Spectrum.prototype.style = 'bars';
@@ -310,8 +311,23 @@ Spectrum.prototype.setColormap = function (cm) {
 	}
 	//custom array
 	else {
-		this.colormap = new Float32Array(cm);
+		this.colormap = new Float32Array(flatten(cm));
 	}
+
+	if (this.inverse && !cm.isReversed) {
+		var reverse = [];
+		for (var i = 0; i < this.colormap.length; i+=4){
+			reverse.unshift([
+				this.colormap[i + 0],
+				this.colormap[i + 1],
+				this.colormap[i + 2],
+				this.colormap[i + 3]
+			]);
+		}
+		reverse.isReversed = true;
+		return this.setColormap(reverse);
+	}
+
 	this.setTexture('colormap', {
 		data: this.colormap,
 		width: 128,

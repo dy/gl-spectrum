@@ -60,18 +60,18 @@ for (var i = 0; i < N; i++) {
 if (isBrowser) {
 	document.body.style.margin = '0';
 	document.body.style.boxSizing = 'border-box';
+	document.body.style.fontFamily = 'sans-serif';
 
 }
 
 function createColormapSelector (spectrum) {
 	//append style switcher
 	var switcher = document.createElement('select');
-	switcher.classList.add('.colormap');
+	switcher.classList.add('colormap');
 	switcher.style.position = 'fixed';
 	switcher.style.bottom = '1rem';
 	switcher.style.left = '1rem';
 	switcher.style.width = '4rem';
-	switcher.style.margin = '0 auto';
 	switcher.style.background = 'rgba(0,0,0,.95)';
 	switcher.style.color = 'white';
 	switcher.style.border = '0';
@@ -104,6 +104,25 @@ function createColormapSelector (spectrum) {
 		spectrum.setColormap(switcher.value);
 	});
 	document.body.appendChild(switcher);
+
+	var checkbox = document.createElement('input');
+	checkbox.classList.add('inversed');
+	checkbox.setAttribute('type', 'checkbox');
+	checkbox.style.position = 'fixed';
+	checkbox.style.margin = '0';
+	checkbox.style.bottom = '1rem';
+	checkbox.style.left = '5.5rem';
+	checkbox.style.width = '1rem';
+	checkbox.style.height = '1rem';
+	checkbox.style.background = 'rgba(0,0,0,.95)';
+	checkbox.style.color = 'white';
+	checkbox.style.border = '0';
+	checkbox.title = 'Reverse colormap';
+	checkbox.addEventListener('click', function () {
+		spectrum.inverse = checkbox.checked;
+		spectrum.setColormap(switcher.value);
+	});
+	document.body.appendChild(checkbox);
 }
 
 

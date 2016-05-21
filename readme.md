@@ -35,6 +35,9 @@ var spectrum = new Spectrum({
 	//name or array of colors
 	colormap: 'jet',
 
+	//inverse colormap
+	inverse: false,
+
 	//WIP shadow frequencies
 	shadow: [],
 
