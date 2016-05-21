@@ -5,13 +5,12 @@ var Spectrum = require('./');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
 var ft = require('fourier-transform');
+var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
 var SCBadge = require('soundcloud-badge');
 var Analyser = require('web-audio-analyser');
-var b = require('audio-buffer');
 var Stats = require('stats.js');
-var ndarray = require('ndarray');
-var fft = require('ndarray-fft');
+var db = require('decibels');
 
 
 var stats = new Stats();
@@ -28,9 +27,9 @@ var audio = new Audio;
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
-	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
-	song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
+	// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
 	dark: false,
 	getFonts: false
 }, function(err, src, data, div) {
@@ -56,7 +55,7 @@ var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(1000 * Math.PI * 2 * (i / rate));
+	sine[i] = Math.sin(4000 * Math.PI * 2 * (i / rate));
 	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
@@ -76,37 +75,26 @@ test.only('line webgl', function () {
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 	var waveform = new Float32Array(analyser.analyser.fftSize);
 	// var waveform = new Float32Array(sine);
-
 	var busy = false;
 
-	var fft = require('ndarray-fft');
-	var ndarray = require('ndarray');
-
 	var spectrum = new Spectrum({
-		frequencies: frequencies,
 		minFrequency: 40,
 		logarithmic: true,
-		smoothing: .5
+		smoothing: .5,
+		minDecibels: analyser.analyser.minDecibels,
+		maxDecibels: analyser.analyser.maxDecibels,
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
 	}).on('render', function () {
 		stats.end();
 		stats.begin();
-		// analyser.analyser.getFloatFrequencyData(frequencies);
-		// frequencies = frequencies.map(function (v) {
-		// 	return Math.max((100 + v) / 100, 0);
-		// });
 
 		analyser.analyser.getFloatTimeDomainData(waveform);
-		frequencies = ft(waveform);
 
-		// var x = ndarray(waveform);
-		// var y = ndarray(waveform);
-
-		// fft(1, x, y);
-
-		// console.log(x.get(5));
+		analyser.analyser.getFloatFrequencyData(frequencies);
+		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
+		// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
 		spectrum.setFrequencies(frequencies);
 	});

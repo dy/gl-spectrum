@@ -16,7 +16,6 @@ var spectrum = new Spectrum({
 	canvas: canvas,
 	context: 'webgl',
 
-	//array with frequencies, where each frequency is 0..1 value
 	frequencies: frequenciesData,
 
 	maxDecibels: 0,
@@ -56,6 +55,7 @@ var spectrum = new Spectrum({
 	weighting: 'z'
 });
 
+//pass db frequencies in -100...0 range
 spectrum.setFrequencies(frequencies);
 spectrum.setColormap(colors);
 ```

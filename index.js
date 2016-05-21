@@ -140,7 +140,7 @@ Spectrum.prototype.frequencies = new Float32Array(1024);
 //index of frequencies texture
 Spectrum.prototype.frequenciesTextureUnit = 0;
 
-Spectrum.prototype.maxDecibels = 0;
+Spectrum.prototype.maxDecibels = -30;
 Spectrum.prototype.minDecibels = -100;
 
 Spectrum.prototype.maxFrequency = 20000;
@@ -187,8 +187,6 @@ Spectrum.prototype.frag = `
 	uniform vec4 viewport;
 	uniform float kernel[5];
 	uniform float kernelWeight;
-	uniform float maxDecibels;
-	uniform float minDecibels;
 	uniform float sampleRate;
 
 	//return [weighted] magnitude of [normalized] frequency
@@ -239,6 +237,10 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	if (!frequencies) return this;
 
 	var gl = this.gl;
+	var minF = this.minFrequency, maxF = this.maxFrequency;
+	var minDb = this.minDecibels, maxDb = this.maxDecibels;
+	var halfRate = this.sampleRate * 0.5;
+	var l = halfRate / this.frequencies.length;
 
 	//choose bigger data
 	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
@@ -246,25 +248,26 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 	var smoothing = bigger === this.frequencies ? this.smoothing : 1 - this.smoothing;
 
+
 	for (var i = 0; i < bigger.length; i++) {
-		bigger[i] = clamp(bigger[i] * smoothing + shorter[Math.floor(shorter.length * (i / bigger.length))] * (1 - smoothing), 0, 1);
+		bigger[i] = clamp(bigger[i], -200, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -200, 0) * (1 - smoothing);
 	}
 
+	//save actual frequencies
 	this.frequencies = bigger;
 
-	var halfRate = this.sampleRate * 0.5;
+
+	//prepare renderable frequencies
+	this._frequencies = bigger.slice();
 
 	//apply a-weighting
-	var l = halfRate / this.frequencies.length;
-
 	if (weighting[this.weighting]) {
 		var w = weighting[this.weighting];
-		this.frequencies = this.frequencies.map((m, i, data) => m * w(i * l));
+		this._frequencies = this._frequencies.map((m, i, data) => m * w(i * l));
 	}
 
-	//subview freqs - min/max f, log mapping
-	var minF = this.minFrequency, maxF = this.maxFrequency;
-	this.frequencies = this.frequencies.map((mag, i, frequencies) => {
+	//subview freqs - min/max f, log mapping, db limiting
+	this._frequencies = this._frequencies.map((mag, i, frequencies) => {
 		var ratio = (i + .5) / frequencies.length;
 
 		if (this.logarithmic) {
@@ -283,11 +286,14 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 		var right = frequencies[Math.ceil(ratio * frequencies.length)];
 		var fract = (ratio * frequencies.length) % 1;
 
-		return left * (1 - fract) + right * fract;
+		var value = left * (1 - fract) + right * fract;
+
+		//sublimit db to 0..1 range
+		return (value - minDb) / (maxDb - minDb);
 	}, this);
 
 	return this.setTexture('frequencies', {
-		data: this.frequencies,
+		data: this._frequencies,
 		format: gl.ALPHA
 	});
 };
