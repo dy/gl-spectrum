@@ -39,7 +39,11 @@
   "keywords": [
     "gl",
     "spectrum",
-    "audio"
+    "audio",
+    "a-weighting",
+    "psychoacoustics",
+    "acoustics",
+    "audio-vis"
   ],
   "author": "ΔY <dfcreative@gmail.com>",
   "license": "MIT",

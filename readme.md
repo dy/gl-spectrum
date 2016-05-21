@@ -4,6 +4,14 @@ Spectrum rendering component.
 
 [![Spectrum](https://raw.githubusercontent.com/audio-lab/gl-spectrum/gh-pages/preview.png "Spectrum")](http://audio-lab.github.io/gl-spectrum/)
 
+* Multitude of colormaps
+* Customizable style
+* Psychoacoustic weighting
+* FPS 60
+* Customizable grid with frequency/db ranges
+* Logarithmic/linear scale
+
+
 ## Usage
 
 [![npm install gl-spectrum](https://nodei.co/npm/gl-spectrum.png?mini=true)](https://npmjs.org/package/gl-spectrum/)

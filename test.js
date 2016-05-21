@@ -27,9 +27,9 @@ var audio = new Audio;
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
-	song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
-	// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
+	song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
 	dark: false,
 	getFonts: false
 }, function(err, src, data, div) {
