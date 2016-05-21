@@ -8,6 +8,15 @@ var ft = require('fourier-transform');
 var isBrowser = require('is-browser');
 var SCBadge = require('soundcloud-badge');
 var Analyser = require('web-audio-analyser');
+var b = require('audio-buffer');
+var Stats = require('stats.js');
+
+var stats = new Stats();
+stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
+document.body.appendChild( stats.dom );
+stats.begin();
+stats.dom.style.left = 'auto';
+stats.dom.style.right = '0';
 
 
 //stream soundcloud
@@ -111,6 +120,8 @@ test.only('linear classics', function () {
 		// 	return [50,20,w-70,h-60];
 		// }
 	}).on('render', function () {
+		stats.end();
+		stats.begin();
 		analyser.analyser.getFloatFrequencyData(frequencies);
 		frequencies = frequencies.map(function (v) {
 			return Math.max((100 + v) / 100, 0);
