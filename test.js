@@ -78,6 +78,7 @@ test.only('line webgl', function () {
 	var busy = false;
 
 	var spectrum = new Spectrum({
+		colormap: [1,1,1,1, 0,0,0,1],
 		minFrequency: 40,
 		logarithmic: true,
 		smoothing: .5,
@@ -159,16 +160,23 @@ test('oscilloscope');
 
 
 function createColormapSelector (spectrum) {
+	var container = document.createElement('div');
+	container.style.position = 'fixed';
+	container.style.bottom = '0';
+	container.style.left = '0';
+	container.style.right = '0';
+	container.style.padding = '.5rem';
+	container.style.color = 'white';
+	container.style.border = '0';
+	document.body.appendChild(container);
+
 	//append style switcher
 	var switcher = document.createElement('select');
 	switcher.classList.add('colormap');
-	switcher.style.position = 'fixed';
-	switcher.style.bottom = '1rem';
-	switcher.style.left = '1rem';
 	switcher.style.width = '4rem';
-	switcher.style.background = 'rgba(0,0,0,.95)';
-	switcher.style.color = 'white';
+	switcher.style.color = 'inherit';
 	switcher.style.border = '0';
+	switcher.style.background = 'none';
 	switcher.innerHTML = `
 		<option value="jet">jet</option>
 		<option value="hsv">hsv</option>
@@ -197,24 +205,48 @@ function createColormapSelector (spectrum) {
 	switcher.addEventListener('input', function () {
 		spectrum.setColormap(switcher.value);
 	});
-	document.body.appendChild(switcher);
+	container.appendChild(switcher);
 
+
+	//inversed colormap checkbox
 	var checkbox = document.createElement('input');
 	checkbox.classList.add('inversed');
 	checkbox.setAttribute('type', 'checkbox');
-	checkbox.style.position = 'fixed';
-	checkbox.style.margin = '0';
-	checkbox.style.bottom = '1rem';
-	checkbox.style.left = '5.5rem';
+	checkbox.style.margin = '0 0 0 .5rem';
 	checkbox.style.width = '1rem';
 	checkbox.style.height = '1rem';
-	checkbox.style.background = 'rgba(0,0,0,.95)';
-	checkbox.style.color = 'white';
 	checkbox.style.border = '0';
+	checkbox.style.background = 'none';
+	checkbox.style.color = 'inherit';
+	checkbox.style.verticalAlign = 'bottom';
 	checkbox.title = 'Reverse colormap';
 	checkbox.addEventListener('click', function () {
 		spectrum.inverse = checkbox.checked;
 		spectrum.setColormap(switcher.value);
+
+		container.style.color = 'rgb(' + spectrum.colormap.slice(-4, -1).map((v) => v*255).join(', ') + ')';
 	});
-	document.body.appendChild(checkbox);
+	container.appendChild(checkbox);
+
+
+	//weighting switcher
+	var weightingEl = document.createElement('select');
+	weightingEl.classList.add('weighting');
+	weightingEl.style.width = '4rem';
+	weightingEl.style.border = '0';
+	weightingEl.style.color = 'inherit';
+	weightingEl.style.marginLeft = '1rem';
+	weightingEl.style.background = 'none';
+	weightingEl.innerHTML = `
+		<option value="a">A</option>
+		<option value="b">B</option>
+		<option value="c">C</option>
+		<option value="d">D</option>
+		<option value="itu" selected>ITU</option>
+		<option value="z">Z (none)</option>
+	`;
+	weightingEl.addEventListener('input', function () {
+		spectrum.weighting = weightingEl.value;
+	});
+	container.appendChild(weightingEl);
 }

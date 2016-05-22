@@ -333,7 +333,7 @@ Spectrum.prototype.setColormap = function (cm) {
 
 	this.setTexture('colormap', {
 		data: this.colormap,
-		width: 128,
+		width: (this.colormap.length / 4)|0,
 		format: this.gl.RGBA
 	});
 
