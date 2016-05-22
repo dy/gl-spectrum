@@ -5,7 +5,7 @@ var Spectrum = require('./');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
 var ft = require('fourier-transform');
-var blackman = require('scijs-window-functions/blackman-harris');
+var blackman = require('scijs-window-functions/blackman');
 var isBrowser = require('is-browser');
 var SCBadge = require('soundcloud-badge');
 var Analyser = require('web-audio-analyser');
@@ -24,6 +24,7 @@ stats.dom.style.top = '1rem';
 
 //stream soundcloud
 var audio = new Audio;
+/*
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
@@ -42,6 +43,7 @@ var badge = SCBadge({
 		audio.play();
 	}, false);
 });
+*/
 
 var analyser = Analyser(audio, { audible: true, stereo: false })
 
@@ -69,21 +71,22 @@ if (isBrowser) {
 }
 
 
-test.only('line webgl', function () {
-	// var frequencies = new Float32Array(ft(sine));
+test.skip('line webgl', function () {
+	var frequencies = ft(noise.map((v, i) => v*blackman(i, noise.length)))
+	.map((v) => db.fromGain(v));
 	// var frequencies = new Float32Array(1024).fill(0.5);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
-	var waveform = new Float32Array(analyser.analyser.fftSize);
+	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	// var waveform = new Float32Array(analyser.analyser.fftSize);
 	// var waveform = new Float32Array(sine);
 	var busy = false;
 
 	var spectrum = new Spectrum({
-		colormap: [1,1,1,1, 0,0,0,1],
+		frequencies: frequencies,
+		// colormap: [1,1,1,1, 0,0,0,1],
 		minFrequency: 40,
 		logarithmic: true,
 		smoothing: .5,
-		minDecibels: analyser.analyser.minDecibels,
-		maxDecibels: analyser.analyser.maxDecibels,
+		maxDecibels: 0,
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
@@ -91,36 +94,41 @@ test.only('line webgl', function () {
 		stats.end();
 		stats.begin();
 
-		analyser.analyser.getFloatTimeDomainData(waveform);
+		// analyser.analyser.getFloatTimeDomainData(waveform);
 
-		analyser.analyser.getFloatFrequencyData(frequencies);
+		// analyser.analyser.getFloatFrequencyData(frequencies);
 		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 		// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-		spectrum.setFrequencies(frequencies);
+		// spectrum.setFrequencies(frequencies);
 	});
 
 	createColormapSelector(spectrum);
 });
 
-test.skip('bars 2d', function () {
+test.only('bars 2d', function () {
 	// var frequencies = new Float32Array(ft(sine));
 	// var frequencies = new Float32Array(1024).fill(0.5);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+
+	var frequencies = ft(noise.map((v, i) => v*blackman(i, noise.length)))
+	.map((v) => db.fromGain(v));
 
 	var spectrum = new Spectrum({
-		style: 'bars',
+		frequencies: frequencies,
+		maxDecibels: 0,
+		// style: 'bars',
 		grid: false,
-		colormap: [255,255,255,1, 255,0,0,1],
+		// colormap: [255,255,255,1, 255,0,0,1],
 		logarithmic: true
 	}).on('render', function () {
 		stats.end();
 		stats.begin();
-		analyser.analyser.getFloatFrequencyData(frequencies);
-		frequencies = frequencies.map(function (v) {
-			return Math.max((100 + v) / 100, 0);
-		});
-		spectrum.setFrequencies(frequencies);
+		// analyser.analyser.getFloatFrequencyData(frequencies);
+		// frequencies = frequencies.map(function (v) {
+		// 	return Math.max((100 + v) / 100, 0);
+		// });
+		// spectrum.setFrequencies(frequencies);
 	});
 
 	createColormapSelector(spectrum);
@@ -253,8 +261,10 @@ function createColormapSelector (spectrum) {
 	container.appendChild(weightingEl);
 
 
+	updateView();
 
 	function updateView () {
+		spectrum.setFrequencies(spectrum.frequencies);
 		container.style.color = 'rgb(' + spectrum.colormap.slice(-4, -1).map((v) => v*255).join(', ') + ')';
 	}
 }

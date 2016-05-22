@@ -134,11 +134,6 @@ function Spectrum (options) {
 inherits(Spectrum, Component);
 
 
-//evenly distributed within indicated diapasone
-Spectrum.prototype.frequencies = new Float32Array(1024);
-
-//index of frequencies texture
-Spectrum.prototype.frequenciesTextureUnit = 0;
 
 Spectrum.prototype.maxDecibels = -30;
 Spectrum.prototype.minDecibels = -100;
@@ -154,6 +149,12 @@ Spectrum.prototype.gridAxes = false;
 Spectrum.prototype.logarithmic = true;
 
 Spectrum.prototype.weighting = 'itu';
+
+//evenly distributed within indicated diapasone
+Spectrum.prototype.frequencies = new Float32Array(512).fill(Spectrum.prototype.minDecibels);
+
+//index of frequencies texture
+Spectrum.prototype.frequenciesTextureUnit = 0;
 
 //TODO
 Spectrum.prototype.orientation = 'horizontal';
@@ -338,8 +339,10 @@ Spectrum.prototype.setColormap = function (cm) {
 	});
 
 	//set grid color to colormap’s color
-	var gridColor = this.colormap.slice(-4).map((v) => v*255);
-	this.grid.linesContainer.style.color = `rgba(${gridColor})`;
+	if (this.grid) {
+		var gridColor = this.colormap.slice(-4).map((v) => v*255);
+		this.grid.linesContainer.style.color = `rgba(${gridColor})`;
+	}
 
 	return this;
 };
