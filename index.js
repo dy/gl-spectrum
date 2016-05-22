@@ -84,8 +84,8 @@ function Spectrum (options) {
 		});
 	};
 
-	this.on('resize', (vp) => this.grid.update({
-		viewport: vp
+	this.on('resize', () => this.grid.update({
+		viewport: this.viewport
 	}));
 
 

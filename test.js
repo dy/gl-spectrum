@@ -166,7 +166,6 @@ function createColormapSelector (spectrum) {
 	container.style.left = '0';
 	container.style.right = '0';
 	container.style.padding = '.5rem';
-	container.style.color = 'white';
 	container.style.border = '0';
 	document.body.appendChild(container);
 
@@ -204,6 +203,7 @@ function createColormapSelector (spectrum) {
 	`;
 	switcher.addEventListener('input', function () {
 		spectrum.setColormap(switcher.value);
+		updateView();
 	});
 	container.appendChild(switcher);
 
@@ -224,7 +224,7 @@ function createColormapSelector (spectrum) {
 		spectrum.inverse = checkbox.checked;
 		spectrum.setColormap(switcher.value);
 
-		container.style.color = 'rgb(' + spectrum.colormap.slice(-4, -1).map((v) => v*255).join(', ') + ')';
+		updateView();
 	});
 	container.appendChild(checkbox);
 
@@ -247,6 +247,14 @@ function createColormapSelector (spectrum) {
 	`;
 	weightingEl.addEventListener('input', function () {
 		spectrum.weighting = weightingEl.value;
+
+		updateView();
 	});
 	container.appendChild(weightingEl);
+
+
+
+	function updateView () {
+		container.style.color = 'rgb(' + spectrum.colormap.slice(-4, -1).map((v) => v*255).join(', ') + ')';
+	}
 }
