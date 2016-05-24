@@ -9,7 +9,7 @@ var lg = require('mumath/lg');
 var isBrowser = require('is-browser');
 var createGrid = require('plot-grid');
 var colormap = require('colormap');
-var flatten = require('array-flatten');
+var flatten = require('flatten');
 var clamp = require('mumath/clamp');
 var weighting = require('a-weighting');
 
@@ -26,6 +26,7 @@ function Spectrum (options) {
 	var that = this;
 
 	options = options || {};
+	options.antialias = true;
 
 	Component.call(this, options);
 
@@ -84,12 +85,11 @@ function Spectrum (options) {
 		});
 	};
 
-	this.on('resize', () => this.grid.update({
+	this.on('resize', () => this.grid && this.grid.update({
 		viewport: this.viewport
 	}));
 
 
-	//setup context
 	if (!this.is2d) {
 		var gl = this.gl;
 
@@ -98,37 +98,9 @@ function Spectrum (options) {
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
-		//setup kernel
-		var kernelLocation = gl.getUniformLocation(this.program, 'kernel[0]');
-		var kernelWeightLocation = gl.getUniformLocation(this.program, 'kernelWeight');
-		gl.uniform1fv(kernelLocation, this.kernel);
-		gl.uniform1f(kernelWeightLocation, this.kernel.reduce((prev, curr) => prev + curr, 0));
-
-		//setup params
-		var minDecibelsLocation = gl.getUniformLocation(this.program, 'minDecibels');
-		gl.uniform1f(minDecibelsLocation, this.minDecibels);
-		var maxDecibelsLocation = gl.getUniformLocation(this.program, 'maxDecibels');
-		gl.uniform1f(maxDecibelsLocation, this.maxDecibels);
-		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
-		gl.uniform1f(sampleRateLocation, this.sampleRate);
-
-		//setup frequencies and colormap textures
-		this.bindTexture('frequencies', {
-			unit: this.frequenciesTextureUnit,
-			wrap: gl.CLAMP_TO_EDGE,
-			magFilter: gl.LINEAR,
-			minFilter: gl.LINEAR
-		});
-		this.bindTexture({colormap: {
-			unit: this.colormapTextureUnit,
-			magFilter: gl.NEAREST,
-			minFilter: gl.NEAREST,
-			wrap: gl.CLAMP_TO_EDGE,
-		}});
+		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
 	}
-
-	this.setFrequencies(this.frequencies);
-	this.setColormap(this.colormap);
+	this.update();
 }
 
 inherits(Spectrum, Component);
@@ -153,8 +125,8 @@ Spectrum.prototype.weighting = 'itu';
 //evenly distributed within indicated diapasone
 Spectrum.prototype.frequencies = new Float32Array(512).fill(Spectrum.prototype.minDecibels);
 
-//index of frequencies texture
-Spectrum.prototype.frequenciesTextureUnit = 0;
+//line, bars, dots, text
+Spectrum.prototype.mode = 'line';
 
 //TODO
 Spectrum.prototype.orientation = 'horizontal';
@@ -164,17 +136,13 @@ Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
 Spectrum.prototype.colormap = 'greys';
-Spectrum.prototype.colormapTextureUnit = 1;
-Spectrum.prototype.inverse = false;
-
-//masking texture shapes data into bars/dots
-Spectrum.prototype.mask = undefined;
+Spectrum.prototype.colormapInverse = false;
 
 //TODO implement shadow frequencies, like averaged/max values
 Spectrum.prototype.shadow = [];
 
-//5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [2, 3, 4, 3, 2];
+//mask defines style of bars, dots or line
+Spectrum.prototype.mask = [.1,.4,.1,0.,  .4,1.,.4,0.,  .1,4.,.1,0.,  .0,.0,.0,0.];
 
 
 /**
@@ -186,48 +154,96 @@ Spectrum.prototype.frag = `
 	uniform sampler2D frequencies;
 	uniform sampler2D colormap;
 	uniform vec4 viewport;
-	uniform float kernel[5];
-	uniform float kernelWeight;
-	uniform float sampleRate;
+	uniform sampler2D mask;
 
-	//return [weighted] magnitude of [normalized] frequency
+	vec2 coord;
+	vec2 bin;
+	float currMag;
+	float prevMag;
+	float nextMag;
+	float currF;
+	float prevF;
+	float nextF;
+	float maxMag;
+	float minMag;
+	float slope;
+	float alpha;
+
+	const float maskSize = 4.;
+
+	//return magnitude of normalized frequency
 	float magnitude (float nf) {
-		vec2 bin = vec2(1. / viewport.zw);
+		return texture2D(frequencies, vec2((nf), 0.5)).w;
+	}
 
-		return texture2D(frequencies, vec2((nf), 0)).w;
+	float within (float x, float left, float right) {
+		return step(left, x) * step(x, right);
+	}
 
-		return (
-			kernel[0] * texture2D(frequencies, vec2((nf - 2. * bin.x), 0)).w +
-			kernel[1] * texture2D(frequencies, vec2((nf - bin.x), 0)).w +
-			kernel[2] * texture2D(frequencies, vec2((nf), 0)).w +
-			kernel[3] * texture2D(frequencies, vec2((nf + bin.x), 0)).w +
-			kernel[4] * texture2D(frequencies, vec2((nf + 2. * bin.x), 0)).w) / kernelWeight;
+	//return masked line intensity
+	float getIntensity () {
+		float result = 0.;
+		float sum = 0.;
+		float x0 = currF;
+		float x1 = prevF;
+		float x2 = nextF;
+		float y0 = coord.y;
+		float y1 = prevMag;
+		float y2 = nextMag;
+		float m = slope;
+		float bottomMag = y0 - .5 * bin.y;
+		float topMag = y0 + .5 * bin.y;
+
+		//go by all mask’s pixels, weight covered pixels
+
+		//intersections
+		float topX = ((y0 + .5 * bin.y) - y1) / m + x1;
+		float bottomX = ((y0 - .5 * bin.y) - y1) / m + x1;
+		float leftY = m * ((x0 - .5 * bin.x) - x1) + y1;
+		float rightY = m * ((x0 + .5 * bin.x) - x1) + y1;
+
+		float resultY = max(within(topX, prevF, nextF), within(bottomX, prevF, nextF));
+		float resultX = max(within(leftY, bottomMag, topMag), within(rightY, bottomMag, topMag));
+
+		result = max(resultX, resultY);
+
+		return result;
 	}
 
 	void main () {
-		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
-		vec2 bin = vec2(1. / viewport.zw);
-		float prevMag = magnitude(coord.x - bin.x);
-		float currMag = magnitude(coord.x);
-		float maxMag = max(currMag, prevMag);
-		float minMag = min(currMag, prevMag);
-
-		vec2 p2 = vec2(coord.x, currMag);
-		vec2 p1 = vec2(coord.x - bin.x, prevMag);
+		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
+		bin = vec2(1. / viewport.zw);
+		prevF = coord.x - bin.x * .5;
+		currF = coord.x;
+		nextF = coord.x + bin.x * .5;
+		prevMag = magnitude(prevF);
+		currMag = magnitude(currF);
+		nextMag = magnitude(nextF);
+		maxMag = max(nextMag, prevMag);
+		minMag = min(nextMag, prevMag);
+		slope = (nextMag - prevMag) / bin.x;
+		alpha = atan(nextMag - prevMag, bin.x);
 
 		float dist = coord.y - currMag;
 		float vertDist = abs(dist);
 
+		float lineIntensity = 0.;
+		float fillIntensity = 0.;
 		float intensity = 0.;
-		intensity += (1. - smoothstep(.0, .0032, vertDist));
-		intensity += (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
-		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
-		gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
+		//apply mask for line intensity
+		lineIntensity = getIntensity();
+
+		intensity = lineIntensity + fillIntensity;
+
+		// intensity += (1. - smoothstep(.0, .0032, vertDist));
+		// intensity += (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
+		// intensity += step(coord.y, maxMag) * step(minMag, coord.y);
+
+		gl_FragColor = vec4(vec3(intensity),1);
+		// gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
 	}
 `;
-
-
 
 
 
@@ -259,16 +275,16 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 
 	//prepare renderable frequencies
-	this._frequencies = this.frequencies.slice();
+	frequencies = this.frequencies.slice();
 
 	//apply a-weighting
 	if (weighting[this.weighting]) {
 		var w = weighting[this.weighting];
-		this._frequencies = this._frequencies.map((mag, i, data) => mag + 20 * Math.log(w(i * l)) / Math.log(10));
+		frequencies = frequencies.map((mag, i, data) => mag + 20 * Math.log(w(i * l)) / Math.log(10));
 	}
 
 	//subview freqs - min/max f, log mapping, db limiting
-	this._frequencies = this._frequencies.map((mag, i, frequencies) => {
+	frequencies = frequencies.map((mag, i, frequencies) => {
 		var ratio = (i + .5) / frequencies.length;
 
 		if (this.logarithmic) {
@@ -286,16 +302,21 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 		var left = frequencies[Math.floor(ratio * frequencies.length)];
 		var right = frequencies[Math.ceil(ratio * frequencies.length)];
 		var fract = (ratio * frequencies.length) % 1;
-
 		var value = left * (1 - fract) + right * fract;
+
+		// var value = frequencies[Math.round(ratio * frequencies.length)];
+
 
 		//sublimit db to 0..1 range
 		return (value - minDb) / (maxDb - minDb);
 	}, this);
 
 	return this.setTexture('frequencies', {
-		data: this._frequencies,
-		format: gl.ALPHA
+		data: frequencies,
+		format: gl.ALPHA,
+		magFilter: this.gl.LINEAR,
+		minFilter: this.gl.LINEAR,
+		wrap: this.gl.CLAMP_TO_EDGE
 	});
 };
 
@@ -318,7 +339,7 @@ Spectrum.prototype.setColormap = function (cm) {
 		this.colormap = new Float32Array(flatten(cm));
 	}
 
-	if (this.inverse && !cm.isReversed) {
+	if (this.colormapInverse && !cm.isReversed) {
 		var reverse = [];
 		for (var i = 0; i < this.colormap.length; i+=4){
 			reverse.unshift([
@@ -335,7 +356,10 @@ Spectrum.prototype.setColormap = function (cm) {
 	this.setTexture('colormap', {
 		data: this.colormap,
 		width: (this.colormap.length / 4)|0,
-		format: this.gl.RGBA
+		format: this.gl.RGBA,
+		magFilter: this.gl.LINEAR,
+		minFilter: this.gl.LINEAR,
+		wrap: this.gl.CLAMP_TO_EDGE
 	});
 
 	//set grid color to colormap’s color
@@ -349,14 +373,61 @@ Spectrum.prototype.setColormap = function (cm) {
 
 
 /**
+ * Set named or array mask
+ */
+Spectrum.prototype.setMask = function (mask) {
+	var width, height;
+
+	if (typeof mask === 'string') {
+
+	}
+
+	else if (Array.isArray(mask)) {
+		width = mask.width || mask.length;
+		height = mask.height || 1;
+	}
+
+	this.setTexture('mask', {
+		data: this.mask,
+		width: 4,
+		height: 4,
+		type: this.gl.FLOAT,
+		format: this.gl.ALPHA,
+		magFilter: this.gl.LINEAR,
+		minFilter: this.gl.LINEAR,
+		wrap: this.gl.CLAMP_TO_EDGE
+	});
+
+	return this;
+};
+
+
+/**
+ * Update uniforms values, textures etc.
+ * It should be called when the settings changed.
+ */
+Spectrum.prototype.update = function () {
+	var gl = this.gl;
+
+	//update unifroms
+	gl.uniform1f(this.maskSizeLocation, this.maskSize);
+
+	//update textures
+	this.setFrequencies(this.frequencies);
+	this.setColormap(this.colormap);
+	this.setMask(this.mask);
+
+	return this;
+};
+
+
+/**
  * Render main loop
  */
 Spectrum.prototype.render = function () {
-	if (!this.is2d) {
-		Component.prototype.render.call(this);
-	}
+	Component.prototype.render.call(this);
 
-	else {
+	if (this.is2d) {
 		//TODO: 2d rendering?
 		var context = this.context;
 		var colormap = this.colormap;
@@ -373,11 +444,3 @@ Spectrum.prototype.render = function () {
 
 	return this;
 };
-
-
-/**
- * Generate mask
- */
-Spectrum.prototype.mask = function () {
-
-}

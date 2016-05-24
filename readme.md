@@ -26,14 +26,16 @@ var spectrum = new Spectrum({
 	canvas: canvas,
 	context: 'webgl',
 
+	//decibels data, -100...0
 	frequencies: frequenciesData,
 
-	maxDecibels: 0,
+	//magnitude range to show
+	maxDecibels: -30,
 	minDecibels: -100,
 
+	//frequency range
 	maxFrequency: 20000,
 	minFrequency: 20,
-
 	sampleRate: 44100,
 
 	//show logarithmic frequencies
@@ -45,20 +47,17 @@ var spectrum = new Spectrum({
 	grid: true,
 	gridAxes: false,
 
-	//colormap name or array of colors
-	//e. g. [[255, 255, 255, 1], [255, 0, 0, 1]]
+	//colormap name or array of colors, e. g. [[255, 255, 255, 1], [255, 0, 0, 1]]
 	colormap: 'jet',
+	colormapInverse: false,
 
-	//inverse colors
-	inverse: false,
-
-	//TODO: 0 - bottom, .5 - center, 1 - top
-	position: 0,
+	//place spectrum at the center
+	symmetrical: false,
 
 	//WIP shadow frequencies
 	shadow: [],
 
-	//type of masking
+	//mask defines the style of bars, dots or a line
 	mask: 'bars',
 
 	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)

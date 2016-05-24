@@ -67,3 +67,7 @@
 ## Q: how do we do background image not-plain color?
 * Do colormap with 0=transparent.
 * Place proper gradientmap?
+
+## Q: should we keep colormap when there are gradient?
+* we could just pick extreme gradient values and that’s it.
+* better leave colormap but make it 2d-able.

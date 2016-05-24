@@ -71,7 +71,7 @@ if (isBrowser) {
 }
 
 
-test.skip('line webgl', function () {
+test('line webgl', function () {
 	var frequencies = ft(noise.map((v, i) => v*blackman(i, noise.length)))
 	.map((v) => db.fromGain(v));
 	// var frequencies = new Float32Array(1024).fill(0.5);
@@ -264,7 +264,7 @@ function createColormapSelector (spectrum) {
 	updateView();
 
 	function updateView () {
-		spectrum.setFrequencies(spectrum.frequencies);
+		spectrum.update();
 		container.style.color = 'rgb(' + spectrum.colormap.slice(-4, -1).map((v) => v*255).join(', ') + ')';
 	}
 }
