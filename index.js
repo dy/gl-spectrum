@@ -100,6 +100,7 @@ function Spectrum (options) {
 
 		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
 	}
+
 	this.update();
 }
 
@@ -142,7 +143,7 @@ Spectrum.prototype.colormapInverse = false;
 Spectrum.prototype.shadow = [];
 
 //mask defines style of bars, dots or line
-Spectrum.prototype.mask = [.1,.4,.1,0,  .4,1.,.4,0,  .1,.4,.1,0,  0,0,0,0];
+Spectrum.prototype.mask = null;
 
 
 /**
@@ -155,6 +156,7 @@ Spectrum.prototype.frag = `
 	uniform sampler2D colormap;
 	uniform vec4 viewport;
 	uniform sampler2D mask;
+	uniform vec2 maskSize;
 
 	vec2 coord;
 	vec2 bin;
@@ -168,8 +170,6 @@ Spectrum.prototype.frag = `
 	float minMag;
 	float slope;
 	float alpha;
-
-	const float maskSize = 4.;
 
 	//return magnitude of normalized frequency
 	float magnitude (float nf) {
@@ -199,14 +199,26 @@ Spectrum.prototype.frag = `
 		slope = (currMag - prevMag) / bin.x;
 		alpha = atan(currMag - prevMag, bin.x);
 
-		float dist = coord.y - currMag;
+
+		//apply mask
+		vec2 maskCoord = vec2(mod(gl_FragCoord.x, maskSize.x) / maskSize.x, .5);
+		float maskOffset = gl_FragCoord.x - mod(gl_FragCoord.x, maskSize.x);
+
+		//find mask’s offset frequency
+		float averageMag = magnitude((maskOffset + .5) / viewport.z);
+
+
+		//calc dist
+		float dist = coord.y - averageMag;
 		float vertDist = abs(dist);
 		float intensity;
 
-		//apply mask for line intensity
 		intensity = (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
-		intensity += (1. - smoothstep(.0, .0032, vertDist));
-		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
+		// intensity += (1. - smoothstep(.0, .0032, vertDist));
+		// intensity += step(coord.y, maxMag) * step(minMag, coord.y);
+
+
+		intensity *= texture2D(mask, maskCoord).x;
 
 		gl_FragColor = vec4(vec3(intensity),1);
 		// gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
@@ -241,8 +253,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	//save actual frequencies
 	this.frequencies = bigger;
 
-
-	//prepare renderable frequencies
+	//prepare f’s for rendering
 	frequencies = this.frequencies.slice();
 
 	//apply a-weighting
@@ -272,6 +283,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 		var fract = (ratio * frequencies.length) % 1;
 		var value = left * (1 - fract) + right * fract;
 
+		//closest interpolation
 		// var value = frequencies[Math.round(ratio * frequencies.length)];
 
 
@@ -344,27 +356,14 @@ Spectrum.prototype.setColormap = function (cm) {
  * Set named or array mask
  */
 Spectrum.prototype.setMask = function (mask) {
-	var width, height;
-
-	if (typeof mask === 'string') {
-
-	}
-
-	else if (Array.isArray(mask)) {
-		width = mask.width || mask.length;
-		height = mask.height || 1;
-	}
-
 	this.setTexture('mask', {
 		data: this.mask,
-		width: 4,
-		height: 4,
 		type: this.gl.FLOAT,
-		format: this.gl.ALPHA,
-		magFilter: this.gl.LINEAR,
-		minFilter: this.gl.LINEAR,
+		format: this.gl.LUMINOCITY,
 		wrap: this.gl.CLAMP_TO_EDGE
 	});
+
+	this.gl.uniform2f(this.maskSizeLocation, this.textures.mask.width, this.textures.mask.height);
 
 	return this;
 };
@@ -376,9 +375,6 @@ Spectrum.prototype.setMask = function (mask) {
  */
 Spectrum.prototype.update = function () {
 	var gl = this.gl;
-
-	//update unifroms
-	gl.uniform1f(this.maskSizeLocation, this.maskSize);
 
 	//update textures
 	this.setFrequencies(this.frequencies);

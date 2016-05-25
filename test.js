@@ -114,10 +114,20 @@ test.only('bars 2d', function () {
 	var frequencies = ft(noise.map((v, i) => v*blackman(i, noise.length)))
 	.map((v) => db.fromGain(v));
 
+	//create mask
+	var canvas = document.createElement('canvas');
+	canvas.width = 20;
+	canvas.height = 20;
+	var ctx = canvas.getContext('2d');
+	ctx.clearRect(0, 0, 20, 20);
+	ctx.fillStyle = 'rgb(255,255,255)';
+	ctx.fillRect(1, 0, 18, 20);
+
 	var spectrum = new Spectrum({
+		mask: canvas,
 		frequencies: frequencies,
 		maxDecibels: 0,
-		// style: 'bars',
+		mode: 'bars',
 		grid: false,
 		// colormap: [255,255,255,1, 255,0,0,1],
 		logarithmic: true

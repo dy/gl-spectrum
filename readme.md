@@ -57,8 +57,9 @@ var spectrum = new Spectrum({
 	//WIP shadow frequencies
 	shadow: [],
 
-	//mask defines the style of bars, dots or a line
-	mask: 'bars',
+	//mask defines the style of bars, should be an image, imageData or canvasElement
+	//the value of luminocity is used
+	mask: null,
 
 	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
 	weighting: 'itu'
