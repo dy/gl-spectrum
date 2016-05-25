@@ -115,13 +115,27 @@ test.only('bars 2d', function () {
 	.map((v) => db.fromGain(v));
 
 	//create mask
+	var rect = [10, 10];
+	var radius = 7;
 	var canvas = document.createElement('canvas');
-	canvas.width = 20;
-	canvas.height = 20;
+	canvas.width = rect[0] + 2;
+	canvas.height = rect[1] + 2;
 	var ctx = canvas.getContext('2d');
-	ctx.clearRect(0, 0, 20, 20);
+	ctx.clearRect(0, 0, rect[0] + 2, rect[1] + 2);
+	ctx.fillStyle = 'rgb(0,0,0)';
+	ctx.fillRect(0, 0, rect[0] + 2, rect[1] + 2);
+	ctx.strokeStyle = 'rgb(255,255,255)';
 	ctx.fillStyle = 'rgb(255,255,255)';
-	ctx.fillRect(1, 0, 18, 20);
+	ctx.lineJoin = 'round';
+	ctx.lineWidth = radius;
+	ctx.strokeRect((radius/2), (radius/2), rect[0]-radius, rect[1]-radius);
+	ctx.fillRect((radius/2), (radius/2), rect[0]-radius, rect[1]-radius);
+
+	document.body.appendChild(canvas);
+	canvas.style.zIndex = 999;
+	canvas.style.position = 'absolute';
+	canvas.style.top = '0px';
+	canvas.style.left = '0px';
 
 	var spectrum = new Spectrum({
 		mask: canvas,

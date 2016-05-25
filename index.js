@@ -202,28 +202,35 @@ Spectrum.prototype.frag = `
 		alpha = atan(currMag - prevMag, bin.x);
 
 
-		//apply mask
-		float maskOffset = mod(gl_FragCoord.x, maskSize.x);
-		vec2 maskCoord = vec2(maskOffset / maskSize.x, .5);
-		float maskX = gl_FragCoord.x - maskOffset;
+		//calc mask
+		float maskX = mod(gl_FragCoord.x, maskSize.x);
+		float maskOutset = gl_FragCoord.x - maskX + .5;
 
 		//find mask’s offset frequency
-		float averageMag = magnitude((maskX + .5) / viewport.z);
+		float averageMag = magnitude(maskOutset / viewport.z);
 
 		//mute the last bar
-		averageMag *= step(gl_FragCoord.x - viewport.x, viewport.z - (maskSize.x - maskOffset));
+		averageMag *= step(gl_FragCoord.x - viewport.x, viewport.z - (maskSize.x - maskX));
 
 
 		//calc dist
 		float dist = coord.y - averageMag;
 		float vertDist = abs(dist);
-		float intensity;
 
+
+		//calc intensity
+		float intensity;
 		intensity = (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
 		// intensity += (1. - smoothstep(.0, .0032, vertDist));
 		// intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
 
+		//apply mask
+		float maskY = min(
+			min((-dist * viewport.w) / maskSize.y, .5),
+			min(coord.y * viewport.w / maskSize.y, .5)
+		);
+		vec2 maskCoord = vec2(maskX / maskSize.x, maskY);
 		intensity *= texture2D(mask, maskCoord).x;
 
 		gl_FragColor = vec4(vec3(intensity),1);
