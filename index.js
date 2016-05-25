@@ -203,11 +203,15 @@ Spectrum.prototype.frag = `
 
 
 		//apply mask
-		vec2 maskCoord = vec2(mod(gl_FragCoord.x, maskSize.x) / maskSize.x, .5);
-		float maskOffset = gl_FragCoord.x - mod(gl_FragCoord.x, maskSize.x);
+		float maskOffset = mod(gl_FragCoord.x, maskSize.x);
+		vec2 maskCoord = vec2(maskOffset / maskSize.x, .5);
+		float maskX = gl_FragCoord.x - maskOffset;
 
 		//find mask’s offset frequency
-		float averageMag = magnitude((maskOffset + .5) / viewport.z);
+		float averageMag = magnitude((maskX + .5) / viewport.z);
+
+		//mute the last bar
+		averageMag *= step(gl_FragCoord.x - viewport.x, viewport.z - (maskSize.x - maskOffset));
 
 
 		//calc dist
