@@ -142,7 +142,7 @@ Spectrum.prototype.colormapInverse = false;
 Spectrum.prototype.shadow = [];
 
 //mask defines style of bars, dots or line
-Spectrum.prototype.mask = [.1,.4,.1,0.,  .4,1.,.4,0.,  .1,4.,.1,0.,  .0,.0,.0,0.];
+Spectrum.prototype.mask = [.1,.4,.1,0,  .4,1.,.4,0,  .1,.4,.1,0,  0,0,0,0];
 
 
 /**
@@ -180,65 +180,33 @@ Spectrum.prototype.frag = `
 		return step(left, x) * step(x, right);
 	}
 
-	//return masked line intensity
-	float getIntensity () {
-		float result = 0.;
-		float sum = 0.;
-		float x0 = currF;
-		float x1 = prevF;
-		float x2 = nextF;
-		float y0 = coord.y;
-		float y1 = prevMag;
-		float y2 = nextMag;
-		float m = slope;
-		float bottomMag = y0 - .5 * bin.y;
-		float topMag = y0 + .5 * bin.y;
-
-		//go by all mask’s pixels, weight covered pixels
-
-		//intersections
-		float topX = ((y0 + .5 * bin.y) - y1) / m + x1;
-		float bottomX = ((y0 - .5 * bin.y) - y1) / m + x1;
-		float leftY = m * ((x0 - .5 * bin.x) - x1) + y1;
-		float rightY = m * ((x0 + .5 * bin.x) - x1) + y1;
-
-		float resultY = max(within(topX, prevF, nextF), within(bottomX, prevF, nextF));
-		float resultX = max(within(leftY, bottomMag, topMag), within(rightY, bottomMag, topMag));
-
-		result = max(resultX, resultY);
-
-		return result;
+	float distToLine(vec2 p1, vec2 p2, vec2 testPt) {
+		vec2 lineDir = p2 - p1;
+		vec2 perpDir = vec2(lineDir.y, -lineDir.x);
+		vec2 dirToPt1 = p1 - testPt;
+		return abs(dot(normalize(perpDir), dirToPt1));
 	}
 
 	void main () {
 		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		bin = vec2(1. / viewport.zw);
-		prevF = coord.x - bin.x * .5;
+		prevF = coord.x - bin.x;
 		currF = coord.x;
-		nextF = coord.x + bin.x * .5;
 		prevMag = magnitude(prevF);
 		currMag = magnitude(currF);
-		nextMag = magnitude(nextF);
-		maxMag = max(nextMag, prevMag);
-		minMag = min(nextMag, prevMag);
-		slope = (nextMag - prevMag) / bin.x;
-		alpha = atan(nextMag - prevMag, bin.x);
+		maxMag = max(currMag, prevMag);
+		minMag = min(currMag, prevMag);
+		slope = (currMag - prevMag) / bin.x;
+		alpha = atan(currMag - prevMag, bin.x);
 
 		float dist = coord.y - currMag;
 		float vertDist = abs(dist);
-
-		float lineIntensity = 0.;
-		float fillIntensity = 0.;
-		float intensity = 0.;
+		float intensity;
 
 		//apply mask for line intensity
-		lineIntensity = getIntensity();
-
-		intensity = lineIntensity + fillIntensity;
-
-		// intensity += (1. - smoothstep(.0, .0032, vertDist));
-		// intensity += (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
-		// intensity += step(coord.y, maxMag) * step(minMag, coord.y);
+		intensity = (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
+		intensity += (1. - smoothstep(.0, .0032, vertDist));
+		intensity += step(coord.y, maxMag) * step(minMag, coord.y);
 
 		gl_FragColor = vec4(vec3(intensity),1);
 		// gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
@@ -314,8 +282,8 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	return this.setTexture('frequencies', {
 		data: frequencies,
 		format: gl.ALPHA,
-		magFilter: this.gl.LINEAR,
-		minFilter: this.gl.LINEAR,
+		magFilter: this.gl.NEAREST,
+		minFilter: this.gl.NEAREST,
 		wrap: this.gl.CLAMP_TO_EDGE
 	});
 };
