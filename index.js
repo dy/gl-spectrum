@@ -99,6 +99,7 @@ function Spectrum (options) {
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
 		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
+		this.alignLocation = gl.getUniformLocation(this.program, 'align');
 	}
 
 	this.update();
@@ -141,6 +142,9 @@ Spectrum.prototype.sampleRate = 44100;
 Spectrum.prototype.fill = 'greys';
 Spectrum.prototype.inverse = false;
 
+//amount of alignment
+Spectrum.prototype.align = .0;
+
 //TODO implement shadow frequencies, like averaged/max values
 Spectrum.prototype.shadow = [];
 
@@ -159,6 +163,7 @@ Spectrum.prototype.frag = `
 	uniform vec4 viewport;
 	uniform sampler2D mask;
 	uniform vec2 maskSize;
+	uniform float align;
 
 	vec2 coord;
 	vec2 bin;
@@ -191,15 +196,15 @@ Spectrum.prototype.frag = `
 
 	void main () {
 		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
-		bin = vec2(1. / viewport.zw);
-		prevF = coord.x - bin.x;
-		currF = coord.x;
-		prevMag = magnitude(prevF);
-		currMag = magnitude(currF);
-		maxMag = max(currMag, prevMag);
-		minMag = min(currMag, prevMag);
-		slope = (currMag - prevMag) / bin.x;
-		alpha = atan(currMag - prevMag, bin.x);
+		// bin = vec2(1. / viewport.zw);
+		// prevF = coord.x - bin.x;
+		// currF = coord.x;
+		// prevMag = magnitude(prevF);
+		// currMag = magnitude(currF);
+		// maxMag = max(currMag, prevMag);
+		// minMag = min(currMag, prevMag);
+		// slope = (currMag - prevMag) / bin.x;
+		// alpha = atan(currMag - prevMag, bin.x);
 
 
 		//calc mask
@@ -207,37 +212,34 @@ Spectrum.prototype.frag = `
 		float maskOutset = gl_FragCoord.x - maskX + .5;
 
 		//find mask’s offset frequency
-		float averageMag = magnitude(maskOutset / viewport.z);
+		float mag = magnitude(maskOutset / viewport.z);
 
 		//mute the last bar
-		averageMag *= step(gl_FragCoord.x - viewport.x, viewport.z - (maskSize.x - maskX));
+		// mag *= step(gl_FragCoord.x - viewport.x, viewport.z - (maskSize.x - maskX));
 
 
 		//calc dist
-		float dist = coord.y - averageMag;
-		float vertDist = abs(dist);
-
+		float dist = abs(align - coord.y);
 
 		//calc intensity
-		float intensity;
-		intensity = (1. - step(0., dist)) * (-.4*log(1. - coord.y) * .5 + pow(coord.y, .75)*.4 + .12);
-		// intensity += (1. - smoothstep(.0, .0032, vertDist));
-		// intensity += step(coord.y, maxMag) * step(minMag, coord.y);
+		float maxAlign = min(max(align, 1. - align), .8);
+		float minAlign = max(1. - maxAlign, .2);
+		float intensity = pow(dist / max(align, 1. - align), .8) * (maxAlign) + (minAlign);
 
 
 		//apply mask
-		float maskY = min(
-			min((-dist * viewport.w) / maskSize.y, .5),
-			min(coord.y * viewport.w / maskSize.y, .5)
+		// float dist = step(coord.y - mag + align*mag - align, 0.) * step(-coord.y - align*mag + align, 0.);
+		float maskY = max(
+			max((coord.y - mag + align*mag - align) * viewport.w / maskSize.y, .5),
+			max((-coord.y - align*mag + align) * viewport.w / maskSize.y, .5)
 		);
 		vec2 maskCoord = vec2(maskX / maskSize.x, maskY);
 		intensity *= texture2D(mask, maskCoord).x;
 
-		gl_FragColor = vec4(vec3(intensity),1);
-		// gl_FragColor = texture2D(fill, vec2(max(0.,intensity), coord.y));
+		// gl_FragColor = vec4(vec3(intensity),1);
+		gl_FragColor = texture2D(fill, vec2(coord.y, max(align, 1. - align)));
 	}
 `;
-
 
 
 /**
@@ -352,7 +354,8 @@ Spectrum.prototype.setFill = function (cm) {
 
 	this.setTexture('fill', {
 		data: this.fill,
-		width: (this.fill.length / 4)|0,
+		width: 1,
+		height: (this.fill.length / 4)|0,
 		format: this.gl.RGBA,
 		magFilter: this.gl.LINEAR,
 		minFilter: this.gl.LINEAR,
@@ -374,7 +377,7 @@ Spectrum.prototype.setFill = function (cm) {
  */
 Spectrum.prototype.setMask = function (mask) {
 	this.setTexture('mask', {
-		data: this.mask,
+		data: this.mask || [1,1,1,1],
 		type: this.gl.FLOAT,
 		format: this.gl.LUMINOCITY,
 		wrap: this.gl.CLAMP_TO_EDGE
@@ -397,6 +400,8 @@ Spectrum.prototype.update = function () {
 	this.setFrequencies(this.frequencies);
 	this.setFill(this.fill);
 	this.setMask(this.mask);
+
+	this.gl.uniform1f(this.alignLocation, this.align);
 
 	return this;
 };

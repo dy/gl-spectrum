@@ -128,21 +128,21 @@ test.only('bars 2d', function () {
 	ctx.fillStyle = 'rgb(255,255,255)';
 	ctx.lineJoin = 'round';
 	ctx.lineWidth = radius;
-	ctx.strokeRect((radius/2), (radius/2), rect[0]-radius, rect[1]-radius);
-	ctx.fillRect((radius/2), (radius/2), rect[0]-radius, rect[1]-radius);
+	ctx.strokeRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
+	ctx.fillRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
 
-	document.body.appendChild(canvas);
-	canvas.style.zIndex = 999;
-	canvas.style.position = 'absolute';
-	canvas.style.top = '0px';
-	canvas.style.left = '0px';
+	// document.body.appendChild(canvas);
+	// canvas.style.zIndex = 999;
+	// canvas.style.position = 'absolute';
+	// canvas.style.top = '0px';
+	// canvas.style.left = '0px';
 
 	var spectrum = new Spectrum({
 		mask: canvas,
 		frequencies: frequencies,
 		maxDecibels: 0,
-		mode: 'bars',
 		grid: false,
+		align: .5,
 		// colormap: [255,255,255,1, 255,0,0,1],
 		logarithmic: true
 	}).on('render', function () {

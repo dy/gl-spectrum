@@ -50,17 +50,17 @@ var spectrum = new Spectrum({
 	//colormap, pixels, imageData, imageElement or canvas
 	fill: null,
 
-	//place spectrum at the center
-	symmetrical: false,
+	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
+	align: 0,
 
 	//WIP shadow frequencies
 	shadow: [],
 
-	//snap magnitude to step
+	//snap magnitude to step. Number.
 	snap: null,
 
-	//defines the style of bars. An image, imageData or canvasElement.
-	barImage: null,
+	//defines the width or style of bars. A number (for width), image, imageData or canvasElement.
+	mask: null,
 
 	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
 	weighting: 'itu'
