@@ -72,7 +72,7 @@ function Spectrum (options) {
 					opacity: '0.08'
 				}
 			} : null],
-			axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.gridAxes) && [{
+			axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
 				name: 'Frequency',
 				labels: function (value, i, opt) {
 					var str = value.toString();
@@ -116,8 +116,10 @@ Spectrum.prototype.minFrequency = 20;
 
 Spectrum.prototype.smoothing = 0.5;
 
+Spectrum.prototype.snap = null;
+
 Spectrum.prototype.grid = true;
-Spectrum.prototype.gridAxes = false;
+Spectrum.prototype.axes = false;
 
 Spectrum.prototype.logarithmic = true;
 
@@ -136,8 +138,8 @@ Spectrum.prototype.orientation = 'horizontal';
 Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
-Spectrum.prototype.colormap = 'greys';
-Spectrum.prototype.colormapInverse = false;
+Spectrum.prototype.fill = 'greys';
+Spectrum.prototype.inverse = false;
 
 //TODO implement shadow frequencies, like averaged/max values
 Spectrum.prototype.shadow = [];
@@ -153,7 +155,7 @@ Spectrum.prototype.frag = `
 	precision lowp float;
 
 	uniform sampler2D frequencies;
-	uniform sampler2D colormap;
+	uniform sampler2D fill;
 	uniform vec4 viewport;
 	uniform sampler2D mask;
 	uniform vec2 maskSize;
@@ -221,7 +223,7 @@ Spectrum.prototype.frag = `
 		intensity *= texture2D(mask, maskCoord).x;
 
 		gl_FragColor = vec4(vec3(intensity),1);
-		// gl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));
+		// gl_FragColor = texture2D(fill, vec2(max(0.,intensity), coord.y));
 	}
 `;
 
@@ -286,6 +288,10 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 		//closest interpolation
 		// var value = frequencies[Math.round(ratio * frequencies.length)];
 
+		//snap
+		if (this.snap) {
+			value = Math.round(value * this.snap) / this.snap;
+		}
 
 		//sublimit db to 0..1 range
 		return (value - minDb) / (maxDb - minDb);
@@ -304,10 +310,10 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 /**
  * Reset colormap
  */
-Spectrum.prototype.setColormap = function (cm) {
+Spectrum.prototype.setFill = function (cm) {
 	//named colormap
 	if (typeof cm === 'string') {
-		this.colormap = new Float32Array(flatten(colormap({
+		this.fill = new Float32Array(flatten(colormap({
 			colormap: cm,
 			nshades: 128,
 			format: 'rgba',
@@ -316,26 +322,26 @@ Spectrum.prototype.setColormap = function (cm) {
 	}
 	//custom array
 	else {
-		this.colormap = new Float32Array(flatten(cm));
+		this.fill = new Float32Array(flatten(cm));
 	}
 
-	if (this.colormapInverse && !cm.isReversed) {
+	if (this.inverse && !cm.isReversed) {
 		var reverse = [];
-		for (var i = 0; i < this.colormap.length; i+=4){
+		for (var i = 0; i < this.fill.length; i+=4){
 			reverse.unshift([
-				this.colormap[i + 0],
-				this.colormap[i + 1],
-				this.colormap[i + 2],
-				this.colormap[i + 3]
+				this.fill[i + 0],
+				this.fill[i + 1],
+				this.fill[i + 2],
+				this.fill[i + 3]
 			]);
 		}
 		reverse.isReversed = true;
-		return this.setColormap(reverse);
+		return this.setFill(reverse);
 	}
 
-	this.setTexture('colormap', {
-		data: this.colormap,
-		width: (this.colormap.length / 4)|0,
+	this.setTexture('fill', {
+		data: this.fill,
+		width: (this.fill.length / 4)|0,
 		format: this.gl.RGBA,
 		magFilter: this.gl.LINEAR,
 		minFilter: this.gl.LINEAR,
@@ -344,7 +350,7 @@ Spectrum.prototype.setColormap = function (cm) {
 
 	//set grid color to colormap’s color
 	if (this.grid) {
-		var gridColor = this.colormap.slice(-4).map((v) => v*255);
+		var gridColor = this.fill.slice(-4).map((v) => v*255);
 		this.grid.linesContainer.style.color = `rgba(${gridColor})`;
 	}
 
@@ -378,7 +384,7 @@ Spectrum.prototype.update = function () {
 
 	//update textures
 	this.setFrequencies(this.frequencies);
-	this.setColormap(this.colormap);
+	this.setFill(this.fill);
 	this.setMask(this.mask);
 
 	return this;
@@ -394,9 +400,9 @@ Spectrum.prototype.render = function () {
 	if (this.is2d) {
 		//TODO: 2d rendering?
 		var context = this.context;
-		var colormap = this.colormap;
+		var fill = this.fill;
 
-		context.fillStyle = 'rgba(' + colormap.slice(0,4).join(',') + ')';
+		context.fillStyle = 'rgba(' + fill.slice(0,4).join(',') + ')';
 		context.fillRect.apply(context, this.viewport);
 
 		//calculate per-bar averages

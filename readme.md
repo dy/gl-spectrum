@@ -45,11 +45,10 @@ var spectrum = new Spectrum({
 
 	//draw frequency/decibels grid
 	grid: true,
-	gridAxes: false,
+	axes: false,
 
-	//colormap name or array of colors, e. g. [[255, 255, 255, 1], [255, 0, 0, 1]]
-	colormap: 'jet',
-	colormapInverse: false,
+	//colormap, pixels, imageData, imageElement or canvas
+	fill: null,
 
 	//place spectrum at the center
 	symmetrical: false,
@@ -57,9 +56,11 @@ var spectrum = new Spectrum({
 	//WIP shadow frequencies
 	shadow: [],
 
-	//mask defines the style of bars, should be an image, imageData or canvasElement
-	//the value of luminocity is used
-	mask: null,
+	//snap magnitude to step
+	snap: null,
+
+	//defines the style of bars. An image, imageData or canvasElement.
+	barImage: null,
 
 	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
 	weighting: 'itu'
@@ -67,11 +68,14 @@ var spectrum = new Spectrum({
 
 //pass db frequencies in -100...0 range
 spectrum.setFrequencies(frequencies);
-spectrum.setColormap(colors);
+spectrum.setFill(colors);
+spectrum.setMask(mask);
+
+//update state according to the params
+spectrum.update();
 ```
 
 ## Related
 
 * [colormap](https://github.com/bpostlethwaite/colormap) — list of js color maps.
 * [cli-visualizer](https://github.com/dpayne/cli-visualizer) — C++ spectrum visualizer.
-* []

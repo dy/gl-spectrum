@@ -220,7 +220,7 @@ function createColormapSelector (spectrum) {
 		<!--<option value="alpha">alpha</option>-->
 	`;
 	switcher.addEventListener('input', function () {
-		spectrum.setColormap(switcher.value);
+		spectrum.setFill(switcher.value);
 		updateView();
 	});
 	container.appendChild(switcher);
@@ -240,7 +240,7 @@ function createColormapSelector (spectrum) {
 	checkbox.title = 'Reverse colormap';
 	checkbox.addEventListener('click', function () {
 		spectrum.inverse = checkbox.checked;
-		spectrum.setColormap(switcher.value);
+		spectrum.setFill(switcher.value);
 
 		updateView();
 	});
@@ -275,6 +275,6 @@ function createColormapSelector (spectrum) {
 
 	function updateView () {
 		spectrum.update();
-		container.style.color = 'rgb(' + spectrum.colormap.slice(-4, -1).map((v) => v*255).join(', ') + ')';
+		container.style.color = 'rgb(' + spectrum.fill.slice(-4, -1).map((v) => v*255).join(', ') + ')';
 	}
 }
