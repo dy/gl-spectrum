@@ -49,7 +49,6 @@ var badge = SCBadge({
 var analyser = Analyser(audio, { audible: true, stereo: false })
 
 
-
 //generate input sine
 var N = 2048;
 var sine = new Float32Array(N);
@@ -68,29 +67,28 @@ if (isBrowser) {
 	document.body.style.margin = '0';
 	document.body.style.boxSizing = 'border-box';
 	document.body.style.fontFamily = 'sans-serif';
-
 }
 
 
 test('line webgl', function () {
-	var frequencies = ft(noise.map((v, i) => v*blackman(i, noise.length)))
-	.map((v) => db.fromGain(v));
+	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
-	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
-	// var waveform = new Float32Array(analyser.analyser.fftSize);
-	// var waveform = new Float32Array(sine);
-	var busy = false;
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+
+	// var frequencies = ft(noise);
+	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
 
 	var spectrum = new Spectrum({
 		frequencies: frequencies,
-		// colormap: [1,1,1,1, 0,0,0,1],
-		minFrequency: 40,
+		fill: 'yignbu',
+		grid: true,
+		minFrequency: 20,
 		maxFrequency: 20000,
 		logarithmic: true,
 		smoothing: .5,
 		maxDecibels: 0,
 		// mask: null,
-		align: 0,
+		align: 0.5,
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
@@ -99,18 +97,18 @@ test('line webgl', function () {
 		stats.begin();
 
 		// analyser.analyser.getFloatTimeDomainData(waveform);
-
-		// analyser.analyser.getFloatFrequencyData(frequencies);
 		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 		// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-		// spectrum.setFrequencies(frequencies);
+		analyser.analyser.getFloatFrequencyData(frequencies);
+
+		spectrum.setFrequencies(frequencies);
 	});
 
 	createColormapSelector(spectrum);
 });
 
-test.only('bars 2d', function () {
+test.skip('bars 2d', function () {
 	var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
@@ -118,39 +116,16 @@ test.only('bars 2d', function () {
 	// var frequencies = ft(noise);
 	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
 
-	//create mask
-	var rect = [10, 10];
-	var radius = 7;
-	var canvas = document.createElement('canvas');
-	canvas.width = rect[0] + 2;
-	canvas.height = rect[1] + 2;
-	var ctx = canvas.getContext('2d');
-	ctx.clearRect(0, 0, rect[0] + 2, rect[1] + 2);
-	ctx.fillStyle = 'rgb(0,0,0)';
-	ctx.fillRect(0, 0, rect[0] + 2, rect[1] + 2);
-	ctx.strokeStyle = 'rgb(255,255,255)';
-	ctx.fillStyle = 'rgb(255,255,255)';
-	ctx.lineJoin = 'round';
-	ctx.lineWidth = radius;
-	ctx.strokeRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
-	ctx.fillRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
-
-	// document.body.appendChild(canvas);
-	// canvas.style.zIndex = 999;
-	// canvas.style.position = 'absolute';
-	// canvas.style.top = '0px';
-	// canvas.style.left = '0px';
-
 	var spectrum = new Spectrum({
-		mask: canvas,
+		mask: createMask(10, 10),
 		// mask: null,
 		frequencies: frequencies,
 		maxDecibels: 0,
 		maxFrequency: 20000,
 		grid: false,
 		align: 0.5,
-		background: [1,0,0,1],
-		fill: [1,1,1,1],
+		// background: [1,0,0,1],
+		// fill: [1,1,1,1],
 		logarithmic: true
 	}).on('render', function () {
 		stats.end();
@@ -162,15 +137,10 @@ test.only('bars 2d', function () {
 	createColormapSelector(spectrum);
 });
 
-test.skip('node', function () {
-
-});
+test.skip('node', function () {});
 
 
-test.skip('viewport', function () {
-
-});
-
+test.skip('viewport', function () {});
 
 test('clannels');
 
@@ -203,6 +173,7 @@ function createColormapSelector (spectrum) {
 	container.style.right = '0';
 	container.style.padding = '.5rem';
 	container.style.border = '0';
+	container.style.zIndex = 999;
 	document.body.appendChild(container);
 
 	//append style switcher
@@ -210,6 +181,7 @@ function createColormapSelector (spectrum) {
 	switcher.classList.add('colormap');
 	switcher.style.width = '4rem';
 	switcher.style.color = 'inherit';
+	switcher.style.fontSize = '.8rem';
 	switcher.style.border = '0';
 	switcher.style.background = 'none';
 	switcher.title = 'Colormap';
@@ -224,8 +196,8 @@ function createColormapSelector (spectrum) {
 		<option value="winter">winter</option>
 		<option value="bone">bone</option>
 		<option value="copper">copper</option>
-		<option value="greys" selected>greys</option>
-		<option value="yignbu">yignbu</option>
+		<option value="greys">greys</option>
+		<option value="yignbu" selected>yignbu</option>
 		<option value="greens">greens</option>
 		<option value="yiorrd">yiorrd</option>
 		<option value="bluered">bluered</option>
@@ -246,24 +218,12 @@ function createColormapSelector (spectrum) {
 
 
 	//inversed colormap checkbox
-	var inverseCheckbox = document.createElement('input');
-	inverseCheckbox.classList.add('inversed');
-	inverseCheckbox.setAttribute('type', 'checkbox');
-	inverseCheckbox.style.margin = '0 0 0 .5rem';
-	inverseCheckbox.style.width = '1rem';
-	inverseCheckbox.style.height = '1rem';
-	inverseCheckbox.style.border = '0';
-	inverseCheckbox.style.background = 'none';
-	inverseCheckbox.style.color = 'inherit';
-	inverseCheckbox.style.verticalAlign = 'bottom';
-	inverseCheckbox.title = 'Inverse colormap';
-	inverseCheckbox.addEventListener('click', function () {
-		// spectrum.inverse = inverseCheckbox.checked;
-		spectrum.setFill(switcher.value, inverseCheckbox.checked);
-
+	var inverseSwitch = createSwitch('inversed', function () {
+		spectrum.setFill(switcher.value, this.checked);
 		updateView();
 	});
-	container.appendChild(inverseCheckbox);
+	var inverseCheckbox = inverseSwitch.querySelector('input');
+	container.appendChild(inverseSwitch);
 
 
 	//weighting switcher
@@ -303,7 +263,7 @@ function createColormapSelector (spectrum) {
 	alignEl.style.border = '0';
 	alignEl.style.color = 'inherit';
 	alignEl.style.margin = '0 0 0 1rem';
-	alignEl.style.verticalAlign = 'top';
+	alignEl.style.verticalAlign = 'middle';
 	alignEl.style.background = 'none';
 	alignEl.title = 'Align: 0.5';
 	alignEl.addEventListener('input', function () {
@@ -314,10 +274,86 @@ function createColormapSelector (spectrum) {
 	container.appendChild(alignEl);
 
 
+	//grid colormap checkbox
+	var gridSwitch = createSwitch('grid', function () {
+		spectrum.grid = this.checked;
+		updateView();
+	});
+	var gridCheckbox = gridSwitch.querySelector('input');
+	gridCheckbox.checked = spectrum.grid;
+	container.appendChild(gridSwitch);
+
+	//bars checkbox
+	container.appendChild(
+		createSwitch('bars', function () {
+			spectrum.setMask(this.checked ? createMask(10, 10) : null);
+			updateView();
+		})
+	);
+
+
 	updateView();
 
 	function updateView () {
 		spectrum.update();
 		container.style.color = 'rgb(' + spectrum.fill.slice(-4, -1).map((v) => v*255).join(', ') + ')';
 	}
+}
+
+
+function createSwitch (name, cb) {
+	var switcher = document.createElement('label');
+	switcher.innerHTML = `
+		<input type="checkbox" id="${name}"/>
+		${name}
+	`;
+	checkbox = switcher.querySelector('input');
+	checkbox.setAttribute('type', 'checkbox');
+	checkbox.style.width = '1rem';
+	checkbox.style.height = '1rem';
+	checkbox.style.verticalAlign = 'middle';
+
+	switcher.style.fontSize = '.8rem';
+	switcher.style.verticalAlign = 'middle';
+	switcher.style.height = '1rem';
+	switcher.classList.add(name + '-switcher');
+	switcher.style.margin = '0 0 0 .5rem';
+	switcher.style.border = '0';
+	switcher.style.background = 'none';
+	switcher.style.color = 'inherit';
+	switcher.title = name;
+	checkbox.addEventListener('click', cb);
+
+	return switcher;
+}
+
+
+
+//create mask
+function createMask (w, h) {
+	w = w || 10;
+	h = h || 10;
+	var rect = [w, h];
+	var radius = w/2;
+	var canvas = document.createElement('canvas');
+	canvas.width = rect[0] + 2;
+	canvas.height = rect[1] + 2;
+	var ctx = canvas.getContext('2d');
+	ctx.clearRect(0, 0, rect[0] + 2, rect[1] + 2);
+	ctx.fillStyle = 'rgb(0,0,0)';
+	ctx.fillRect(0, 0, rect[0] + 2, rect[1] + 2);
+	ctx.strokeStyle = 'rgb(255,255,255)';
+	ctx.fillStyle = 'rgb(255,255,255)';
+	ctx.lineJoin = 'round';
+	ctx.lineWidth = radius;
+	ctx.strokeRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
+	ctx.fillRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
+
+	// document.body.appendChild(canvas);
+	// canvas.style.zIndex = 999;
+	// canvas.style.position = 'absolute';
+	// canvas.style.top = '0px';
+	// canvas.style.left = '0px';
+
+	return canvas;
 }

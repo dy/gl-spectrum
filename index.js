@@ -35,61 +35,6 @@ function Spectrum (options) {
 	}
 
 
-	//setup grid (have to go before context setup)
-	if (this.grid) {
-		this.grid = createGrid({
-			container: this.container,
-			viewport: this.viewport,
-			lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
-				min: this.minFrequency,
-				max: this.maxFrequency,
-				orientation: 'x',
-				logarithmic: this.logarithmic,
-				titles: function (value) {
-					return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
-				}
-			}, {
-				min: this.minDecibels,
-				max: this.maxDecibels,
-				orientation: 'y',
-				titles: function (value) {
-					return value.toLocaleString() + 'dB';
-				}
-			}, this.logarithmic ? {
-				min: this.minFrequency,
-				max: this.maxFrequency,
-				orientation: 'x',
-				logarithmic: this.logarithmic,
-				values: function (value) {
-					var str = value.toString();
-					if (str[0] !== '1') return null;
-					return value;
-				},
-				titles: null,
-				style: {
-					borderLeftStyle: 'solid',
-					pointerEvents: 'none',
-					opacity: '0.08'
-				}
-			} : null],
-			axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
-				name: 'Frequency',
-				labels: function (value, i, opt) {
-					var str = value.toString();
-					if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
-					return opt.titles[i];
-				}
-			}, {
-				name: 'Magnitude'
-			}]
-		});
-	};
-
-	this.on('resize', () => this.grid && this.grid.update({
-		viewport: this.viewport
-	}));
-
-
 	if (!this.is2d) {
 		var gl = this.gl;
 
@@ -129,8 +74,6 @@ Spectrum.prototype.weighting = 'itu';
 //evenly distributed within indicated diapasone
 Spectrum.prototype.frequencies = new Float32Array(512).fill(Spectrum.prototype.minDecibels);
 
-//line, bars, dots, text
-Spectrum.prototype.mode = 'line';
 
 //TODO
 Spectrum.prototype.orientation = 'horizontal';
@@ -221,9 +164,9 @@ Spectrum.prototype.frag = `
 		float dist = abs(align - coord.y);
 
 		//calc intensity
-		float maxAlign = min(max(align, 1. - align), .8);
-		float minAlign = max(1. - maxAlign, .2);
-		float intensity = pow(dist / max(align, 1. - align), .8) * (maxAlign) + (minAlign);
+		float maxAlign = min(max(align, 1. - align), .75);
+		float minAlign = max(1. - maxAlign, .25);
+		float intensity = pow(dist / max(align, 1. - align), .85) * (maxAlign) + (minAlign);
 
 
 		//apply mask
@@ -371,9 +314,9 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	}
 
 	//set grid color to colormap’s color
-	if (this.grid) {
+	if (this.gridEl) {
 		var gridColor = this.fill.slice(-4).map((v) => v*255);
-		this.grid.linesContainer.style.color = `rgba(${gridColor})`;
+		this.gridEl.linesContainer.style.color = `rgba(${gridColor})`;
 	}
 
 	return this;
@@ -397,8 +340,10 @@ Spectrum.prototype.setBackground = function (bg) {
  * Set named or array mask
  */
 Spectrum.prototype.setMask = function (mask) {
+	this.mask = mask || [1,1,1,1]
+
 	this.setTexture('mask', {
-		data: mask || [1,1,1,1],
+		data: this.mask,
 		type: this.gl.FLOAT,
 		format: this.gl.LUMINOCITY,
 		wrap: this.gl.CLAMP_TO_EDGE
@@ -416,6 +361,67 @@ Spectrum.prototype.setMask = function (mask) {
  */
 Spectrum.prototype.update = function () {
 	var gl = this.gl;
+
+	//create grid, if not created yet
+	if (this.grid) {
+		if (!this.gridEl) {
+			this.gridEl = createGrid({
+				container: this.container,
+				viewport: this.viewport,
+				lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
+					min: this.minFrequency,
+					max: this.maxFrequency,
+					orientation: 'x',
+					logarithmic: this.logarithmic,
+					titles: function (value) {
+						return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
+					}
+				}, {
+					min: this.minDecibels,
+					max: this.maxDecibels,
+					orientation: 'y',
+					titles: function (value) {
+						return value.toLocaleString() + 'dB';
+					}
+				}, this.logarithmic ? {
+					min: this.minFrequency,
+					max: this.maxFrequency,
+					orientation: 'x',
+					logarithmic: this.logarithmic,
+					values: function (value) {
+						var str = value.toString();
+						if (str[0] !== '1') return null;
+						return value;
+					},
+					titles: null,
+					style: {
+						borderLeftStyle: 'solid',
+						pointerEvents: 'none',
+						opacity: '0.08'
+					}
+				} : null],
+				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
+					name: 'Frequency',
+					labels: function (value, i, opt) {
+						var str = value.toString();
+						if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
+						return opt.titles[i];
+					}
+				}, {
+					name: 'Magnitude'
+				}]
+			});
+
+			this.on('resize', () => this.grid.update({
+				viewport: this.viewport
+			}));
+		} else {
+			this.gridEl.grid.style.display = 'block';
+		}
+	}
+	else if (this.gridEl) {
+		this.gridEl.grid.style.display = 'none';
+	}
 
 	//update textures
 	this.setFrequencies(this.frequencies);
