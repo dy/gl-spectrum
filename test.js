@@ -291,6 +291,29 @@ function createColormapSelector (spectrum) {
 	container.appendChild(weightingEl);
 
 
+	//align slider
+	var alignEl = document.createElement('input');
+	alignEl.type = 'range';
+	alignEl.min = 0;
+	alignEl.max = 1;
+	alignEl.step = .01;
+	alignEl.classList.add('align');
+	alignEl.style.width = '5rem';
+	alignEl.style.height = '1rem';
+	alignEl.style.border = '0';
+	alignEl.style.color = 'inherit';
+	alignEl.style.margin = '0 0 0 1rem';
+	alignEl.style.verticalAlign = 'top';
+	alignEl.style.background = 'none';
+	alignEl.title = 'Align: 0.5';
+	alignEl.addEventListener('input', function () {
+		spectrum.align = parseFloat(alignEl.value);
+		alignEl.title = 'Align: ' + alignEl.value;
+		updateView();
+	});
+	container.appendChild(alignEl);
+
+
 	updateView();
 
 	function updateView () {

@@ -52,6 +52,7 @@ var spectrum = new Spectrum({
 	fill: null,
 
 	//undefined background takes the 0-level of the fill
+	//Can be a color tuple, imageData, imageElement, canvas
 	background: null,
 
 	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
