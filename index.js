@@ -140,6 +140,7 @@ Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
 Spectrum.prototype.fill = 'greys';
+Spectrum.prototype.background = null;
 
 //amount of alignment
 Spectrum.prototype.align = .0;
@@ -159,8 +160,9 @@ Spectrum.prototype.frag = `
 
 	uniform sampler2D frequencies;
 	uniform sampler2D fill;
-	uniform vec4 viewport;
 	uniform sampler2D mask;
+	uniform sampler2D background;
+	uniform vec4 viewport;
 	uniform vec2 maskSize;
 	uniform float align;
 
@@ -196,10 +198,12 @@ Spectrum.prototype.frag = `
 	void main () {
 		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		bin = vec2(1. / viewport.zw);
-		// prevF = coord.x - bin.x;
-		// currF = coord.x;
-		// prevMag = magnitude(prevF);
-		// currMag = magnitude(currF);
+		prevF = coord.x - bin.x;
+		currF = coord.x;
+		// nextF = coord.x + .5*bin.x;
+		prevMag = magnitude(prevF);
+		currMag = magnitude(currF);
+		// nextMag = magnitude(nextF);
 		// maxMag = max(currMag, prevMag);
 		// minMag = min(currMag, prevMag);
 		// slope = (currMag - prevMag) / bin.x;
@@ -211,7 +215,7 @@ Spectrum.prototype.frag = `
 		float maskOutset = gl_FragCoord.x - maskX + .5;
 
 		//find mask’s offset frequency
-		float mag = magnitude(maskOutset / viewport.z);
+		float mag = max(magnitude(maskOutset / viewport.z), 0.);
 
 		//calc dist
 		float dist = abs(align - coord.y);
@@ -223,19 +227,23 @@ Spectrum.prototype.frag = `
 
 
 		//apply mask
-		float top = coord.y - mag + align*mag - align;
-		float bottom = -coord.y - align*mag + align;
-		float active = step(top - maskSize.y/viewport.w, 0.) * step(bottom - maskSize.y/viewport.w, 0.);
+		float top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;
+		float bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;
 		float maskY = max(
 			max(top * viewport.w / maskSize.y, .5),
 			max(bottom * viewport.w / maskSize.y, .5)
 		);
 		vec2 maskCoord = vec2(maskX / maskSize.x, maskY);
-		intensity *= texture2D(mask, maskCoord).x;
-		intensity = intensity * active;
+		float maskLevel = texture2D(mask, maskCoord).x;
 
-		// gl_FragColor = vec4(vec3(intensity),1);
-		gl_FragColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
+		//active area limits 0-mask case
+		float active = smoothstep(0., 0.5*abs(currMag - prevMag), top - maskSize.y/viewport.w) + smoothstep(0., 0.5*abs(currMag - prevMag), bottom - maskSize.y/viewport.w);
+		maskLevel *= (1. - active);
+
+		// gl_FragColor = vec4(vec3(intensity), 1);
+		vec4 bgColor = texture2D(background, coord);
+		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
+		gl_FragColor = fillColor * maskLevel + bgColor * (1. - maskLevel);
 	}
 `;
 
@@ -272,7 +280,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	//apply a-weighting
 	if (weighting[this.weighting]) {
 		var w = weighting[this.weighting];
-		frequencies = frequencies.map((mag, i, data) => mag + 20 * Math.log(w(i * l)) / Math.log(10));
+		frequencies = frequencies.map((mag, i, data) => clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -100, 0));
 	}
 
 	//subview freqs - min/max f, log mapping, db limiting
@@ -324,7 +332,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 Spectrum.prototype.setFill = function (cm, inverse) {
 	//named colormap
 	if (typeof cm === 'string') {
-		this.fill = new Float32Array(flatten(colormap({
+		this.fill = (flatten(colormap({
 			colormap: cm,
 			nshades: 128,
 			format: 'rgba',
@@ -333,11 +341,11 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	}
 	//custom array
 	else {
-		this.fill = new Float32Array(flatten(cm));
+		this.fill = (flatten(cm));
 	}
 
 	if (inverse) {
-		var reverse = new Float32Array(this.fill.length);
+		var reverse = this.fill.slice();
 		for (var i = 0; i < this.fill.length; i+=4){
 			reverse[this.fill.length - i - 1] = this.fill[i + 3];
 			reverse[this.fill.length - i - 2] = this.fill[i + 2];
@@ -357,6 +365,11 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 		wrap: this.gl.CLAMP_TO_EDGE
 	});
 
+	//ensure bg
+	if (!this.background) {
+		this.setBackground(this.fill.slice(0, 4));
+	}
+
 	//set grid color to colormap’s color
 	if (this.grid) {
 		var gridColor = this.fill.slice(-4).map((v) => v*255);
@@ -369,16 +382,13 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 
 /** Set background */
 Spectrum.prototype.setBackground = function (bg) {
-
-	// this.setTexture('background', {
-	// 	data: this.background,
-	// 	width: 1,
-	// 	height: (this.background.length / 4)|0,
-	// 	format: this.gl.RGBA,
-	// 	magFilter: this.gl.LINEAR,
-	// 	minFilter: this.gl.LINEAR,
-	// 	wrap: this.gl.CLAMP_TO_EDGE
-	// });
+	this.setTexture('background', {
+		data: bg || this.fill.slice(0, 4),
+		format: this.gl.RGBA,
+		magFilter: this.gl.LINEAR,
+		minFilter: this.gl.LINEAR,
+		wrap: this.gl.CLAMP_TO_EDGE
+	});
 
 	return this;
 };
@@ -411,11 +421,7 @@ Spectrum.prototype.update = function () {
 	this.setFrequencies(this.frequencies);
 	this.setFill(this.fill);
 	this.setMask(this.mask);
-
-	//upd background
-	if (!this.background) {
-		this.setBackground(this.fill.slice(-4));
-	}
+	this.setBackground(this.background);
 
 	this.gl.uniform1f(this.alignLocation, this.align);
 

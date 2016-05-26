@@ -5,7 +5,7 @@ var Spectrum = require('./');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
 var ft = require('fourier-transform');
-var blackman = require('scijs-window-functions/blackman');
+var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
 var SCBadge = require('soundcloud-badge');
 var Analyser = require('web-audio-analyser');
@@ -24,10 +24,11 @@ stats.dom.style.top = '1rem';
 
 //stream soundcloud
 var audio = new Audio;
-/*
+
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
-	song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
+	song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
 	// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
@@ -43,21 +44,21 @@ var badge = SCBadge({
 		audio.play();
 	}, false);
 });
-*/
+
 
 var analyser = Analyser(audio, { audible: true, stereo: false })
 
 
 
 //generate input sine
-var N = 4096;
+var N = 2048;
 var sine = new Float32Array(N);
 var saw = new Float32Array(N);
 var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(4000 * Math.PI * 2 * (i / rate));
+	sine[i] = Math.sin(1000 * Math.PI * 2 * (i / rate));
 	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
@@ -84,6 +85,7 @@ test('line webgl', function () {
 		frequencies: frequencies,
 		// colormap: [1,1,1,1, 0,0,0,1],
 		minFrequency: 40,
+		maxFrequency: 20000,
 		logarithmic: true,
 		smoothing: .5,
 		maxDecibels: 0,
@@ -109,12 +111,12 @@ test('line webgl', function () {
 });
 
 test.only('bars 2d', function () {
-	// var frequencies = new Float32Array(ft(sine));
+	var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
-	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 
-	var frequencies = ft(noise.map((v, i) => v*blackman(i, noise.length)))
-	.map((v) => db.fromGain(v));
+	// var frequencies = ft(noise);
+	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
 
 	//create mask
 	var rect = [10, 10];
@@ -144,19 +146,17 @@ test.only('bars 2d', function () {
 		// mask: null,
 		frequencies: frequencies,
 		maxDecibels: 0,
+		maxFrequency: 20000,
 		grid: false,
 		align: 0.5,
-		// background: [1,0,0,1],
-		// fill: [1,1,1,1, 1,0,0,1],
+		background: [1,0,0,1],
+		fill: [1,1,1,1],
 		logarithmic: true
 	}).on('render', function () {
 		stats.end();
 		stats.begin();
-		// analyser.analyser.getFloatFrequencyData(frequencies);
-		// frequencies = frequencies.map(function (v) {
-		// 	return Math.max((100 + v) / 100, 0);
-		// });
-		// spectrum.setFrequencies(frequencies);
+		analyser.analyser.getFloatFrequencyData(frequencies);
+		spectrum.setFrequencies(frequencies);
 	});
 
 	createColormapSelector(spectrum);
