@@ -2280,8 +2280,9 @@ var lg = require('mumath/lg');
 var isBrowser = require('is-browser');
 var createGrid = require('plot-grid');
 var colormap = require('colormap');
-var flatten = require('array-flatten');
+var flatten = require('flatten');
 var clamp = require('mumath/clamp');
+var weighting = require('a-weighting');
 
 module.exports = Spectrum;
 
@@ -2291,11 +2292,12 @@ module.exports = Spectrum;
  * @contructor
  */
 function Spectrum (options) {
-	var this$1 = this;
-
 	if (!(this instanceof Spectrum)) return new Spectrum(options);
 
 	var that = this;
+
+	options = options || {};
+	options.antialias = true;
 
 	Component.call(this, options);
 
@@ -2303,127 +2305,27 @@ function Spectrum (options) {
 		this.container.classList.add('gl-spectrum');
 	}
 
+
 	if (!this.is2d) {
-		var gl = this.context;
+		var gl = this.gl;
 
 		var float = gl.getExtension('OES_texture_float');
 		if (!float) throw Error('WebGL does not support floats.');
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
-		//setup kernel
-		var kernelLocation = gl.getUniformLocation(this.program, 'kernel[0]');
-		var kernelWeightLocation = gl.getUniformLocation(this.program, 'kernelWeight');
-		gl.uniform1fv(kernelLocation, this.kernel);
-		gl.uniform1f(kernelWeightLocation, this.kernel.reduce(function (prev, curr) { return prev + curr; }, 0));
-
-		//setup params
-		var logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
-		gl.uniform1i(logarithmicLocation, this.logarithmic ? 1 : 0);
-		var minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
-		gl.uniform1f(minFrequencyLocation, this.minFrequency);
-		var maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
-		gl.uniform1f(maxFrequencyLocation, this.maxFrequency);
-		var minDecibelsLocation = gl.getUniformLocation(this.program, 'minDecibels');
-		gl.uniform1f(minDecibelsLocation, this.minDecibels);
-		var maxDecibelsLocation = gl.getUniformLocation(this.program, 'maxDecibels');
-		gl.uniform1f(maxDecibelsLocation, this.maxDecibels);
-		var sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
-		gl.uniform1f(sampleRateLocation, this.sampleRate);
-
-		//setup frequencies texture
-		this.bindTexture('frequencies', {
-			unit: this.frequenciesTextureUnit,
-			wrap: gl.CLAMP_TO_EDGE,
-			magFilter: gl.LINEAR,
-			minFilter: gl.LINEAR
-		});
-		this.setTexture('frequencies', {
-			data: this.frequencies,
-			format: gl.ALPHA
-		});
-		this.bindTexture({colormap: {
-			unit: this.colormapTextureUnit,
-			magFilter: gl.NEAREST,
-			minFilter: gl.NEAREST,
-			wrap: gl.CLAMP_TO_EDGE,
-		}});
-		this.setColormap(this.colormap);
-	}
-	else {
-
+		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
+		this.alignLocation = gl.getUniformLocation(this.program, 'align');
 	}
 
-	//setup grid
-	if (this.grid) {
-		this.grid = createGrid({
-			container: this.container,
-			viewport: this.viewport,
-			lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
-				min: this.minFrequency,
-				max: this.maxFrequency,
-				orientation: 'x',
-				logarithmic: this.logarithmic,
-				titles: function (value) {
-					return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
-				}
-			}, {
-				min: this.minDecibels,
-				max: this.maxDecibels,
-				orientation: 'y',
-				titles: function (value) {
-					return value.toLocaleString() + 'dB';
-				}
-			}, this.logarithmic ? {
-				min: this.minFrequency,
-				max: this.maxFrequency,
-				orientation: 'x',
-				logarithmic: this.logarithmic,
-				values: function (value) {
-					var str = value.toString();
-					if (str[0] !== '1') return null;
-					return value;
-				},
-				titles: null,
-				style: {
-					borderLeftStyle: 'solid',
-					pointerEvents: 'none'
-				}
-			} : null],
-			axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.gridAxes) && [{
-				name: 'Frequency',
-				labels: function (value, i, opt) {
-					var str = value.toString();
-					if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
-					return opt.titles[i];
-				}
-			}, {
-				name: 'Magnitude'
-			}]
-		});
-	};
-
-	this.on('resize', function (vp) { return this$1.grid.update({
-		viewport: vp
-	}); });
+	this.update();
 }
 
 inherits(Spectrum, Component);
 
 
-/**
- * Here we might have to do kernel averaging for some
- */
-Spectrum.prototype.frag = "\n\tprecision lowp float;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D colormap;\n\tuniform vec4 viewport;\n\tuniform float kernel[5];\n\tuniform float kernelWeight;\n\tuniform int logarithmic;\n\tuniform float maxFrequency;\n\tuniform float minFrequency;\n\tuniform float maxDecibels;\n\tuniform float minDecibels;\n\tuniform float sampleRate;\n\n\tfloat frequency;\n\n\t// varying float average;\n\t// varying float peak;\n\n\tconst float log10 = log(10.);\n\tconst float pi = " + (Math.PI) + ";\n\tconst float pi2 = " + (Math.PI*2) + ";\n\n\tfloat lg (float a) {\n\t\treturn log(a) / log10;\n\t}\n\n\t//return frequency coordinate from screen position\n\tfloat f (float ratio) {\n\t\tif (logarithmic == 1) {\n\t\t\tfloat frequency = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\t\t\tratio = (frequency - minFrequency) / (maxFrequency - minFrequency);\n\t\t}\n\n\t\t//map the freq range to visible range\n\t\tfloat halfRate = sampleRate * 0.5;\n\t\tfloat left = minFrequency / halfRate;\n\t\tfloat right = maxFrequency / halfRate;\n\n\t\tratio = left + ratio * (right - left);\n\n\t\treturn ratio;\n\t}\n\n\t//return [weighted] magnitude of [normalized] frequency\n\tfloat magnitude (float nf) {\n\t\tvec2 bin = vec2(1. / viewport.zw);\n\n\t\treturn texture2D(frequencies, vec2(f(nf), 0)).w;\n\n\t\treturn (\n\t\t\tkernel[0] * texture2D(frequencies, vec2(f(nf - 2. * bin.x), 0)).w +\n\t\t\tkernel[1] * texture2D(frequencies, vec2(f(nf - bin.x), 0)).w +\n\t\t\tkernel[2] * texture2D(frequencies, vec2(f(nf), 0)).w +\n\t\t\tkernel[3] * texture2D(frequencies, vec2(f(nf + bin.x), 0)).w +\n\t\t\tkernel[4] * texture2D(frequencies, vec2(f(nf + 2. * bin.x), 0)).w) / kernelWeight;\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tvec2 bin = vec2(1. / viewport.zw);\n\t\tfloat prevMag = magnitude(coord.x - bin.x);\n\t\tfloat currMag = magnitude(coord.x);\n\t\tfloat maxMag = max(currMag, prevMag);\n\t\tfloat minMag = min(currMag, prevMag);\n\n\t\tvec2 p2 = vec2(coord.x, currMag);\n\t\tvec2 p1 = vec2(coord.x - bin.x, prevMag);\n\n\t\tfloat dist = coord.y - currMag;\n\t\tfloat vertDist = abs(dist);\n\n\t\tfloat intensity = 0.;\n\t\tintensity += 1. - smoothstep(.0, .0032, vertDist);\n\t\tintensity += (1. - step(0., dist)) * (-.8*log(1. - coord.y) * .5 + coord.y * .5);\n\t\tintensity += step(coord.y, maxMag) * step(minMag, coord.y);\n\n\t\t// gl_FragColor = vec4(vec3(intensity), 1);\n\t\tgl_FragColor = texture2D(colormap, vec2(max(0.,intensity), 0.5));\n\t}\n";
 
-
-//evenly distributed within indicated diapasone
-Spectrum.prototype.frequencies = new Float32Array(1024);
-
-//index of frequencies texture
-Spectrum.prototype.frequenciesTextureUnit = 0;
-
-Spectrum.prototype.maxDecibels = 0;
+Spectrum.prototype.maxDecibels = -30;
 Spectrum.prototype.minDecibels = -100;
 
 Spectrum.prototype.maxFrequency = 20000;
@@ -2431,10 +2333,18 @@ Spectrum.prototype.minFrequency = 20;
 
 Spectrum.prototype.smoothing = 0.5;
 
+Spectrum.prototype.snap = null;
+
 Spectrum.prototype.grid = true;
-Spectrum.prototype.gridAxes = false;
+Spectrum.prototype.axes = false;
 
 Spectrum.prototype.logarithmic = true;
+
+Spectrum.prototype.weighting = 'itu';
+
+//evenly distributed within indicated diapasone
+Spectrum.prototype.frequencies = new Float32Array(512).fill(Spectrum.prototype.minDecibels);
+
 
 //TODO
 Spectrum.prototype.orientation = 'horizontal';
@@ -2443,44 +2353,101 @@ Spectrum.prototype.orientation = 'horizontal';
 Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
-Spectrum.prototype.colormap = 'greys';
-Spectrum.prototype.colormapTextureUnit = 1;
+Spectrum.prototype.fill = 'greys';
+Spectrum.prototype.background = null;
 
-//TODO bars, line, dots
-Spectrum.prototype.style = 'bars';
+//amount of alignment
+Spectrum.prototype.align = .0;
 
 //TODO implement shadow frequencies, like averaged/max values
-Spectrum.prototype.shadow;
+Spectrum.prototype.shadow = [];
 
-
-//5-items linear kernel for smoothing frequencies
-Spectrum.prototype.kernel = [2, 3, 4, 3, 2];
+//mask defines style of bars, dots or line
+Spectrum.prototype.mask = null;
 
 
 /**
- * Set frequencies texture taking into account smoothing
+ * Here we might have to do kernel averaging for some
+ */
+Spectrum.prototype.frag = "\n\tprecision lowp float;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D fill;\n\tuniform sampler2D mask;\n\tuniform sampler2D background;\n\tuniform vec4 viewport;\n\tuniform vec2 maskSize;\n\tuniform float align;\n\n\tvec2 coord;\n\tvec2 bin;\n\tfloat currMag;\n\tfloat prevMag;\n\tfloat nextMag;\n\tfloat currF;\n\tfloat prevF;\n\tfloat nextF;\n\tfloat maxMag;\n\tfloat minMag;\n\tfloat slope;\n\tfloat alpha;\n\n\t//return magnitude of normalized frequency\n\tfloat magnitude (float nf) {\n\t\treturn texture2D(frequencies, vec2((nf), 0.5)).w;\n\t}\n\n\tfloat within (float x, float left, float right) {\n\t\treturn step(left, x) * step(x, right);\n\t}\n\n\tfloat distToLine(vec2 p1, vec2 p2, vec2 testPt) {\n\t\tvec2 lineDir = p2 - p1;\n\t\tvec2 perpDir = vec2(lineDir.y, -lineDir.x);\n\t\tvec2 dirToPt1 = p1 - testPt;\n\t\treturn abs(dot(normalize(perpDir), dirToPt1));\n\t}\n\n\tvoid main () {\n\t\tcoord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tbin = vec2(1. / viewport.zw);\n\t\t// prevF = coord.x - .5*bin.x;\n\t\t// currF = coord.x;\n\t\t// nextF = coord.x + .5*bin.x;\n\t\t// prevMag = magnitude(prevF);\n\t\t// currMag = magnitude(currF);\n\t\t// nextMag = magnitude(nextF);\n\t\t// maxMag = max(currMag, prevMag);\n\t\t// minMag = min(currMag, prevMag);\n\t\t// slope = (currMag - prevMag) / bin.x;\n\t\t// alpha = atan(currMag - prevMag, bin.x);\n\n\n\t\t//calc mask\n\t\tfloat maskX = mod(gl_FragCoord.x, maskSize.x);\n\t\tfloat maskOutset = gl_FragCoord.x - maskX + .5;\n\n\t\t//find mask’s offset frequency\n\t\tfloat mag = max(magnitude(maskOutset / viewport.z), 0.);\n\n\t\t//calc dist\n\t\tfloat dist = abs(align - coord.y);\n\n\t\t//calc intensity\n\t\tfloat maxAlign = min(max(align, 1. - align), .75);\n\t\tfloat minAlign = max(1. - maxAlign, .25);\n\t\tfloat intensity = pow(dist / max(align, 1. - align), .85) * (maxAlign) + (minAlign);\n\n\n\t\t//apply mask\n\t\tfloat top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;\n\t\tfloat bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;\n\t\tfloat maskY = max(\n\t\t\tmax(top * viewport.w / maskSize.y, .5),\n\t\t\tmax(bottom * viewport.w / maskSize.y, .5)\n\t\t);\n\t\tvec2 maskCoord = vec2(maskX / maskSize.x, maskY);\n\t\tfloat maskLevel = texture2D(mask, maskCoord).x;\n\n\t\t//active area limits 0-mask case\n\t\tfloat active = smoothstep(-0.001, 0.001, top - maskSize.y/viewport.w) + smoothstep(-0.001, 0.001, bottom - maskSize.y/viewport.w);\n\t\tmaskLevel *= (1. - active);\n\n\t\t// gl_FragColor = vec4(vec3(intensity), 1);\n\t\tvec4 bgColor = texture2D(background, coord);\n\t\tvec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));\n\t\tgl_FragColor = fillColor * maskLevel + bgColor * (1. - maskLevel);\n\t}\n";
+
+
+/**
+ * Set frequencies taking into account smoothing, logarithmic and grouping params
  */
 Spectrum.prototype.setFrequencies = function (frequencies) {
+	var this$1 = this;
+
 	if (!frequencies) return this;
-	if (!this.frequencies) return this.setTexture('frequencies', {
-		data: frequencies,
-		format: gl.ALPHA
-	});
 
-	var gl = this.context;
+	var gl = this.gl;
+	var minF = this.minFrequency, maxF = this.maxFrequency;
+	var minDb = this.minDecibels, maxDb = this.maxDecibels;
+	var halfRate = this.sampleRate * 0.5;
+	var l = halfRate / this.frequencies.length;
 
+	//choose bigger data
 	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
 	var shorter = bigger === frequencies ? this.frequencies : frequencies;
 
 	var smoothing = bigger === this.frequencies ? this.smoothing : 1 - this.smoothing;
 
+
 	for (var i = 0; i < bigger.length; i++) {
-		bigger[i] = clamp(bigger[i] * smoothing + shorter[Math.floor(shorter.length * (i / bigger.length))] * (1 - smoothing), 0, 1);
+		bigger[i] = clamp(bigger[i], -200, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -200, 0) * (1 - smoothing);
 	}
 
+	//save actual frequencies
+	this.frequencies = bigger;
+
+	//prepare f’s for rendering
+	frequencies = this.frequencies.slice();
+
+	//apply a-weighting
+	if (weighting[this.weighting]) {
+		var w = weighting[this.weighting];
+		frequencies = frequencies.map(function (mag, i, data) { return clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -100, 0); });
+	}
+
+	//subview freqs - min/max f, log mapping, db limiting
+	frequencies = frequencies.map(function (mag, i, frequencies) {
+		var ratio = (i + .5) / frequencies.length;
+
+		if (this$1.logarithmic) {
+			var frequency = Math.pow(10., lg(minF) + ratio * (lg(maxF) - lg(minF)) );
+			ratio = (frequency - minF) / (maxF - minF);
+		}
+
+		var leftF = minF / halfRate;
+		var rightF = maxF / halfRate;
+
+		ratio = leftF + ratio * (rightF - leftF);
+
+		//apply linear interpolation
+		//TODO: implement here another interpolation: hi-f gets lost
+		var left = frequencies[Math.floor(ratio * frequencies.length)];
+		var right = frequencies[Math.ceil(ratio * frequencies.length)];
+		var fract = (ratio * frequencies.length) % 1;
+		var value = left * (1 - fract) + right * fract;
+
+		//closest interpolation
+		// var value = frequencies[Math.round(ratio * frequencies.length)];
+
+		//snap
+		if (this$1.snap) {
+			value = Math.round(value * this$1.snap) / this$1.snap;
+		}
+
+		//sublimit db to 0..1 range
+		return (value - minDb) / (maxDb - minDb);
+	}, this);
+
 	return this.setTexture('frequencies', {
-		data: bigger,
-		format: gl.ALPHA
+		data: frequencies,
+		format: gl.ALPHA,
+		magFilter: this.gl.NEAREST,
+		minFilter: this.gl.NEAREST,
+		wrap: this.gl.CLAMP_TO_EDGE
 	});
 };
 
@@ -2488,10 +2455,12 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 /**
  * Reset colormap
  */
-Spectrum.prototype.setColormap = function (cm) {
+Spectrum.prototype.setFill = function (cm, inverse) {
 	//named colormap
+	var this$1 = this;
+
 	if (typeof cm === 'string') {
-		this.colormap = new Float32Array(flatten(colormap({
+		this.fill = (flatten(colormap({
 			colormap: cm,
 			nshades: 128,
 			format: 'rgba',
@@ -2500,13 +2469,154 @@ Spectrum.prototype.setColormap = function (cm) {
 	}
 	//custom array
 	else {
-		this.colormap = new Float32Array(cm);
+		this.fill = (flatten(cm));
 	}
-	this.setTexture('colormap', {
-		data: this.colormap,
-		width: 128,
-		format: this.context.RGBA
+
+	if (inverse) {
+		var reverse = this.fill.slice();
+		for (var i = 0; i < this$1.fill.length; i+=4){
+			reverse[this$1.fill.length - i - 1] = this$1.fill[i + 3];
+			reverse[this$1.fill.length - i - 2] = this$1.fill[i + 2];
+			reverse[this$1.fill.length - i - 3] = this$1.fill[i + 1];
+			reverse[this$1.fill.length - i - 4] = this$1.fill[i + 0];
+		}
+		this.fill = reverse;
+	}
+
+	this.setTexture('fill', {
+		data: this.fill,
+		width: 1,
+		height: (this.fill.length / 4)|0,
+		format: this.gl.RGBA,
+		magFilter: this.gl.LINEAR,
+		minFilter: this.gl.LINEAR,
+		wrap: this.gl.CLAMP_TO_EDGE
 	});
+
+	//ensure bg
+	if (!this.background) {
+		this.setBackground(this.fill.slice(0, 4));
+	}
+
+	//set grid color to colormap’s color
+	if (this._grid) {
+		var gridColor = this.fill.slice(-4).map(function (v) { return v*255; });
+		this._grid.linesContainer.style.color = "rgba(" + gridColor + ")";
+	}
+
+	return this;
+};
+
+
+/** Set background */
+Spectrum.prototype.setBackground = function (bg) {
+	this.setTexture('background', {
+		data: bg || this.fill.slice(0, 4),
+		format: this.gl.RGBA,
+		magFilter: this.gl.LINEAR,
+		minFilter: this.gl.LINEAR,
+		wrap: this.gl.CLAMP_TO_EDGE
+	});
+
+	return this;
+};
+
+/**
+ * Set named or array mask
+ */
+Spectrum.prototype.setMask = function (mask) {
+	this.mask = mask || [1,1,1,1]
+
+	this.setTexture('mask', {
+		data: this.mask,
+		type: this.gl.FLOAT,
+		format: this.gl.LUMINOCITY,
+		wrap: this.gl.CLAMP_TO_EDGE
+	});
+
+	this.gl.uniform2f(this.maskSizeLocation, this.textures.mask.width, this.textures.mask.height);
+
+	return this;
+};
+
+
+/**
+ * Update uniforms values, textures etc.
+ * It should be called when the settings changed.
+ */
+Spectrum.prototype.update = function () {
+	var this$1 = this;
+
+	var gl = this.gl;
+
+	//create grid, if not created yet
+	if (this.grid) {
+		if (!this._grid) {
+			this._grid = createGrid({
+				container: this.container,
+				viewport: this.viewport,
+				lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
+					min: this.minFrequency,
+					max: this.maxFrequency,
+					orientation: 'x',
+					logarithmic: this.logarithmic,
+					titles: function (value) {
+						return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
+					}
+				}, {
+					min: this.minDecibels,
+					max: this.maxDecibels,
+					orientation: 'y',
+					titles: function (value) {
+						return value.toLocaleString() + 'dB';
+					}
+				}, this.logarithmic ? {
+					min: this.minFrequency,
+					max: this.maxFrequency,
+					orientation: 'x',
+					logarithmic: this.logarithmic,
+					values: function (value) {
+						var str = value.toString();
+						if (str[0] !== '1') return null;
+						return value;
+					},
+					titles: null,
+					style: {
+						borderLeftStyle: 'solid',
+						pointerEvents: 'none',
+						opacity: '0.08'
+					}
+				} : null],
+				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
+					name: 'Frequency',
+					labels: function (value, i, opt) {
+						var str = value.toString();
+						if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
+						return opt.titles[i];
+					}
+				}, {
+					name: 'Magnitude'
+				}]
+			});
+
+			this.on('resize', function () { return this$1._grid.update({
+				viewport: this$1.viewport
+			}); });
+		} else {
+			this._grid.grid.style.display = 'block';
+		}
+	}
+	else if (this._grid) {
+		this._grid.grid.style.display = 'none';
+	}
+
+	//update textures
+	this.setFrequencies(this.frequencies);
+	this.setFill(this.fill);
+	this.setMask(this.mask);
+	this.setBackground(this.background);
+
+	this.gl.uniform1f(this.alignLocation, this.align);
 
 	return this;
 };
@@ -2516,20 +2626,89 @@ Spectrum.prototype.setColormap = function (cm) {
  * Render main loop
  */
 Spectrum.prototype.render = function () {
-	var gl = this.gl;
+	var this$1 = this;
 
-	if (!this.is2d) {
-		Component.prototype.render.call(this);
-	}
+	Component.prototype.render.call(this);
 
-	else {
+	if (this.is2d) {
+		//TODO: 2d rendering?
+		var context = this.context;
+		var fill = this.fill;
 
+		context.fillStyle = 'rgba(' + fill.slice(0,4).join(',') + ')';
+		context.fillRect.apply(context, this.viewport);
+
+		//calculate per-bar averages
+		var bars = [];
+		for (var i = 0; i < this$1.frequencies.length; i++) {
+
+		}
 	}
 
 	return this;
 };
 
-},{"array-flatten":15,"colormap":22,"gl-component":30,"inherits":33,"is-browser":35,"mumath/clamp":38,"mumath/lg":40,"plot-grid":46,"xtend/mutable":62}],12:[function(require,module,exports){
+},{"a-weighting":16,"colormap":28,"flatten":36,"gl-component":40,"inherits":43,"is-browser":45,"mumath/clamp":48,"mumath/lg":50,"plot-grid":57,"xtend/mutable":75}],12:[function(require,module,exports){
+module.exports = function a (f) {
+	var f2 = f*f;
+	return 1.2588966 * 148840000 * f2*f2 /
+	((f2 + 424.36) * Math.sqrt((f2 + 11599.29) * (f2 + 544496.41)) * (f2 + 148840000));
+};
+
+},{}],13:[function(require,module,exports){
+module.exports = function b (f) {
+	var f2 = f*f;
+	return 1.019764760044717 * 148840000 * f*f2 /
+	((f2 + 424.36) * Math.sqrt(f2 + 25122.25) * (f2 + 148840000));
+};
+
+},{}],14:[function(require,module,exports){
+module.exports = function c (f) {
+	var f2 = f*f;
+	return 1.0069316688518042 * 148840000 * f2 /
+	((f2 + 424.36) * (f2 + 148840000));
+};
+
+},{}],15:[function(require,module,exports){
+module.exports = function d (f) {
+	var f2 = f*f;
+	return (f / 6.8966888496476e-5) * Math.sqrt(
+		(
+			((1037918.48 - f2)*(1037918.48 - f2) + 1080768.16*f2) /
+			((9837328 - f2)*(9837328 - f2) + 11723776*f2)
+		) /	((f2 + 79919.29) * (f2 + 1345600))
+	);
+};
+
+},{}],16:[function(require,module,exports){
+/**
+ * @module  noise-weighting
+ */
+
+module.exports = {
+	a: require('./a'),
+	b: require('./b'),
+	c: require('./c'),
+	d: require('./d'),
+	itu: require('./itu'),
+	z: require('./z')
+};
+},{"./a":12,"./b":13,"./c":14,"./d":15,"./itu":17,"./z":18}],17:[function(require,module,exports){
+module.exports = function itu (f) {
+	var f2 = f*f;
+
+	var h1 = -4.737338981378384e-24*f2*f2*f2 + 2.043828333606125e-15*f2*f2 - 1.363894795463638e-7*f2 + 1;
+	var h2 = 1.306612257412824e-19*f2*f2*f - 2.118150887518656e-11*f2*f + 5.559488023498642e-4*f;
+
+	return 8.128305161640991 * 1.246332637532143e-4 * f / Math.sqrt(h1*h1 + h2*h2);
+};
+
+},{}],18:[function(require,module,exports){
+module.exports = function (f) {
+	return 1;
+};
+
+},{}],19:[function(require,module,exports){
 (function (process){
 'use strict';
 var ESC = '\u001b[';
@@ -2639,13 +2818,13 @@ x.iTerm.setCwd = function (cwd) {
 };
 
 }).call(this,require('_process'))
-},{"_process":7}],13:[function(require,module,exports){
+},{"_process":7}],20:[function(require,module,exports){
 'use strict';
 module.exports = function () {
 	return /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
 };
 
-},{}],14:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 
 function assembleStyles () {
@@ -2712,117 +2891,7 @@ Object.defineProperty(module, 'exports', {
 	get: assembleStyles
 });
 
-},{}],15:[function(require,module,exports){
-'use strict'
-
-/**
- * Expose `arrayFlatten`.
- */
-module.exports = flatten
-module.exports.from = flattenFrom
-module.exports.depth = flattenDepth
-module.exports.fromDepth = flattenFromDepth
-
-/**
- * Flatten an array.
- *
- * @param  {Array} array
- * @return {Array}
- */
-function flatten (array) {
-  if (!Array.isArray(array)) {
-    throw new TypeError('Expected value to be an array')
-  }
-
-  return flattenFrom(array)
-}
-
-/**
- * Flatten an array-like structure.
- *
- * @param  {Array} array
- * @return {Array}
- */
-function flattenFrom (array) {
-  return flattenDown(array, [], Infinity)
-}
-
-/**
- * Flatten an array-like structure with depth.
- *
- * @param  {Array}  array
- * @param  {number} depth
- * @return {Array}
- */
-function flattenDepth (array, depth) {
-  if (!Array.isArray(array)) {
-    throw new TypeError('Expected value to be an array')
-  }
-
-  return flattenFromDepth(array, depth)
-}
-
-/**
- * Flatten an array-like structure with depth.
- *
- * @param  {Array}  array
- * @param  {number} depth
- * @return {Array}
- */
-function flattenFromDepth (array, depth) {
-  if (typeof depth !== 'number') {
-    throw new TypeError('Expected the depth to be a number')
-  }
-
-  return flattenDownDepth(array, [], depth)
-}
-
-/**
- * Flatten an array indefinitely.
- *
- * @param  {Array} array
- * @param  {Array} result
- * @return {Array}
- */
-function flattenDown (array, result) {
-  for (var i = 0; i < array.length; i++) {
-    var value = array[i]
-
-    if (Array.isArray(value)) {
-      flattenDown(value, result)
-    } else {
-      result.push(value)
-    }
-  }
-
-  return result
-}
-
-/**
- * Flatten an array with depth.
- *
- * @param  {Array}  array
- * @param  {Array}  result
- * @param  {number} depth
- * @return {Array}
- */
-function flattenDownDepth (array, result, depth) {
-  depth--
-
-  for (var i = 0; i < array.length; i++) {
-    var value = array[i]
-
-    if (depth > -1 && Array.isArray(value)) {
-      flattenDownDepth(value, result, depth)
-    } else {
-      result.push(value)
-    }
-  }
-
-  return result
-}
-
-},{}],16:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 'use strict';
 
 var arraytools  = function () {
@@ -3011,7 +3080,7 @@ var arraytools  = function () {
 
 module.exports = arraytools();
 
-},{}],17:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var size = require('element-size')
 
 module.exports = fit
@@ -3061,7 +3130,7 @@ function fit(canvas, parent, scale) {
   }
 }
 
-},{"element-size":24}],18:[function(require,module,exports){
+},{"element-size":33}],24:[function(require,module,exports){
 (function (process){
 'use strict';
 var escapeStringRegexp = require('escape-string-regexp');
@@ -3181,7 +3250,7 @@ module.exports.stripColor = stripAnsi;
 module.exports.supportsColor = supportsColor;
 
 }).call(this,require('_process'))
-},{"_process":7,"ansi-styles":14,"escape-string-regexp":25,"has-ansi":32,"strip-ansi":54,"supports-color":55}],19:[function(require,module,exports){
+},{"_process":7,"ansi-styles":21,"escape-string-regexp":34,"has-ansi":42,"strip-ansi":67,"supports-color":68}],25:[function(require,module,exports){
 (function (process){
 'use strict';
 var restoreCursor = require('restore-cursor');
@@ -3211,7 +3280,7 @@ exports.toggle = function (force) {
 };
 
 }).call(this,require('_process'))
-},{"_process":7,"restore-cursor":49}],20:[function(require,module,exports){
+},{"_process":7,"restore-cursor":60}],26:[function(require,module,exports){
 (function (Buffer){
 var clone = (function() {
 'use strict';
@@ -3375,10 +3444,10 @@ if (typeof module === 'object' && module.exports) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":3}],21:[function(require,module,exports){
+},{"buffer":3}],27:[function(require,module,exports){
 module.exports={"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],"hsv":[{"index":0,"rgb":[255,0,0]},{"index":0.169,"rgb":[253,255,2]},{"index":0.173,"rgb":[247,255,2]},{"index":0.337,"rgb":[0,252,4]},{"index":0.341,"rgb":[0,252,10]},{"index":0.506,"rgb":[1,249,255]},{"index":0.671,"rgb":[2,0,253]},{"index":0.675,"rgb":[8,0,253]},{"index":0.839,"rgb":[255,0,251]},{"index":0.843,"rgb":[255,0,245]},{"index":1,"rgb":[255,0,6]}],"hot":[{"index":0,"rgb":[0,0,0]},{"index":0.3,"rgb":[230,0,0]},{"index":0.6,"rgb":[255,210,0]},{"index":1,"rgb":[255,255,255]}],"cool":[{"index":0,"rgb":[0,255,255]},{"index":1,"rgb":[255,0,255]}],"spring":[{"index":0,"rgb":[255,0,255]},{"index":1,"rgb":[255,255,0]}],"summer":[{"index":0,"rgb":[0,128,102]},{"index":1,"rgb":[255,255,102]}],"autumn":[{"index":0,"rgb":[255,0,0]},{"index":1,"rgb":[255,255,0]}],"winter":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[0,255,128]}],"bone":[{"index":0,"rgb":[0,0,0]},{"index":0.376,"rgb":[84,84,116]},{"index":0.753,"rgb":[169,200,200]},{"index":1,"rgb":[255,255,255]}],"copper":[{"index":0,"rgb":[0,0,0]},{"index":0.804,"rgb":[255,160,102]},{"index":1,"rgb":[255,199,127]}],"greys":[{"index":0,"rgb":[0,0,0]},{"index":1,"rgb":[255,255,255]}],"yignbu":[{"index":0,"rgb":[8,29,88]},{"index":0.125,"rgb":[37,52,148]},{"index":0.25,"rgb":[34,94,168]},{"index":0.375,"rgb":[29,145,192]},{"index":0.5,"rgb":[65,182,196]},{"index":0.625,"rgb":[127,205,187]},{"index":0.75,"rgb":[199,233,180]},{"index":0.875,"rgb":[237,248,217]},{"index":1,"rgb":[255,255,217]}],"greens":[{"index":0,"rgb":[0,68,27]},{"index":0.125,"rgb":[0,109,44]},{"index":0.25,"rgb":[35,139,69]},{"index":0.375,"rgb":[65,171,93]},{"index":0.5,"rgb":[116,196,118]},{"index":0.625,"rgb":[161,217,155]},{"index":0.75,"rgb":[199,233,192]},{"index":0.875,"rgb":[229,245,224]},{"index":1,"rgb":[247,252,245]}],"yiorrd":[{"index":0,"rgb":[128,0,38]},{"index":0.125,"rgb":[189,0,38]},{"index":0.25,"rgb":[227,26,28]},{"index":0.375,"rgb":[252,78,42]},{"index":0.5,"rgb":[253,141,60]},{"index":0.625,"rgb":[254,178,76]},{"index":0.75,"rgb":[254,217,118]},{"index":0.875,"rgb":[255,237,160]},{"index":1,"rgb":[255,255,204]}],"bluered":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[255,0,0]}],"rdbu":[{"index":0,"rgb":[5,10,172]},{"index":0.35,"rgb":[106,137,247]},{"index":0.5,"rgb":[190,190,190]},{"index":0.6,"rgb":[220,170,132]},{"index":0.7,"rgb":[230,145,90]},{"index":1,"rgb":[178,10,28]}],"picnic":[{"index":0,"rgb":[0,0,255]},{"index":0.1,"rgb":[51,153,255]},{"index":0.2,"rgb":[102,204,255]},{"index":0.3,"rgb":[153,204,255]},{"index":0.4,"rgb":[204,204,255]},{"index":0.5,"rgb":[255,255,255]},{"index":0.6,"rgb":[255,204,255]},{"index":0.7,"rgb":[255,153,255]},{"index":0.8,"rgb":[255,102,204]},{"index":0.9,"rgb":[255,102,102]},{"index":1,"rgb":[255,0,0]}],"rainbow":[{"index":0,"rgb":[150,0,90]},{"index":0.125,"rgb":[0,0,200]},{"index":0.25,"rgb":[0,25,255]},{"index":0.375,"rgb":[0,152,255]},{"index":0.5,"rgb":[44,255,150]},{"index":0.625,"rgb":[151,255,0]},{"index":0.75,"rgb":[255,234,0]},{"index":0.875,"rgb":[255,111,0]},{"index":1,"rgb":[255,0,0]}],"portland":[{"index":0,"rgb":[12,51,131]},{"index":0.25,"rgb":[10,136,186]},{"index":0.5,"rgb":[242,211,56]},{"index":0.75,"rgb":[242,143,56]},{"index":1,"rgb":[217,30,30]}],"blackbody":[{"index":0,"rgb":[0,0,0]},{"index":0.2,"rgb":[230,0,0]},{"index":0.4,"rgb":[230,210,0]},{"index":0.7,"rgb":[255,255,255]},{"index":1,"rgb":[160,200,255]}],"earth":[{"index":0,"rgb":[0,0,130]},{"index":0.1,"rgb":[0,180,180]},{"index":0.2,"rgb":[40,210,40]},{"index":0.4,"rgb":[230,230,50]},{"index":0.6,"rgb":[120,70,20]},{"index":1,"rgb":[255,255,255]}],"electric":[{"index":0,"rgb":[0,0,0]},{"index":0.15,"rgb":[30,0,100]},{"index":0.4,"rgb":[120,0,100]},{"index":0.6,"rgb":[160,90,0]},{"index":0.8,"rgb":[230,200,0]},{"index":1,"rgb":[255,250,220]}], "alpha": [{"index":0, "rgb": [255,255,255,0]},{"index":0, "rgb": [255,255,255,1]}]};
 
-},{}],22:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 /*
  * Ben Postlethwaite
  * January 2013
@@ -3514,7 +3583,24 @@ function rgbaStr (rgba) {
     return 'rgba(' + rgba.join(',') + ')';
 }
 
-},{"./colorScales":21,"arraytools":16,"clone":20}],23:[function(require,module,exports){
+},{"./colorScales":27,"arraytools":22,"clone":26}],29:[function(require,module,exports){
+module.exports = function gainToDecibels(value) {
+  if (value == null) return 0
+  return Math.round(Math.round(20 * (0.43429 * Math.log(value)) * 100) / 100 * 10) / 10
+}
+},{}],30:[function(require,module,exports){
+module.exports = {
+  fromGain: require('./from-gain'),
+  toGain: require('./to-gain')
+}
+},{"./from-gain":29,"./to-gain":31}],31:[function(require,module,exports){
+module.exports = function decibelsToGain(value){
+  if (value <= -40){
+    return 0
+  }
+  return Math.round(Math.exp(value / 8.6858) * 10000) / 10000
+}
+},{}],32:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -3533,7 +3619,7 @@ module.exports = function () {
 module.exports.frames = frames;
 
 }).call(this,require('_process'))
-},{"_process":7}],24:[function(require,module,exports){
+},{"_process":7}],33:[function(require,module,exports){
 module.exports = getSize
 
 function getSize(element) {
@@ -3569,7 +3655,7 @@ function parse(prop) {
   return parseFloat(prop) || 0
 }
 
-},{}],25:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 'use strict';
 
 var matchOperatorsRe = /[|\\{}()[\]^$+*?.]/g;
@@ -3582,7 +3668,7 @@ module.exports = function (str) {
 	return str.replace(matchOperatorsRe, '\\$&');
 };
 
-},{}],26:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -3616,7 +3702,32 @@ module.exports = function (cb) {
 };
 
 }).call(this,require('_process'))
-},{"_process":7}],27:[function(require,module,exports){
+},{"_process":7}],36:[function(require,module,exports){
+module.exports = function flatten(list, depth) {
+  depth = (typeof depth == 'number') ? depth : Infinity;
+
+  if (!depth) {
+    if (Array.isArray(list)) {
+      return list.map(function(i) { return i; });
+    }
+    return list;
+  }
+
+  return _flatten(list, 1);
+
+  function _flatten(list, d) {
+    return list.reduce(function (acc, item) {
+      if (Array.isArray(item) && d < depth) {
+        return acc.concat(_flatten(item, d + 1));
+      }
+      else {
+        return acc.concat(item);
+      }
+    }, []);
+  }
+};
+
+},{}],37:[function(require,module,exports){
 /**
  * Real values fourier transform.
  *
@@ -3840,7 +3951,7 @@ function reverseBinPermute (N, dest, source) {
 
 	dest[nm1] = source[nm1];
 };
-},{}],28:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 module.exports = getCanvasContext
 function getCanvasContext (type, opts) {
   if (typeof type !== 'string') {
@@ -3878,14 +3989,14 @@ function getCanvasContext (type, opts) {
   return (gl || null) // ensure null on fail
 }
 
-},{}],29:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 /** generate unique id for selector */
 var counter = Date.now() % 1e9;
 
 module.exports = function getUid(){
 	return (Math.random() * 1e9 >>> 0) + (counter++);
 };
-},{}],30:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 /**
  * @module  gl-spectrum
  */
@@ -3897,6 +4008,7 @@ var loop = require('raf-loop');
 var isBrowser = require('is-browser');
 var Emitter = require('events').EventEmitter;
 var inherits = require('inherits');
+var isPlainObject = require('mutype/is-object');
 
 module.exports = Component;
 
@@ -3916,6 +4028,9 @@ function Component (options) {
 	}
 
 	extend(this, options);
+
+	//preserve initial viewport argument
+	this._viewport = this.viewport;
 
 	if (!this.container) {
 		this.container = isBrowser ? document.body : {};
@@ -3942,10 +4057,13 @@ function Component (options) {
 
 	this.is2d = !this.context.drawingBufferHeight;
 
+	var gl = this.gl = this.context;
+
+	//cache of textures
+	this.textures = {};
+
 	//setup webgl context
 	if (!this.is2d) {
-		var gl = this.gl = this.context;
-
 		if (this.float) {
 			var float = gl.getExtension('OES_texture_float');
 			if (!float) throw Error('WebGL does not support floats.');
@@ -3953,7 +4071,7 @@ function Component (options) {
 			if (!floatLinear) throw Error('WebGL does not support floats.');
 		}
 
-		this.program = createProgram(gl, this.vert, this.frag);
+		this.program = this.createProgram(this.vert, this.frag);
 
 		//FIXME: ensure that buffer spot does not interfere with other occupied spots
 		var buffer = gl.createBuffer();
@@ -3964,6 +4082,15 @@ function Component (options) {
 		gl.bindAttribLocation(this.program, 0, 'position');
 
 		gl.linkProgram(this.program);
+
+		//stub textures with empty data (to avoid errors)
+		var numUniforms = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS);
+		for(var i=0; i<numUniforms; ++i) {
+			var info = gl.getActiveUniform(this$1.program, i);
+			if (info && info.type === gl.SAMPLER_2D) {
+				this$1.setTexture(info.name, null);
+			}
+		}
 	}
 
 	//set canvas fit container size
@@ -3975,12 +4102,9 @@ function Component (options) {
 		window.addEventListener('resize', this.resize, false);
 	}
 
-	//create raf loop
-	this.engine = loop(function (dt) {
-		this$1.emit('render');
 
-		this$1.render();
-	}).start();
+	//create raf loop
+	this.engine = loop(function (dt) { return this$1.render(); }).start();
 }
 
 
@@ -4002,52 +4126,16 @@ Component.prototype.frag = "\n\tprecision mediump float;\n\tuniform vec4 viewpor
 //enable floating-point textures
 Component.prototype.float = true;
 
-
-/**
- * Bind texture unit
- */
-Component.prototype.bindTexture = function (a, b) {
-	if (arguments.length === 2) {
-		var opts = {};
-		opts[a] = b;
-	}
-	else {
-		var opts = a || {};
-	}
-
-	var gl = this.context;
-
-	for (var name in opts) {
-		var texture = this[name + 'Texture'] = gl.createTexture();
-		var textureUnit = this[name + 'TextureUnit'] = opts[name].unit != null ? opts[name].unit : opts[name];
-
-		gl.useProgram(this.program);
-		var textureLocation = gl.getUniformLocation(this.program, name);
-
-		gl.activeTexture(gl.TEXTURE0 + textureUnit);
-		gl.bindTexture(gl.TEXTURE_2D, texture);
-
-		var wrapS = opts[name].wrap && opts[name].wrap[0] || opts[name].wrapS || opts[name].wrap || gl.REPEAT;
-		var wrapT = opts[name].wrap && opts[name].wrap[1] || opts[name].wrapT || opts[name].wrap || gl.REPEAT;
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
-
-		var minFilter = opts[name].minFilter || gl.NEAREST;
-		var magFilter = opts[name].magFilter || gl.NEAREST;
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
-
-		gl.uniform1i(textureLocation, textureUnit);
-	}
-
-	return this;
-};
+//Increased each time new texture added
+Component.prototype.texturesCount = 0;
 
 
 /**
- * Set texture’s data
+ * Set texture
  */
 Component.prototype.setTexture = function (a, b) {
+	if (this.is2d) return this;
+
 	if (arguments.length === 2) {
 		var opts = {};
 		opts[a] = b;
@@ -4057,18 +4145,89 @@ Component.prototype.setTexture = function (a, b) {
 	}
 
 	var gl = this.context;
+
+	gl.useProgram(this.program);
+
 	for (var name in opts) {
-		var arr = opts[name] && opts[name].data || opts[name] || [];
-		var data = new Float32Array(arr);
+		var obj = this.textures[name];
 
-		var width = opts[name].width || opts[name].shape && opts[name].shape[0] || (opts[name].format === gl.ALPHA ? data.length : data.length / 4);
-		var height = opts[name].height || opts[name].shape && opts[name].shape[1] || 1;
-		var type = opts[name].type || (this.float ? gl.FLOAT : gl.UNSIGNED_BYTE);
+		//check if passed some data/image-like object for the texture or settings object
+		var opt = isPlainObject(opts[name]) ? opts[name] : {data: opts[name]};
 
-		var format = opts[name].format || (width * height === data.length ? gl.ALPHA : width * height * 3 === data.length ? gl.RGB : width * height * 4 === data.length ? gl.RGBA : gl.LUMINANCE);
+		//if no object - create and bind texture
+		if (!obj) {
+			obj = this.textures[name] = {name: name};
+		}
 
-		gl.activeTexture(gl.TEXTURE0 + this[name + 'TextureUnit']);
-		gl.texImage2D(gl.TEXTURE_2D, 0, format, width, height, 0, format, type, data);
+		if (!obj.texture) {
+			obj.texture = gl.createTexture();
+		}
+
+		if (!obj.location) {
+			obj.location = gl.getUniformLocation(this.program, name);
+		}
+
+		if (obj.unit == null || opt.unit != null) {
+			obj.unit = opt.unit != null ? opt.unit : this.texturesCount++;
+			this.texturesCount = Math.max(this.texturesCount, obj.unit);
+			gl.activeTexture(gl.TEXTURE0 + obj.unit);
+			gl.bindTexture(gl.TEXTURE_2D, obj.texture);
+			gl.uniform1i(obj.location, obj.unit);
+		}
+		else {
+			gl.activeTexture(gl.TEXTURE0 + obj.unit);
+		}
+
+		if (!obj.wrapS || opt.wrapS || opt.wrap) {
+			obj.wrapS = opt.wrap && opt.wrap[0] || opt.wrapS || opt.wrap || gl.REPEAT;
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, obj.wrapS);
+		}
+		if (!obj.wrapT || opt.wrapT || opt.wrap) {
+			obj.wrapT = opt.wrap && opt.wrap[1] || opt.wrapT || opt.wrap || gl.REPEAT;
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, obj.wrapT);
+		}
+
+		if (!obj.minFilter || opt.minFilter) {
+			obj.minFilter = opt.minFilter || gl.NEAREST;
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, obj.minFilter);
+		}
+
+		if (!obj.magFilter || opt.magFilter) {
+			obj.magFilter = opt.magFilter || gl.NEAREST;
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, obj.magFilter);
+		}
+
+		if (!obj.type || opt.type) {
+			obj.type = opt.type || obj.type || (this.float ? gl.FLOAT : gl.UNSIGNED_BYTE);
+		}
+
+		if (!obj.format || opt.format) {
+			obj.format = opt.format || obj.format || gl.RGBA;
+		}
+
+		var data = opt.data || [0, 0, 0, 1];
+
+		//handle raw data case
+		if (Array.isArray(data) || ArrayBuffer.isView(data)) {
+			if (opt && opt.shape) {
+				obj.width = opt.shape[0];
+				obj.height = opt.shape[1];
+			}
+			else {
+				obj.width = opt.width || data.width || (obj.format === gl.ALPHA ? data.length : Math.max(data.length / 4, 1));
+				obj.height = opt.height || data.height || 1;
+			}
+
+			obj.data = new Float32Array(data);
+
+			gl.texImage2D(gl.TEXTURE_2D, 0, obj.format, obj.width, obj.height, 0, obj.format, obj.type, obj.data);
+		} else {
+			obj.width = data.width;
+			obj.height = data.height;
+			obj.data = data;
+
+			gl.texImage2D(gl.TEXTURE_2D, 0, obj.format, obj.format, obj.type, obj.data);
+		}
 	}
 
 	return this;
@@ -4086,15 +4245,14 @@ Component.prototype.resize = function () {
 	var w = this.canvas.width, h = this.canvas.height;
 
 	//if vp is undefined - set it as full-height
-	var viewport;
-	if (!this.viewport) {
-		viewport = [0, 0, w, h];
+	if (!this._viewport) {
+		this.viewport = [0, 0, w, h];
 	}
-	else if (this.viewport instanceof Function) {
-		viewport = this.viewport(w, h);
+	else if (this._viewport instanceof Function) {
+		this.viewport = this._viewport(w, h);
 	}
 	else {
-		viewport = this.viewport;
+		this.viewport = this._viewport;
 	}
 
 	if (!this.is2d) {
@@ -4103,15 +4261,24 @@ Component.prototype.resize = function () {
 		var viewportLocation = gl.getUniformLocation(this.program, 'viewport');
 
 		//this trickery inverts viewport Y
-		var top = h-(viewport[3]+viewport[1]);
-		var vp = [viewport[0], top, viewport[2], viewport[3] + Math.min(top, 0)];
+		var top = h-(this.viewport[3]+this.viewport[1]);
+		var vp = [this.viewport[0], top, this.viewport[2], this.viewport[3] + Math.min(top, 0)];
 
 		gl.viewport(vp[0], vp[1], vp[2], vp[3]);
 		gl.uniform4fv(viewportLocation, vp);
 	}
 
-	this.emit('resize', viewport);
+	this.emit('resize');
 
+	return this;
+};
+
+
+/**
+ * Stop rendering loop
+ */
+Component.prototype.stop = function () {
+	this.engine.stop();
 	return this;
 };
 
@@ -4121,6 +4288,8 @@ Component.prototype.resize = function () {
  */
 Component.prototype.render = function () {
 	var gl = this.context;
+
+	this.emit('render');
 
 	if (!this.is2d) {
 		gl.useProgram(this.program);
@@ -4132,7 +4301,11 @@ Component.prototype.render = function () {
 
 
 //create program (2 shaders)
-function createProgram (gl, vSrc, fSrc) {
+Component.prototype.createProgram = function (vSrc, fSrc) {
+	if (this.is2d) return null;
+
+	var gl = this.gl;
+
 	var fShader = gl.createShader(gl.FRAGMENT_SHADER);
 	var vShader = gl.createShader(gl.VERTEX_SHADER);
 
@@ -4166,7 +4339,7 @@ function createProgram (gl, vSrc, fSrc) {
 	return program;
 }
 
-},{"canvas-fit":17,"events":5,"get-canvas-context":28,"inherits":33,"is-browser":35,"raf-loop":47,"xtend/mutable":62}],31:[function(require,module,exports){
+},{"canvas-fit":23,"events":5,"get-canvas-context":38,"inherits":43,"is-browser":45,"mutype/is-object":54,"raf-loop":58,"xtend/mutable":75}],41:[function(require,module,exports){
 module.exports = asString
 module.exports.add = append
 
@@ -4206,13 +4379,13 @@ function makeArray(arr) {
   return Array.isArray(arr) ? arr : [arr]
 }
 
-},{}],32:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 'use strict';
 var ansiRegex = require('ansi-regex');
 var re = new RegExp(ansiRegex().source); // remove the `g` flag
 module.exports = re.test.bind(re);
 
-},{"ansi-regex":13}],33:[function(require,module,exports){
+},{"ansi-regex":20}],43:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -4237,7 +4410,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],34:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -4261,9 +4434,9 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],35:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 module.exports = true;
-},{}],36:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 (function (process){
 'use strict';
 var ansiEscapes = require('ansi-escapes');
@@ -4297,7 +4470,7 @@ module.exports.stderr = main(process.stderr);
 module.exports.create = main;
 
 }).call(this,require('_process'))
-},{"_process":7,"ansi-escapes":12,"cli-cursor":19}],37:[function(require,module,exports){
+},{"_process":7,"ansi-escapes":19,"cli-cursor":25}],47:[function(require,module,exports){
 
 /**
  * Expose `render()`.`
@@ -4448,7 +4621,7 @@ function escape(html) {
     .replace(/>/g, '&gt;');
 }
 
-},{}],38:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 /**
  * Clamp value.
  * Detects proper clamp min/max.
@@ -4463,7 +4636,7 @@ function escape(html) {
 module.exports = require('./wrap')(function(a, min, max){
 	return max > min ? Math.max(Math.min(a,max),min) : Math.max(Math.min(a,min),max);
 });
-},{"./wrap":43}],39:[function(require,module,exports){
+},{"./wrap":53}],49:[function(require,module,exports){
 /**
  * @module  mumath/closest
  */
@@ -4480,7 +4653,7 @@ module.exports = function closest (num, arr) {
 	}
 	return curr;
 }
-},{}],40:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 /**
  * Base 10 logarithm
  *
@@ -4489,7 +4662,7 @@ module.exports = function closest (num, arr) {
 module.exports = require('./wrap')(function (a) {
 	return Math.log(a) / Math.log(10);
 });
-},{"./wrap":43}],41:[function(require,module,exports){
+},{"./wrap":53}],51:[function(require,module,exports){
 /**
  * @module mumath/order
  */
@@ -4498,7 +4671,7 @@ module.exports = require('./wrap')(function (n) {
 	var order = Math.floor(Math.log(n) / Math.LN10 + 0.000000001);
 	return Math.pow(10,order);
 });
-},{"./wrap":43}],42:[function(require,module,exports){
+},{"./wrap":53}],52:[function(require,module,exports){
 /**
  * Whether element is between left & right including
  *
@@ -4517,7 +4690,7 @@ module.exports = require('./wrap')(function(a, left, right){
 	if (a <= right && a >= left) return true;
 	return false;
 });
-},{"./wrap":43}],43:[function(require,module,exports){
+},{"./wrap":53}],53:[function(require,module,exports){
 /**
  * Get fn wrapped with array/object attrs recognition
  *
@@ -4559,7 +4732,20 @@ module.exports = function(fn){
 		}
 	};
 };
-},{}],44:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
+/**
+ * @module mutype/is-object
+ */
+
+//TODO: add st8 tests
+
+//isPlainObject indeed
+module.exports = function(o){
+	// return obj === Object(obj);
+	return !!o && typeof o === 'object' && o.constructor === Object;
+};
+
+},{}],55:[function(require,module,exports){
 'use strict';
 module.exports = function (fn, errMsg) {
 	if (typeof fn !== 'function') {
@@ -4592,7 +4778,7 @@ module.exports = function (fn, errMsg) {
 	return onetime;
 };
 
-},{}],45:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 (function (process){
 // Generated by CoffeeScript 1.7.1
 (function() {
@@ -4628,7 +4814,7 @@ module.exports = function (fn, errMsg) {
 }).call(this);
 
 }).call(this,require('_process'))
-},{"_process":7}],46:[function(require,module,exports){
+},{"_process":7}],57:[function(require,module,exports){
 /**
  * @module  plot-grid
  */
@@ -4639,7 +4825,7 @@ var lg = require('mumath/lg');
 var Emitter = require('events').EventEmitter;
 var inherits = require('inherits');
 var sf = 0;
-var className = ((require('insert-css')("._6bad5a5e {\r\n\tposition: relative;\r\n}\r\n\r\n._6bad5a5e .grid {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tfont-family: sans-serif;\r\n}\r\n\r\n._6bad5a5e .grid-lines {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\toverflow: hidden;\r\n}\r\n\r\n._6bad5a5e .grid-line {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\twidth: .5rem;\r\n\theight: .5rem;\r\n\tcolor: rgba(127,127,127,.3);\r\n}\r\n._6bad5a5e .grid-line[hidden] {\r\n\tdisplay: none;\r\n}\r\n._6bad5a5e .grid-line:hover {\r\n\tcolor: rgba(127,127,127,.5);\r\n}\r\n\r\n._6bad5a5e .grid-line-x {\r\n\theight: 100%;\r\n\twidth: 0;\r\n\tborder-left: 1px dotted;\r\n\tmargin-left: -1px;\r\n}\r\n._6bad5a5e .grid-line-x:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -.25rem;\r\n}\r\n._6bad5a5e .grid-line-x.grid-line-min {\r\n\tmargin-left: 0px;\r\n}\r\n\r\n._6bad5a5e .grid-line-y {\r\n\twidth: 100%;\r\n\theight: 0;\r\n\tmargin-top: -1px;\r\n\tborder-top: 1px dotted;\r\n}\r\n._6bad5a5e .grid-line-y:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\tleft: 0;\r\n\tright: 0;\r\n\ttop: -.25rem;\r\n}\r\n._6bad5a5e .grid-line-y.grid-line-max {\r\n\tmargin-top: 0px;\r\n}\r\n\r\n._6bad5a5e .grid-axis {\r\n\tposition: absolute;\r\n}\r\n._6bad5a5e .grid-axis-x {\r\n\ttop: auto;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tborder-bottom: 2px solid;\r\n\tmargin-bottom: -.5rem;\r\n}\r\n._6bad5a5e .grid-axis-y {\r\n\tborder-left: 2px solid;\r\n\tright: auto;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -1px;\r\n    margin-left: -.5rem;\r\n}\r\n\r\n._6bad5a5e .grid-label {\r\n\tposition: absolute;\r\n\ttop: auto;\r\n\tleft: auto;\r\n\tmin-height: 1rem;\r\n\tfont-size: .8rem;\r\n}\r\n._6bad5a5e .grid-label-x {\r\n\tbottom: auto;\r\n\ttop: 100%;\r\n\tmargin-top: 1.5rem;\r\n\twidth: 2rem;\r\n\tmargin-left: -1rem;\r\n\ttext-align: center;\r\n}\r\n._6bad5a5e .grid-label-x:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\twidth: 0;\r\n\tborder-left: 2px solid;\r\n\ttop: -1rem;\r\n\tmargin-left: -1px;\r\n\tmargin-top: -2px;\r\n\tleft: 1rem;\r\n}\r\n\r\n._6bad5a5e .grid-label-y {\r\n    right: 100%;\r\n    margin-right: 1.5rem;\r\n    margin-top: -.5rem;\r\n}\r\n._6bad5a5e .grid-label-y:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\theight: 0;\r\n\tborder-top: 2px solid;\r\n\tright: -1rem;\r\n\ttop: .4rem;\r\n\tmargin-right: -1px;\r\n}\r\n") || true) && "_6bad5a5e");
+var className = ((require('insert-css')("._8bdd9f94 {\r\n\tposition: relative;\r\n}\r\n\r\n._8bdd9f94 .grid {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tfont-family: sans-serif;\r\n}\r\n\r\n._8bdd9f94 .grid-lines {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\toverflow: hidden;\r\n}\r\n\r\n._8bdd9f94 .grid-line {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\twidth: .5rem;\r\n\theight: .5rem;\r\n\topacity: .135;\r\n}\r\n._8bdd9f94 .grid-line[hidden] {\r\n\tdisplay: none;\r\n}\r\n._8bdd9f94 .grid-line:hover {\r\n\topacity: .27;\r\n}\r\n\r\n._8bdd9f94 .grid-line-x {\r\n\theight: 100%;\r\n\twidth: 0;\r\n\tborder-left: 1px dotted;\r\n\tmargin-left: -1px;\r\n}\r\n._8bdd9f94 .grid-line-x:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -.25rem;\r\n}\r\n._8bdd9f94 .grid-line-x.grid-line-min {\r\n\tmargin-left: 0px;\r\n}\r\n\r\n._8bdd9f94 .grid-line-y {\r\n\twidth: 100%;\r\n\theight: 0;\r\n\tmargin-top: -1px;\r\n\tborder-top: 1px dotted;\r\n}\r\n._8bdd9f94 .grid-line-y:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\tleft: 0;\r\n\tright: 0;\r\n\ttop: -.25rem;\r\n}\r\n._8bdd9f94 .grid-line-y.grid-line-max {\r\n\tmargin-top: 0px;\r\n}\r\n\r\n._8bdd9f94 .grid-axis {\r\n\tposition: absolute;\r\n}\r\n._8bdd9f94 .grid-axis-x {\r\n\ttop: auto;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tborder-bottom: 2px solid;\r\n\tmargin-bottom: -.5rem;\r\n}\r\n._8bdd9f94 .grid-axis-y {\r\n\tborder-left: 2px solid;\r\n\tright: auto;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -1px;\r\n    margin-left: -.5rem;\r\n}\r\n\r\n._8bdd9f94 .grid-label {\r\n\tposition: absolute;\r\n\ttop: auto;\r\n\tleft: auto;\r\n\tmin-height: 1rem;\r\n\tfont-size: .8rem;\r\n}\r\n._8bdd9f94 .grid-label-x {\r\n\tbottom: auto;\r\n\ttop: 100%;\r\n\tmargin-top: 1.5rem;\r\n\twidth: 2rem;\r\n\tmargin-left: -1rem;\r\n\ttext-align: center;\r\n}\r\n._8bdd9f94 .grid-label-x:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\twidth: 0;\r\n\tborder-left: 2px solid;\r\n\ttop: -1rem;\r\n\tmargin-left: -1px;\r\n\tmargin-top: -2px;\r\n\tleft: 1rem;\r\n}\r\n\r\n._8bdd9f94 .grid-label-y {\r\n    right: 100%;\r\n    margin-right: 1.5rem;\r\n    margin-top: -.5rem;\r\n}\r\n._8bdd9f94 .grid-label-y:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\theight: 0;\r\n\tborder-top: 2px solid;\r\n\tright: -1rem;\r\n\ttop: .4rem;\r\n\tmargin-right: -1px;\r\n}\r\n") || true) && "_8bdd9f94");
 var closestNumber = require('mumath/closest');
 var mag = require('mumath/order');
 var within = require('mumath/within');
@@ -4932,7 +5118,7 @@ Grid.prototype.update = function (options) {
 
 	return this;
 };
-},{"events":5,"get-uid":29,"inherits":33,"insert-css":34,"is-browser":35,"mumath/closest":39,"mumath/lg":40,"mumath/order":41,"mumath/within":42,"xtend":61}],47:[function(require,module,exports){
+},{"events":5,"get-uid":39,"inherits":43,"insert-css":44,"is-browser":45,"mumath/closest":49,"mumath/lg":50,"mumath/order":51,"mumath/within":52,"xtend":74}],58:[function(require,module,exports){
 var inherits = require('inherits')
 var EventEmitter = require('events').EventEmitter
 var now = require('right-now')
@@ -4977,7 +5163,7 @@ Engine.prototype.tick = function() {
     this.emit('tick', dt)
     this.last = time
 }
-},{"events":5,"inherits":33,"raf":48,"right-now":50}],48:[function(require,module,exports){
+},{"events":5,"inherits":43,"raf":59,"right-now":61}],59:[function(require,module,exports){
 (function (global){
 var now = require('performance-now')
   , root = typeof window === 'undefined' ? global : window
@@ -5053,7 +5239,7 @@ module.exports.polyfill = function() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"performance-now":45}],49:[function(require,module,exports){
+},{"performance-now":56}],60:[function(require,module,exports){
 (function (process){
 'use strict';
 var onetime = require('onetime');
@@ -5066,7 +5252,7 @@ module.exports = onetime(function () {
 });
 
 }).call(this,require('_process'))
-},{"_process":7,"exit-hook":26,"onetime":44}],50:[function(require,module,exports){
+},{"_process":7,"exit-hook":35,"onetime":55}],61:[function(require,module,exports){
 (function (global){
 module.exports =
   global.performance &&
@@ -5077,7 +5263,22 @@ module.exports =
   }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],51:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
+'use strict'
+
+function blackmanHarris (i,N) {
+  var a0 = 0.35875,
+      a1 = 0.48829,
+      a2 = 0.14128,
+      a3 = 0.01168,
+      f = 6.283185307179586*i/(N-1)
+
+  return a0 - a1*Math.cos(f) +a2*Math.cos(2*f) - a3*Math.cos(3*f)
+}
+
+module.exports = blackmanHarris
+
+},{}],63:[function(require,module,exports){
 var resolve = require('soundcloud-resolve')
 var fonts = require('google-fonts')
 var minstache = require('minstache')
@@ -5142,7 +5343,7 @@ function badge(options, callback) {
   return div
 }
 
-},{"fs":1,"google-fonts":31,"insert-css":52,"minstache":37,"soundcloud-resolve":53}],52:[function(require,module,exports){
+},{"fs":1,"google-fonts":41,"insert-css":64,"minstache":47,"soundcloud-resolve":65}],64:[function(require,module,exports){
 var inserted = [];
 
 module.exports = function (css) {
@@ -5161,7 +5362,7 @@ module.exports = function (css) {
     }
 };
 
-},{}],53:[function(require,module,exports){
+},{}],65:[function(require,module,exports){
 var qs  = require('querystring')
 var xhr = require('xhr')
 
@@ -5194,7 +5395,14 @@ function resolve(id, goal, callback) {
   })
 }
 
-},{"querystring":10,"xhr":58}],54:[function(require,module,exports){
+},{"querystring":10,"xhr":71}],66:[function(require,module,exports){
+// stats.js - http://github.com/mrdoob/stats.js
+var Stats=function(){function h(a){c.appendChild(a.dom);return a}function k(a){for(var d=0;d<c.children.length;d++)c.children[d].style.display=d===a?"block":"none";l=a}var l=0,c=document.createElement("div");c.style.cssText="position:fixed;top:0;left:0;cursor:pointer;opacity:0.9;z-index:10000";c.addEventListener("click",function(a){a.preventDefault();k(++l%c.children.length)},!1);var g=(performance||Date).now(),e=g,a=0,r=h(new Stats.Panel("FPS","#0ff","#002")),f=h(new Stats.Panel("MS","#0f0","#020"));
+if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
+Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
+v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
+
+},{}],67:[function(require,module,exports){
 'use strict';
 var ansiRegex = require('ansi-regex')();
 
@@ -5202,7 +5410,7 @@ module.exports = function (str) {
 	return typeof str === 'string' ? str.replace(ansiRegex, '') : str;
 };
 
-},{"ansi-regex":13}],55:[function(require,module,exports){
+},{"ansi-regex":20}],68:[function(require,module,exports){
 (function (process){
 'use strict';
 var argv = process.argv;
@@ -5256,7 +5464,7 @@ module.exports = (function () {
 })();
 
 }).call(this,require('_process'))
-},{"_process":7}],56:[function(require,module,exports){
+},{"_process":7}],69:[function(require,module,exports){
 (function (process){
 /**
  * Simple node/browser test runner
@@ -5920,7 +6128,7 @@ test.test = test;
 
 module.exports = test;
 }).call(this,require('_process'))
-},{"_process":7,"ansi-escapes":12,"chalk":18,"elegant-spinner":23,"events":5,"inherits":33,"is-browser":35,"log-update":36,"performance-now":45,"xtend/mutable":62}],57:[function(require,module,exports){
+},{"_process":7,"ansi-escapes":19,"chalk":24,"elegant-spinner":32,"events":5,"inherits":43,"is-browser":45,"log-update":46,"performance-now":56,"xtend/mutable":75}],70:[function(require,module,exports){
 var AudioContext = window.AudioContext || window.webkitAudioContext
 
 module.exports = WebAudioAnalyser
@@ -6002,7 +6210,7 @@ WebAudioAnalyser.prototype.frequencies = function(output, channel) {
   return output
 }
 
-},{}],58:[function(require,module,exports){
+},{}],71:[function(require,module,exports){
 var window = require("global/window")
 var once = require("once")
 
@@ -6108,7 +6316,7 @@ function createXHR(options, callback) {
 
 function noop() {}
 
-},{"global/window":59,"once":60}],59:[function(require,module,exports){
+},{"global/window":72,"once":73}],72:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
     module.exports = window
@@ -6119,7 +6327,7 @@ if (typeof window !== "undefined") {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],60:[function(require,module,exports){
+},{}],73:[function(require,module,exports){
 module.exports = once
 
 once.proto = once(function () {
@@ -6140,7 +6348,7 @@ function once (fn) {
   }
 }
 
-},{}],61:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -6163,7 +6371,7 @@ function extend() {
     return target
 }
 
-},{}],62:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -6184,7 +6392,7 @@ function extend(target) {
     return target
 }
 
-},{}],63:[function(require,module,exports){
+},{}],76:[function(require,module,exports){
 var test = require('tst');
 var Spectrum = require('./');
 // var Formant = require('audio-formant');
@@ -6192,17 +6400,33 @@ var Spectrum = require('./');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
 var ft = require('fourier-transform');
+var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
 var SCBadge = require('soundcloud-badge');
 var Analyser = require('web-audio-analyser');
+var Stats = require('stats.js');
+var db = require('decibels');
+
+
+var stats = new Stats();
+stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
+document.body.appendChild( stats.dom );
+stats.begin();
+stats.dom.style.left = 'auto';
+stats.dom.style.right = '1rem';
+stats.dom.style.top = '1rem';
 
 
 //stream soundcloud
 var audio = new Audio;
+
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
-	// , song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016'
-	song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
+	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
+	// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
 	dark: false,
 	getFonts: false
 }, function(err, src, data, div) {
@@ -6216,12 +6440,12 @@ var badge = SCBadge({
 	}, false);
 });
 
+
 var analyser = Analyser(audio, { audible: true, stereo: false })
 
 
-
 //generate input sine
-var N = 4096;
+var N = 2048;
 var sine = new Float32Array(N);
 var saw = new Float32Array(N);
 var noise = new Float32Array(N);
@@ -6237,83 +6461,81 @@ for (var i = 0; i < N; i++) {
 if (isBrowser) {
 	document.body.style.margin = '0';
 	document.body.style.boxSizing = 'border-box';
-
-}
-
-function createColormapSelector (spectrum) {
-	//append style switcher
-	var switcher = document.createElement('select');
-	switcher.classList.add('.colormap');
-	switcher.style.position = 'fixed';
-	switcher.style.bottom = '1rem';
-	switcher.style.left = '1rem';
-	switcher.style.width = '4rem';
-	switcher.style.margin = '0 auto';
-	switcher.style.background = 'rgba(0,0,0,.95)';
-	switcher.style.color = 'white';
-	switcher.style.border = '0';
-	switcher.innerHTML = "\n\t\t<option value=\"jet\">jet</option>\n\t\t<option value=\"hsv\">hsv</option>\n\t\t<option value=\"hot\">hot</option>\n\t\t<option value=\"cool\">cool</option>\n\t\t<option value=\"spring\">spring</option>\n\t\t<option value=\"summer\">summer</option>\n\t\t<option value=\"autumn\">autumn</option>\n\t\t<option value=\"winter\">winter</option>\n\t\t<option value=\"bone\">bone</option>\n\t\t<option value=\"copper\">copper</option>\n\t\t<option value=\"greys\" selected>greys</option>\n\t\t<option value=\"yignbu\">yignbu</option>\n\t\t<option value=\"greens\">greens</option>\n\t\t<option value=\"yiorrd\">yiorrd</option>\n\t\t<option value=\"bluered\">bluered</option>\n\t\t<option value=\"rdbu\">rdbu</option>\n\t\t<option value=\"picnic\">picnic</option>\n\t\t<option value=\"rainbow\">rainbow</option>\n\t\t<option value=\"portland\">portland</option>\n\t\t<option value=\"blackbody\">blackbody</option>\n\t\t<option value=\"earth\">earth</option>\n\t\t<option value=\"electric\">electric</option>\n\t\t<!--<option value=\"alpha\">alpha</option>-->\n\t";
-	switcher.addEventListener('input', function () {
-		spectrum.setColormap(switcher.value);
-	});
-	document.body.appendChild(switcher);
+	document.body.style.fontFamily = 'sans-serif';
 }
 
 
-test.only('linear classics', function () {
-	// var frequencies = new Float32Array(ft(sine));
+test('line webgl', function () {
+	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 
+	// var frequencies = ft(noise);
+	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
+
 	var spectrum = new Spectrum({
 		frequencies: frequencies,
+		fill: 'yignbu',
+		grid: true,
 		minFrequency: 40,
+		maxFrequency: 20000,
 		logarithmic: true,
-		smoothing: .8
+		smoothing: .5,
+		maxDecibels: 0,
+		// mask: null,
+		align: 0.5,
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
 	}).on('render', function () {
+		stats.end();
+		stats.begin();
+
+		// analyser.analyser.getFloatTimeDomainData(waveform);
+		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
+		// frequencies = frequencies.map((f, i) => db.fromGain(f));
+
 		analyser.analyser.getFloatFrequencyData(frequencies);
-		frequencies = frequencies.map(function (v) {
-			return Math.max((100 + v) / 100, 0);
-		});
+
 		spectrum.setFrequencies(frequencies);
 	});
 
 	createColormapSelector(spectrum);
 });
 
-test('log scale', function () {
+test.skip('bars 2d', function () {
+	var frequencies = ft(sine);
+	// var frequencies = new Float32Array(1024).fill(0.5);
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 
-});
+	// var frequencies = ft(noise);
+	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
 
-test.skip('streaming', function () {
 	var spectrum = new Spectrum({
-
+		mask: createMask(10, 10),
+		// mask: null,
+		frequencies: frequencies,
+		maxDecibels: 0,
+		maxFrequency: 20000,
+		grid: false,
+		align: 0.5,
+		// background: [1,0,0,1],
+		// fill: [1,1,1,1],
+		logarithmic: true
+	}).on('render', function () {
+		stats.end();
+		stats.begin();
+		analyser.analyser.getFloatFrequencyData(frequencies);
+		spectrum.setFrequencies(frequencies);
 	});
 
-	Formant([1/1000, 1, 1, 0.5])
-	.on('data', function (buffer) {
-		spectrum.setFrequencies(buffer)
-	})
-	.pipe(Slice(1))
-	.pipe(Sink());
+	createColormapSelector(spectrum);
 });
 
-test.skip('2d', function () {
-
-});
-
-test.skip('node', function () {
-
-});
+test.skip('node', function () {});
 
 
-test.skip('viewport', function () {
-
-});
-
+test.skip('viewport', function () {});
 
 test('clannels');
 
@@ -6336,4 +6558,164 @@ test('line');
 test('oscilloscope');
 
 
-},{"./":11,"fourier-transform":27,"is-browser":35,"soundcloud-badge":51,"tst":56,"web-audio-analyser":57}]},{},[63]);
+
+
+function createColormapSelector (spectrum) {
+	var container = document.createElement('div');
+	container.style.position = 'fixed';
+	container.style.bottom = '0';
+	container.style.left = '0';
+	container.style.right = '0';
+	container.style.padding = '.5rem';
+	container.style.border = '0';
+	container.style.zIndex = 999;
+	document.body.appendChild(container);
+
+	//append style switcher
+	var switcher = document.createElement('select');
+	switcher.classList.add('colormap');
+	switcher.style.width = '4rem';
+	switcher.style.color = 'inherit';
+	switcher.style.fontSize = '.8rem';
+	switcher.style.border = '0';
+	switcher.style.background = 'none';
+	switcher.title = 'Colormap';
+	switcher.innerHTML = "\n\t\t<option value=\"jet\">jet</option>\n\t\t<option value=\"hsv\">hsv</option>\n\t\t<option value=\"hot\">hot</option>\n\t\t<option value=\"cool\">cool</option>\n\t\t<option value=\"spring\">spring</option>\n\t\t<option value=\"summer\">summer</option>\n\t\t<option value=\"autumn\">autumn</option>\n\t\t<option value=\"winter\">winter</option>\n\t\t<option value=\"bone\">bone</option>\n\t\t<option value=\"copper\">copper</option>\n\t\t<option value=\"greys\">greys</option>\n\t\t<option value=\"yignbu\" selected>yignbu</option>\n\t\t<option value=\"greens\">greens</option>\n\t\t<option value=\"yiorrd\">yiorrd</option>\n\t\t<option value=\"bluered\">bluered</option>\n\t\t<option value=\"rdbu\">rdbu</option>\n\t\t<option value=\"picnic\">picnic</option>\n\t\t<option value=\"rainbow\">rainbow</option>\n\t\t<option value=\"portland\">portland</option>\n\t\t<option value=\"blackbody\">blackbody</option>\n\t\t<option value=\"earth\">earth</option>\n\t\t<option value=\"electric\">electric</option>\n\t\t<!--<option value=\"alpha\">alpha</option>-->\n\t";
+	switcher.addEventListener('input', function () {
+		spectrum.setFill(switcher.value, inverseCheckbox.checked);
+		updateView();
+	});
+	container.appendChild(switcher);
+
+
+	//inversed colormap checkbox
+	var inverseSwitch = createSwitch('inversed', function () {
+		spectrum.setFill(switcher.value, this.checked);
+		updateView();
+	});
+	var inverseCheckbox = inverseSwitch.querySelector('input');
+	container.appendChild(inverseSwitch);
+
+
+	//weighting switcher
+	var weightingEl = document.createElement('select');
+	weightingEl.classList.add('weighting');
+	weightingEl.style.width = '4rem';
+	weightingEl.style.border = '0';
+	weightingEl.style.color = 'inherit';
+	weightingEl.style.marginLeft = '1rem';
+	weightingEl.style.background = 'none';
+	weightingEl.title = 'Noise weighting';
+	weightingEl.innerHTML = "\n\t\t<option value=\"a\">A</option>\n\t\t<option value=\"b\">B</option>\n\t\t<option value=\"c\">C</option>\n\t\t<option value=\"d\">D</option>\n\t\t<option value=\"itu\" selected>ITU</option>\n\t\t<option value=\"z\">Z (none)</option>\n\t";
+	weightingEl.addEventListener('input', function () {
+		spectrum.weighting = weightingEl.value;
+
+		updateView();
+	});
+	container.appendChild(weightingEl);
+
+
+	//align slider
+	var alignEl = document.createElement('input');
+	alignEl.type = 'range';
+	alignEl.min = 0;
+	alignEl.max = 1;
+	alignEl.step = .01;
+	alignEl.classList.add('align');
+	alignEl.style.width = '5rem';
+	alignEl.style.height = '1rem';
+	alignEl.style.border = '0';
+	alignEl.style.color = 'inherit';
+	alignEl.style.margin = '0 0 0 1rem';
+	alignEl.style.verticalAlign = 'middle';
+	alignEl.style.background = 'none';
+	alignEl.title = 'Align: 0.5';
+	alignEl.addEventListener('input', function () {
+		spectrum.align = parseFloat(alignEl.value);
+		alignEl.title = 'Align: ' + alignEl.value;
+		updateView();
+	});
+	container.appendChild(alignEl);
+
+
+	//grid colormap checkbox
+	var gridSwitch = createSwitch('grid', function () {
+		spectrum.grid = this.checked;
+		updateView();
+	});
+	var gridCheckbox = gridSwitch.querySelector('input');
+	gridCheckbox.checked = spectrum.grid;
+	container.appendChild(gridSwitch);
+
+	//bars checkbox
+	container.appendChild(
+		createSwitch('bars', function () {
+			spectrum.setMask(this.checked ? createMask(10, 10) : null);
+			updateView();
+		})
+	);
+
+
+	updateView();
+
+	function updateView () {
+		spectrum.update();
+		container.style.color = 'rgb(' + spectrum.fill.slice(-4, -1).map(function (v) { return v*255; }).join(', ') + ')';
+	}
+}
+
+
+function createSwitch (name, cb) {
+	var switcher = document.createElement('label');
+	switcher.innerHTML = "\n\t\t<input type=\"checkbox\" id=\"" + name + "\"/>\n\t\t" + name + "\n\t";
+	checkbox = switcher.querySelector('input');
+	checkbox.setAttribute('type', 'checkbox');
+	checkbox.style.width = '1rem';
+	checkbox.style.height = '1rem';
+	checkbox.style.verticalAlign = 'middle';
+
+	switcher.style.fontSize = '.8rem';
+	switcher.style.verticalAlign = 'middle';
+	switcher.style.height = '1rem';
+	switcher.classList.add(name + '-switcher');
+	switcher.style.margin = '0 0 0 .5rem';
+	switcher.style.border = '0';
+	switcher.style.background = 'none';
+	switcher.style.color = 'inherit';
+	switcher.title = name;
+	checkbox.addEventListener('click', cb);
+
+	return switcher;
+}
+
+
+
+//create mask
+function createMask (w, h) {
+	w = w || 10;
+	h = h || 10;
+	var rect = [w, h];
+	var radius = w/2;
+	var canvas = document.createElement('canvas');
+	canvas.width = rect[0] + 2;
+	canvas.height = rect[1] + 2;
+	var ctx = canvas.getContext('2d');
+	ctx.clearRect(0, 0, rect[0] + 2, rect[1] + 2);
+	ctx.fillStyle = 'rgb(0,0,0)';
+	ctx.fillRect(0, 0, rect[0] + 2, rect[1] + 2);
+	ctx.strokeStyle = 'rgb(255,255,255)';
+	ctx.fillStyle = 'rgb(255,255,255)';
+	ctx.lineJoin = 'round';
+	ctx.lineWidth = radius;
+	ctx.strokeRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
+	ctx.fillRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
+
+	// document.body.appendChild(canvas);
+	// canvas.style.zIndex = 999;
+	// canvas.style.position = 'absolute';
+	// canvas.style.top = '0px';
+	// canvas.style.left = '0px';
+
+	return canvas;
+}
+},{"./":11,"decibels":30,"fourier-transform":37,"is-browser":45,"scijs-window-functions/blackman-harris":62,"soundcloud-badge":63,"stats.js":66,"tst":69,"web-audio-analyser":70}]},{},[76]);
