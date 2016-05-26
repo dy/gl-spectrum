@@ -27,10 +27,10 @@ var audio = new Audio;
 /*
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
-	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
+	song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
-	song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
+	// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
 	dark: false,
 	getFonts: false
 }, function(err, src, data, div) {
@@ -87,6 +87,8 @@ test('line webgl', function () {
 		logarithmic: true,
 		smoothing: .5,
 		maxDecibels: 0,
+		// mask: null,
+		align: 0,
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
@@ -139,11 +141,13 @@ test.only('bars 2d', function () {
 
 	var spectrum = new Spectrum({
 		mask: canvas,
+		// mask: null,
 		frequencies: frequencies,
 		maxDecibels: 0,
 		grid: false,
-		align: .5,
-		// colormap: [255,255,255,1, 255,0,0,1],
+		align: 0.5,
+		// background: [1,0,0,1],
+		// fill: [1,1,1,1, 1,0,0,1],
 		logarithmic: true
 	}).on('render', function () {
 		stats.end();
@@ -208,6 +212,7 @@ function createColormapSelector (spectrum) {
 	switcher.style.color = 'inherit';
 	switcher.style.border = '0';
 	switcher.style.background = 'none';
+	switcher.title = 'Colormap';
 	switcher.innerHTML = `
 		<option value="jet">jet</option>
 		<option value="hsv">hsv</option>
@@ -234,31 +239,31 @@ function createColormapSelector (spectrum) {
 		<!--<option value="alpha">alpha</option>-->
 	`;
 	switcher.addEventListener('input', function () {
-		spectrum.setFill(switcher.value);
+		spectrum.setFill(switcher.value, inverseCheckbox.checked);
 		updateView();
 	});
 	container.appendChild(switcher);
 
 
 	//inversed colormap checkbox
-	var checkbox = document.createElement('input');
-	checkbox.classList.add('inversed');
-	checkbox.setAttribute('type', 'checkbox');
-	checkbox.style.margin = '0 0 0 .5rem';
-	checkbox.style.width = '1rem';
-	checkbox.style.height = '1rem';
-	checkbox.style.border = '0';
-	checkbox.style.background = 'none';
-	checkbox.style.color = 'inherit';
-	checkbox.style.verticalAlign = 'bottom';
-	checkbox.title = 'Reverse colormap';
-	checkbox.addEventListener('click', function () {
-		spectrum.inverse = checkbox.checked;
-		spectrum.setFill(switcher.value);
+	var inverseCheckbox = document.createElement('input');
+	inverseCheckbox.classList.add('inversed');
+	inverseCheckbox.setAttribute('type', 'checkbox');
+	inverseCheckbox.style.margin = '0 0 0 .5rem';
+	inverseCheckbox.style.width = '1rem';
+	inverseCheckbox.style.height = '1rem';
+	inverseCheckbox.style.border = '0';
+	inverseCheckbox.style.background = 'none';
+	inverseCheckbox.style.color = 'inherit';
+	inverseCheckbox.style.verticalAlign = 'bottom';
+	inverseCheckbox.title = 'Inverse colormap';
+	inverseCheckbox.addEventListener('click', function () {
+		// spectrum.inverse = inverseCheckbox.checked;
+		spectrum.setFill(switcher.value, inverseCheckbox.checked);
 
 		updateView();
 	});
-	container.appendChild(checkbox);
+	container.appendChild(inverseCheckbox);
 
 
 	//weighting switcher
@@ -269,6 +274,7 @@ function createColormapSelector (spectrum) {
 	weightingEl.style.color = 'inherit';
 	weightingEl.style.marginLeft = '1rem';
 	weightingEl.style.background = 'none';
+	weightingEl.title = 'Noise weighting';
 	weightingEl.innerHTML = `
 		<option value="a">A</option>
 		<option value="b">B</option>

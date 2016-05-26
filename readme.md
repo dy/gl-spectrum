@@ -47,8 +47,12 @@ var spectrum = new Spectrum({
 	grid: true,
 	axes: false,
 
-	//colormap, pixels, imageData, imageElement or canvas
+	//The levels of magnitude/frequency.
+	//A colormap name, colormap, pixels array, imageData, imageElement or canvas
 	fill: null,
+
+	//undefined background takes the 0-level of the fill
+	background: null,
 
 	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
 	align: 0,
@@ -68,7 +72,7 @@ var spectrum = new Spectrum({
 
 //pass db frequencies in -100...0 range
 spectrum.setFrequencies(frequencies);
-spectrum.setFill(colors);
+spectrum.setFill(colors, inverse?);
 spectrum.setMask(mask);
 
 //update state according to the params
