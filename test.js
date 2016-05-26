@@ -82,7 +82,7 @@ test('line webgl', function () {
 		frequencies: frequencies,
 		fill: 'yignbu',
 		grid: true,
-		minFrequency: 20,
+		minFrequency: 40,
 		maxFrequency: 20000,
 		logarithmic: true,
 		smoothing: .5,

@@ -141,11 +141,11 @@ Spectrum.prototype.frag = `
 	void main () {
 		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		bin = vec2(1. / viewport.zw);
-		prevF = coord.x - bin.x;
-		currF = coord.x;
+		// prevF = coord.x - .5*bin.x;
+		// currF = coord.x;
 		// nextF = coord.x + .5*bin.x;
-		prevMag = magnitude(prevF);
-		currMag = magnitude(currF);
+		// prevMag = magnitude(prevF);
+		// currMag = magnitude(currF);
 		// nextMag = magnitude(nextF);
 		// maxMag = max(currMag, prevMag);
 		// minMag = min(currMag, prevMag);
@@ -180,7 +180,7 @@ Spectrum.prototype.frag = `
 		float maskLevel = texture2D(mask, maskCoord).x;
 
 		//active area limits 0-mask case
-		float active = smoothstep(0., 0.5*abs(currMag - prevMag), top - maskSize.y/viewport.w) + smoothstep(0., 0.5*abs(currMag - prevMag), bottom - maskSize.y/viewport.w);
+		float active = smoothstep(-0.001, 0.001, top - maskSize.y/viewport.w) + smoothstep(-0.001, 0.001, bottom - maskSize.y/viewport.w);
 		maskLevel *= (1. - active);
 
 		// gl_FragColor = vec4(vec3(intensity), 1);
@@ -314,9 +314,9 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	}
 
 	//set grid color to colormap’s color
-	if (this.gridEl) {
+	if (this._grid) {
 		var gridColor = this.fill.slice(-4).map((v) => v*255);
-		this.gridEl.linesContainer.style.color = `rgba(${gridColor})`;
+		this._grid.linesContainer.style.color = `rgba(${gridColor})`;
 	}
 
 	return this;
@@ -364,8 +364,8 @@ Spectrum.prototype.update = function () {
 
 	//create grid, if not created yet
 	if (this.grid) {
-		if (!this.gridEl) {
-			this.gridEl = createGrid({
+		if (!this._grid) {
+			this._grid = createGrid({
 				container: this.container,
 				viewport: this.viewport,
 				lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
@@ -412,15 +412,15 @@ Spectrum.prototype.update = function () {
 				}]
 			});
 
-			this.on('resize', () => this.grid.update({
+			this.on('resize', () => this._grid.update({
 				viewport: this.viewport
 			}));
 		} else {
-			this.gridEl.grid.style.display = 'block';
+			this._grid.grid.style.display = 'block';
 		}
 	}
-	else if (this.gridEl) {
-		this.gridEl.grid.style.display = 'none';
+	else if (this._grid) {
+		this._grid.grid.style.display = 'none';
 	}
 
 	//update textures
