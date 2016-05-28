@@ -25,6 +25,7 @@ stats.dom.style.top = '1rem';
 //stream soundcloud
 var audio = new Audio;
 
+/*
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
@@ -44,6 +45,7 @@ var badge = SCBadge({
 		audio.play();
 	}, false);
 });
+*/
 
 
 var analyser = Analyser(audio, { audible: true, stereo: false })
@@ -70,13 +72,15 @@ if (isBrowser) {
 }
 
 
-test('line webgl', function () {
+test.only('line webgl', function () {
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 
-	// var frequencies = ft(noise);
-	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
+	var frequencies = ft(noise);
+	frequencies = frequencies
+	// .map((v, i) => v*blackman(i, noise.length))
+	.map((v) => db.fromGain(v));
 
 	var spectrum = new Spectrum({
 		frequencies: frequencies,
@@ -100,11 +104,12 @@ test('line webgl', function () {
 		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 		// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-		analyser.analyser.getFloatFrequencyData(frequencies);
+		// analyser.analyser.getFloatFrequencyData(frequencies);
 
 		spectrum.setFrequencies(frequencies);
 	});
 
+	setBackgoundImage(spectrum);
 	createColormapSelector(spectrum);
 });
 
@@ -356,4 +361,14 @@ function createMask (w, h) {
 	// canvas.style.left = '0px';
 
 	return canvas;
+}
+
+
+function setBackgoundImage (spectrum) {
+	var img = new Image();
+	img.src = './images/bg-small.jpg';
+	img.onload = function () {
+		spectrum.setBackground(img);
+	}
+	return img;
 }

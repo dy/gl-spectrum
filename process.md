@@ -71,3 +71,23 @@
 ## Q: should we keep colormap when there are gradient?
 * we could just pick extreme gradient values and that’s it.
 * better leave colormap but make it 2d-able.
+
+## Q: how do we organize bg rendering?
+1. That would be nice to have a simple way to set bg to 0-level of colormap.
+	* Therefore, bg should be rendered along by a single component.
+2. We could combine it in a single component
+	* then we would have to update the gl-component API to include multiple programs, buffers etc.
+		- that is lazy for me.
+		- reserving gl-component for a single program is quite nice and simple practice.
+		+ that would allow for avoiding managing reserved texture spots.
+
+## Q: should we render bg as a separate component, but include it in gl-spectrum?
++ That would allow for reusability in gl-spectrum, gl-waveform etc.
++ That would remove need in combining multiple buffers in single component, we in that case keep things discreet.
+
+## Q: how can we organize a single component combining any type of audio-info: spectrum, waveform or spectrogram?
+* call it audio-stats and render anything by a chosen type.
++ That would allow for persistent style across selected components.
+
+## Q: will there be a problem as a result of re-including gl-background in gl-spectrum, gl-waveform etc?
+* should not, it should be a single component.

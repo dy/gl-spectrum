@@ -4,15 +4,6 @@ Spectrum rendering component.
 
 [![Spectrum](https://raw.githubusercontent.com/audio-lab/gl-spectrum/gh-pages/preview.png "Spectrum")](http://audio-lab.github.io/gl-spectrum/)
 
-* [Colormaps](https://github.com/bpostlethwaite/colormap).
-* _Bars_, _dots_ or _line_ styles.
-* Symmetrical mode.
-* [A-weighting](https://github.com/audio-lab/a-weighting).
-* FPS 60.
-* Frequency / decibels ranges.
-* Logarithmic / linear scale.
-* Customizable [grid](https://github.com/dfcreative/plot-grid).
-
 
 ## Usage
 

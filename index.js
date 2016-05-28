@@ -34,7 +34,6 @@ function Spectrum (options) {
 		this.container.classList.add('gl-spectrum');
 	}
 
-
 	if (!this.is2d) {
 		var gl = this.gl;
 
@@ -43,11 +42,47 @@ function Spectrum (options) {
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
+		//create buffer with the number of vertex points according to the screen
+		// this.freqBuffer = gl.createBuffer();
+		// gl.bindBuffer(gl.ARRAY_BUFFER, this.freqBuffer);
+
+		//create stripe data
+		// var data = [];
+		// for (var i = 0; i < 1024; i++) {
+		// 	data.push(i/1024);
+		// 	data.push(1);
+		// 	data.push((i+1)/1024);
+		// 	data.push(1);
+		// 	data.push(i/1024);
+		// 	data.push(-1);
+		// 	data.push((i+1)/1024);
+		// 	data.push(-1);
+		// }
+
+		// gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+		// gl.enableVertexAttribArray(1);
+		// gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
+		// gl.bindAttribLocation(this.program, 0, 'position');
+
 		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
 		this.alignLocation = gl.getUniformLocation(this.program, 'align');
+
+		this.bgComponent = new Component({
+			frag: `
+			precision lowp float;
+			uniform sampler2D background;
+			uniform vec4 viewport;
+			void main() {
+				vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
+				gl_FragColor = texture2D(background, coord);
+			}`,
+			viewport: () => this.viewport,
+			context: this.context
+		});
 	}
 
 	this.update();
+
 }
 
 inherits(Spectrum, Component);
@@ -94,17 +129,23 @@ Spectrum.prototype.shadow = [];
 //mask defines style of bars, dots or line
 Spectrum.prototype.mask = null;
 
+//render spectrum
+Spectrum.prototype.spectrumFrag = `
+	void main () {
+		// vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
+		// vec4 bgColor = texture2D(background, coord);
+		// gl_FragColor = bgColor;
+		gl_FragColor = vec4(0,0,0,1);
+	}
+`;
 
-/**
- * Here we might have to do kernel averaging for some
- */
+//render background
 Spectrum.prototype.frag = `
 	precision lowp float;
 
 	uniform sampler2D frequencies;
 	uniform sampler2D fill;
 	uniform sampler2D mask;
-	uniform sampler2D background;
 	uniform vec4 viewport;
 	uniform vec2 maskSize;
 	uniform float align;
@@ -183,10 +224,9 @@ Spectrum.prototype.frag = `
 		float active = smoothstep(-0.001, 0.001, top - maskSize.y/viewport.w) + smoothstep(-0.001, 0.001, bottom - maskSize.y/viewport.w);
 		maskLevel *= (1. - active);
 
-		// gl_FragColor = vec4(vec3(intensity), 1);
-		vec4 bgColor = texture2D(background, coord);
-		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
-		gl_FragColor = fillColor * maskLevel + bgColor * (1. - maskLevel);
+		gl_FragColor = vec4(vec3(intensity), 1);
+		// vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
+		// gl_FragColor = fillColor * maskLevel + bgColor * (1. - maskLevel);
 	}
 `;
 
@@ -314,9 +354,9 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	}
 
 	//set grid color to colormap’s color
-	if (this._grid) {
+	if (this.gridComponent) {
 		var gridColor = this.fill.slice(-4).map((v) => v*255);
-		this._grid.linesContainer.style.color = `rgba(${gridColor})`;
+		this.gridComponent.linesContainer.style.color = `rgba(${gridColor})`;
 	}
 
 	return this;
@@ -325,8 +365,8 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 
 /** Set background */
 Spectrum.prototype.setBackground = function (bg) {
-	this.setTexture('background', {
-		data: bg || this.fill.slice(0, 4),
+	this.bgComponent && this.bgComponent.setTexture('background', {
+		data: bg,
 		format: this.gl.RGBA,
 		magFilter: this.gl.LINEAR,
 		minFilter: this.gl.LINEAR,
@@ -364,8 +404,8 @@ Spectrum.prototype.update = function () {
 
 	//create grid, if not created yet
 	if (this.grid) {
-		if (!this._grid) {
-			this._grid = createGrid({
+		if (!this.gridComponent) {
+			this.gridComponent = createGrid({
 				container: this.container,
 				viewport: this.viewport,
 				lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
@@ -412,22 +452,23 @@ Spectrum.prototype.update = function () {
 				}]
 			});
 
-			this.on('resize', () => this._grid.update({
+			this.on('resize', () => this.gridComponent.update({
 				viewport: this.viewport
 			}));
 		} else {
-			this._grid.grid.style.display = 'block';
+			this.gridComponent.grid.style.display = 'block';
 		}
 	}
-	else if (this._grid) {
-		this._grid.grid.style.display = 'none';
+	else if (this.gridComponent) {
+		this.gridComponent.grid.style.display = 'none';
 	}
 
+
 	//update textures
+	this.setBackground(this.background);
 	this.setFrequencies(this.frequencies);
 	this.setFill(this.fill);
 	this.setMask(this.mask);
-	this.setBackground(this.background);
 
 	this.gl.uniform1f(this.alignLocation, this.align);
 
