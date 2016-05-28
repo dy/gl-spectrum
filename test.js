@@ -83,6 +83,7 @@ test.only('line webgl', function () {
 	.map((v) => db.fromGain(v));
 
 	var spectrum = new Spectrum({
+		// autostart: false,
 		frequencies: frequencies,
 		fill: 'yignbu',
 		grid: true,
@@ -92,7 +93,8 @@ test.only('line webgl', function () {
 		smoothing: .5,
 		maxDecibels: 0,
 		// mask: null,
-		align: 0.5,
+		align: 0.,
+		background: './images/bg-small.jpg'
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
@@ -106,46 +108,20 @@ test.only('line webgl', function () {
 
 		// analyser.analyser.getFloatFrequencyData(frequencies);
 
-		spectrum.setFrequencies(frequencies);
+		// spectrum.setFrequencies(frequencies);
 	});
-
-	setBackgoundImage(spectrum);
-	createColormapSelector(spectrum);
-});
-
-test.skip('bars 2d', function () {
-	var frequencies = ft(sine);
-	// var frequencies = new Float32Array(1024).fill(0.5);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
-
-	// var frequencies = ft(noise);
-	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
-
-	var spectrum = new Spectrum({
-		mask: createMask(10, 10),
-		// mask: null,
-		frequencies: frequencies,
-		maxDecibels: 0,
-		maxFrequency: 20000,
-		grid: false,
-		align: 0.5,
-		// background: [1,0,0,1],
-		// fill: [1,1,1,1],
-		logarithmic: true
-	}).on('render', function () {
-		stats.end();
-		stats.begin();
-		analyser.analyser.getFloatFrequencyData(frequencies);
-		spectrum.setFrequencies(frequencies);
-	});
+	// spectrum.render();
+	// console.log(spectrum.frequencies)
 
 	createColormapSelector(spectrum);
 });
 
-test.skip('node', function () {});
+test('bars 2d');
+
+test('node');
 
 
-test.skip('viewport', function () {});
+test('viewport');
 
 test('clannels');
 
@@ -361,14 +337,4 @@ function createMask (w, h) {
 	// canvas.style.left = '0px';
 
 	return canvas;
-}
-
-
-function setBackgoundImage (spectrum) {
-	var img = new Image();
-	img.src = './images/bg-small.jpg';
-	img.onload = function () {
-		spectrum.setBackground(img);
-	}
-	return img;
 }

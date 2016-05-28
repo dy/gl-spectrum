@@ -42,8 +42,8 @@ var spectrum = new Spectrum({
 	//A colormap name, colormap, pixels array, imageData, imageElement or canvas
 	fill: null,
 
+	//Can be a color tuple, imageData, imageElement, canvas or url
 	//undefined background takes the 0-level of the fill
-	//Can be a color tuple, imageData, imageElement, canvas
 	background: null,
 
 	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top

@@ -26,7 +26,6 @@ function Spectrum (options) {
 	var that = this;
 
 	options = options || {};
-	options.antialias = true;
 
 	Component.call(this, options);
 
@@ -42,28 +41,6 @@ function Spectrum (options) {
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
-		//create buffer with the number of vertex points according to the screen
-		// this.freqBuffer = gl.createBuffer();
-		// gl.bindBuffer(gl.ARRAY_BUFFER, this.freqBuffer);
-
-		//create stripe data
-		// var data = [];
-		// for (var i = 0; i < 1024; i++) {
-		// 	data.push(i/1024);
-		// 	data.push(1);
-		// 	data.push((i+1)/1024);
-		// 	data.push(1);
-		// 	data.push(i/1024);
-		// 	data.push(-1);
-		// 	data.push((i+1)/1024);
-		// 	data.push(-1);
-		// }
-
-		// gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
-		// gl.enableVertexAttribArray(1);
-		// gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
-		// gl.bindAttribLocation(this.program, 0, 'position');
-
 		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
 		this.alignLocation = gl.getUniformLocation(this.program, 'align');
 
@@ -77,16 +54,23 @@ function Spectrum (options) {
 				gl_FragColor = texture2D(background, coord);
 			}`,
 			viewport: () => this.viewport,
-			context: this.context
+			context: this.context,
+			autostart: false
 		});
 	}
 
-	this.update();
+	this.on('resize', () => {
+		this.recalc();
+	});
 
+	this.update();
 }
 
 inherits(Spectrum, Component);
 
+
+Spectrum.prototype.antialias = true;
+Spectrum.prototype.premultipliedAlpha = false;
 
 
 Spectrum.prototype.maxDecibels = -30;
@@ -129,17 +113,25 @@ Spectrum.prototype.shadow = [];
 //mask defines style of bars, dots or line
 Spectrum.prototype.mask = null;
 
-//render spectrum
-Spectrum.prototype.spectrumFrag = `
+//scale verteces to frequencies values and apply alignment
+Spectrum.prototype.vert = `
+	precision lowp float;
+
+	attribute vec2 position;
+
+	uniform sampler2D frequencies;
+	uniform float align;
+
 	void main () {
-		// vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
-		// vec4 bgColor = texture2D(background, coord);
-		// gl_FragColor = bgColor;
-		gl_FragColor = vec4(0,0,0,1);
+		vec2 coord = vec2(position.x + 1., position.y + 1.) * .5;
+		float mag = texture2D(frequencies, vec2(coord.x, 0.5)).w;
+
+		coord.y = coord.y * mag - mag * align + align;
+
+		gl_Position = vec4(position.x, coord.y*2. - 1., 0, 1);
 	}
 `;
 
-//render background
 Spectrum.prototype.frag = `
 	precision lowp float;
 
@@ -224,9 +216,9 @@ Spectrum.prototype.frag = `
 		float active = smoothstep(-0.001, 0.001, top - maskSize.y/viewport.w) + smoothstep(-0.001, 0.001, bottom - maskSize.y/viewport.w);
 		maskLevel *= (1. - active);
 
-		gl_FragColor = vec4(vec3(intensity), 1);
-		// vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
-		// gl_FragColor = fillColor * maskLevel + bgColor * (1. - maskLevel);
+		// gl_FragColor = vec4(vec3(intensity), 1);
+		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
+		gl_FragColor = fillColor;
 	}
 `;
 
@@ -310,6 +302,31 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 
 /**
+ * Recalculate number of verteces
+ */
+Spectrum.prototype.recalc = function () {
+	//preset buffer positions based on current viewport size
+	var data = [], w = this.viewport[2];
+	for (var i = 0; i < w; i++) {
+		var curr = i/w * 2 - 1;
+		var next = (i+1)/w * 2 - 1;
+		data.push(curr);
+		data.push(1);
+		data.push(next);
+		data.push(1);
+		data.push(curr);
+		data.push(-1);
+		data.push(next);
+		data.push(-1);
+	}
+	this.setAttribute('position', data);
+
+	return this;
+};
+
+
+
+/**
  * Reset colormap
  */
 Spectrum.prototype.setFill = function (cm, inverse) {
@@ -365,6 +382,7 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 
 /** Set background */
 Spectrum.prototype.setBackground = function (bg) {
+	this.background = bg;
 	this.bgComponent && this.bgComponent.setTexture('background', {
 		data: bg,
 		format: this.gl.RGBA,
@@ -463,6 +481,8 @@ Spectrum.prototype.update = function () {
 		this.gridComponent.grid.style.display = 'none';
 	}
 
+	//update verteces
+	this.recalc();
 
 	//update textures
 	this.setBackground(this.background);
@@ -479,23 +499,13 @@ Spectrum.prototype.update = function () {
 /**
  * Render main loop
  */
-Spectrum.prototype.render = function () {
-	Component.prototype.render.call(this);
+Spectrum.prototype.draw = function () {
+	var gl = this.gl;
 
-	if (this.is2d) {
-		//TODO: 2d rendering?
-		var context = this.context;
-		var fill = this.fill;
+	this.bgComponent.render();
 
-		context.fillStyle = 'rgba(' + fill.slice(0,4).join(',') + ')';
-		context.fillRect.apply(context, this.viewport);
-
-		//calculate per-bar averages
-		var bars = [];
-		for (var i = 0; i < this.frequencies.length; i++) {
-
-		}
-	}
+	gl.useProgram(this.program);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
 
 	return this;
 };
