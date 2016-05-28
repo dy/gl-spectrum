@@ -59,7 +59,7 @@ var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(1000 * Math.PI * 2 * (i / rate));
+	sine[i] = Math.sin(100 * Math.PI * 2 * (i / rate));
 	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
@@ -76,8 +76,8 @@ test.only('line webgl', function () {
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
-
 	var frequencies = ft(noise);
+
 	frequencies = frequencies
 	// .map((v, i) => v*blackman(i, noise.length))
 	.map((v) => db.fromGain(v));
@@ -91,10 +91,11 @@ test.only('line webgl', function () {
 		maxFrequency: 20000,
 		logarithmic: true,
 		smoothing: .5,
+		details: 1,
 		maxDecibels: 0,
 		// mask: null,
-		align: 0.,
-		background: './images/bg-small.jpg'
+		align: .5,
+		// background: './images/bg-small.jpg'
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }

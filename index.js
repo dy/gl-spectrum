@@ -43,6 +43,10 @@ function Spectrum (options) {
 
 		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
 		this.alignLocation = gl.getUniformLocation(this.program, 'align');
+		this.minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
+		this.maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
+		this.logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
+		this.sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
 
 		this.bgComponent = new Component({
 			frag: `
@@ -80,6 +84,7 @@ Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
 
 Spectrum.prototype.smoothing = 0.5;
+Spectrum.prototype.details = 1;
 
 Spectrum.prototype.snap = null;
 
@@ -121,14 +126,40 @@ Spectrum.prototype.vert = `
 
 	uniform sampler2D frequencies;
 	uniform float align;
+	uniform float minFrequency;
+	uniform float maxFrequency;
+	uniform float logarithmic;
+	uniform float sampleRate;
+
+	const float log10 = ${Math.log(10)};
+
+	float lg (float x) {
+		return log(x) / log10;
+	}
+
+	//get mapped frequency
+	float f (float ratio) {
+		float halfRate = sampleRate * .5;
+
+		float logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );
+
+		ratio = step(logarithmic, 0.) * ratio + step(0., logarithmic) * (logF - minFrequency) / (maxFrequency - minFrequency);
+
+		float leftF = minFrequency / halfRate;
+		float rightF = maxFrequency / halfRate;
+
+		ratio = leftF + ratio * (rightF - leftF);
+
+		return ratio;
+	}
 
 	void main () {
-		vec2 coord = vec2(position.x + 1., position.y + 1.) * .5;
-		float mag = texture2D(frequencies, vec2(coord.x, 0.5)).w;
+		float mag = texture2D(frequencies, vec2(f(position.x), 0.5)).w;
 
+		vec2 coord = position;
 		coord.y = coord.y * mag - mag * align + align;
 
-		gl_Position = vec4(position.x, coord.y*2. - 1., 0, 1);
+		gl_Position = vec4(coord*2. - 1., 0, 1);
 	}
 `;
 
@@ -250,52 +281,28 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	this.frequencies = bigger;
 
 	//prepare f’s for rendering
-	frequencies = this.frequencies.slice();
+	magnitudes = bigger.slice();
 
 	//apply a-weighting
 	if (weighting[this.weighting]) {
 		var w = weighting[this.weighting];
-		frequencies = frequencies.map((mag, i, data) => clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -100, 0));
+		magnitudes = magnitudes.map((mag, i, data) => clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -100, 0));
 	}
 
-	//subview freqs - min/max f, log mapping, db limiting
-	frequencies = frequencies.map((mag, i, frequencies) => {
-		var ratio = (i + .5) / frequencies.length;
+	//snap magnitudes
+	if (this.snap) {
+		magnitudes = magnitudes.map((value) => Math.round(value * this.snap) / this.snap);
+	}
 
-		if (this.logarithmic) {
-			var frequency = Math.pow(10., lg(minF) + ratio * (lg(maxF) - lg(minF)) );
-			ratio = (frequency - minF) / (maxF - minF);
-		}
+	//convert mags to 0..1 range limiting by db subrange
+	magnitudes = magnitudes.map((value) => (value - minDb) / (maxDb - minDb));
 
-		var leftF = minF / halfRate;
-		var rightF = maxF / halfRate;
-
-		ratio = leftF + ratio * (rightF - leftF);
-
-		//apply linear interpolation
-		//TODO: implement here another interpolation: hi-f gets lost
-		var left = frequencies[Math.floor(ratio * frequencies.length)];
-		var right = frequencies[Math.ceil(ratio * frequencies.length)];
-		var fract = (ratio * frequencies.length) % 1;
-		var value = left * (1 - fract) + right * fract;
-
-		//closest interpolation
-		// var value = frequencies[Math.round(ratio * frequencies.length)];
-
-		//snap
-		if (this.snap) {
-			value = Math.round(value * this.snap) / this.snap;
-		}
-
-		//sublimit db to 0..1 range
-		return (value - minDb) / (maxDb - minDb);
-	}, this);
 
 	return this.setTexture('frequencies', {
-		data: frequencies,
+		data: magnitudes,
 		format: gl.ALPHA,
-		magFilter: this.gl.NEAREST,
-		minFilter: this.gl.NEAREST,
+		magFilter: this.gl.LINEAR,
+		minFilter: this.gl.LINEAR,
 		wrap: this.gl.CLAMP_TO_EDGE
 	});
 };
@@ -305,20 +312,22 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
  * Recalculate number of verteces
  */
 Spectrum.prototype.recalc = function () {
-	//preset buffer positions based on current viewport size
-	var data = [], w = this.viewport[2];
+	var data = [], w = this.viewport[2] * this.details;
+
 	for (var i = 0; i < w; i++) {
-		var curr = i/w * 2 - 1;
-		var next = (i+1)/w * 2 - 1;
+		var curr = i/w;
+		var next = (i+1)/w;
+
 		data.push(curr);
 		data.push(1);
 		data.push(next);
 		data.push(1);
 		data.push(curr);
-		data.push(-1);
+		data.push(0);
 		data.push(next);
-		data.push(-1);
+		data.push(0);
 	}
+
 	this.setAttribute('position', data);
 
 	return this;
@@ -382,14 +391,15 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 
 /** Set background */
 Spectrum.prototype.setBackground = function (bg) {
-	this.background = bg;
-	this.bgComponent && this.bgComponent.setTexture('background', {
-		data: bg,
-		format: this.gl.RGBA,
-		magFilter: this.gl.LINEAR,
-		minFilter: this.gl.LINEAR,
-		wrap: this.gl.CLAMP_TO_EDGE
-	});
+	if (this.background !== null) {
+		this.bgComponent && this.bgComponent.setTexture('background', {
+			data: bg,
+			format: this.gl.RGBA,
+			magFilter: this.gl.LINEAR,
+			minFilter: this.gl.LINEAR,
+			wrap: this.gl.CLAMP_TO_EDGE
+		});
+	}
 
 	return this;
 };
@@ -491,6 +501,10 @@ Spectrum.prototype.update = function () {
 	this.setMask(this.mask);
 
 	this.gl.uniform1f(this.alignLocation, this.align);
+	this.gl.uniform1f(this.minFrequencyLocation, this.minFrequency);
+	this.gl.uniform1f(this.maxFrequencyLocation, this.maxFrequency);
+	this.gl.uniform1f(this.logarithmicLocation, this.logarithmic ? 1 : 0);
+	this.gl.uniform1f(this.sampleRateLocation, this.sampleRate);
 
 	return this;
 };

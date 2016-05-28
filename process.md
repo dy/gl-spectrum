@@ -91,3 +91,24 @@
 
 ## Q: will there be a problem as a result of re-including gl-background in gl-spectrum, gl-waveform etc?
 * should not, it should be a single component.
+
+## Q: what is the strategy of mapping log frequencies through vertex shader?
+* we should provide freq’s texture as is (linear), and take current vertex coord.x as normal frequency value.
+	* Therefore, vertex values should be properly scaled - log and subview
+
+## Q: should our freq texture contain all the freq’s or only subrange?
+* all freq’s is clearer, but requires subview recalc within the shader in case
+	* ? how do we do this case, how should we map verteces?
+		* 0-vertex should be mapped to 0.2 texture for one. 1-vertex to 0.9. How?
+		* ideally we should do vertex.x*.5 + .5 and obtain proper texture value.
+			- but in this case we force picking interpolated frequency, because freq array should be subviewed for that case.
+			+ though the freq texture contains 0..1 subview values.
+		* if we subview frequency in vert,
+			+ that is less calcs, and also parallel, which is faster than CPU
+			- that forces conditioning in shader - decision whether log or real subview
+* subview is mapped to 0..1 range, but the fill x-colors are shifted with changing subview.
+* So the answer: we map in vertex shaders, conditionless. Pass whole texture as is.
+
+## Q: how is it possible - to avoid subviewing in CPU with falsy interpolation - and at the same time avoid log condition in shader?
+* we have to equalize lg(minF) + ratio * (lg(maxF) - lg(minF)) and minF + ratio * (maxF - minF). How to make lg(f) function which with some argument returns f?
+	* simple. y = step(0., isLog) * log(x) + x * step(isLog, x) / log(10) ...

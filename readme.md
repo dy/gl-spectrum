@@ -33,6 +33,7 @@ var spectrum = new Spectrum({
 	logarithmic: true,
 
 	smoothing: 0.5,
+	details: 1,
 
 	//draw frequency/decibels grid
 	grid: true,
