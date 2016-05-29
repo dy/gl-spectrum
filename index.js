@@ -41,6 +41,11 @@ function Spectrum (options) {
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
+		//setup alpha
+		gl.enable( gl.BLEND );
+		gl.blendEquation( gl.FUNC_ADD );
+		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
 		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
 		this.alignLocation = gl.getUniformLocation(this.program, 'align');
 		this.minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
@@ -74,7 +79,8 @@ inherits(Spectrum, Component);
 
 
 Spectrum.prototype.antialias = true;
-Spectrum.prototype.premultipliedAlpha = false;
+Spectrum.prototype.premultipliedAlpha = true;
+Spectrum.prototype.alpha = false;
 
 
 Spectrum.prototype.maxDecibels = -30;
@@ -125,6 +131,8 @@ Spectrum.prototype.vert = `
 	attribute vec2 position;
 
 	uniform sampler2D frequencies;
+	uniform sampler2D mask;
+	uniform vec2 maskSize;
 	uniform float align;
 	uniform float minFrequency;
 	uniform float maxFrequency;
@@ -133,6 +141,7 @@ Spectrum.prototype.vert = `
 	uniform vec4 viewport;
 
 	varying float vDist;
+	varying float vMag;
 
 	const float log10 = ${Math.log(10)};
 
@@ -157,13 +166,29 @@ Spectrum.prototype.vert = `
 	}
 
 	void main () {
-		float mag = texture2D(frequencies, vec2(f(position.x), 0.5)).w;
+		float ratio = position.x;
+		float mag = texture2D(frequencies, vec2(f(ratio), 0.5)).w;
 
-		mag = clamp(mag, 1./viewport.w, 1.);
+		mag = clamp(mag, 0., 1.);
 
+		//save mask params
+		float x = ratio * viewport.z + .5;
+		float maskX = mod(x, maskSize.x);
+		mag = (
+			texture2D(frequencies, vec2(f((x - maskX) / viewport.z), 0.5)).w +
+			texture2D(frequencies, vec2(f((x - maskX + maskSize.x*.5) / viewport.z), 0.5)).w +
+			texture2D(frequencies, vec2(f((x - maskX + maskSize.x) / viewport.z), 0.5)).w
+		) / 3.;
+		vMag = mag;
+
+		//ensure mask borders are set
+		mag += maskSize.y / viewport.w;
+
+		//map coord to alignment
 		vec2 coord = position;
 		coord.y = coord.y * mag - mag * align + align;
 
+		//save distance from the align
 		vDist = (coord.y - align) * (1./max(align, 1. - align));
 
 		gl_Position = vec4(coord*2. - 1., 0, 1);
@@ -173,65 +198,27 @@ Spectrum.prototype.vert = `
 Spectrum.prototype.frag = `
 	precision lowp float;
 
-	uniform sampler2D frequencies;
 	uniform sampler2D fill;
 	uniform sampler2D mask;
-	uniform vec4 viewport;
 	uniform vec2 maskSize;
+	uniform vec4 viewport;
 	uniform float align;
 
 	varying float vDist;
+	varying float vMag;
 
 	vec2 coord;
 	vec2 bin;
-	float currMag;
-	float prevMag;
-	float nextMag;
-	float currF;
-	float prevF;
-	float nextF;
-	float maxMag;
-	float minMag;
-	float slope;
-	float alpha;
-
-	//return magnitude of normalized frequency
-	float magnitude (float nf) {
-		return texture2D(frequencies, vec2((nf), 0.5)).w;
-	}
-
-	float within (float x, float left, float right) {
-		return step(left, x) * step(x, right);
-	}
-
-	float distToLine(vec2 p1, vec2 p2, vec2 testPt) {
-		vec2 lineDir = p2 - p1;
-		vec2 perpDir = vec2(lineDir.y, -lineDir.x);
-		vec2 dirToPt1 = p1 - testPt;
-		return abs(dot(normalize(perpDir), dirToPt1));
-	}
 
 	void main () {
 		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		bin = vec2(1. / viewport.zw);
-		// prevF = coord.x - .5*bin.x;
-		// currF = coord.x;
-		// nextF = coord.x + .5*bin.x;
-		// prevMag = magnitude(prevF);
-		// currMag = magnitude(currF);
-		// nextMag = magnitude(nextF);
-		// maxMag = max(currMag, prevMag);
-		// minMag = min(currMag, prevMag);
-		// slope = (currMag - prevMag) / bin.x;
-		// alpha = atan(currMag - prevMag, bin.x);
-
 
 		//calc mask
 		float maskX = mod(gl_FragCoord.x, maskSize.x);
-		float maskOutset = gl_FragCoord.x - maskX + .5;
 
 		//find mask’s offset frequency
-		float mag = max(magnitude(maskOutset / viewport.z), 0.);
+		float mag = vMag;
 
 		//calc dist
 		float dist = abs(vDist);
@@ -240,7 +227,6 @@ Spectrum.prototype.frag = `
 		float maxAlign = min(max(align, 1. - align), .75);
 		float minAlign = max(1. - maxAlign, .25);
 		float intensity = (1. - pow((1. - dist), .85)) * maxAlign + minAlign;
-
 
 		//apply mask
 		float top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;
@@ -253,11 +239,13 @@ Spectrum.prototype.frag = `
 		float maskLevel = texture2D(mask, maskCoord).x;
 
 		//active area limits 0-mask case
-		float active = smoothstep(-0.001, 0.001, top - maskSize.y/viewport.w) + smoothstep(-0.001, 0.001, bottom - maskSize.y/viewport.w);
-		maskLevel *= (1. - active);
+		// float active = smoothstep(-0.001, 0.001, top - maskSize.y/viewport.w) + smoothstep(-0.001, 0.001, bottom - maskSize.y/viewport.w);
+		// maskLevel *= (1. - active);
 
-		// gl_FragColor = vec4(vec3(intensity), 1);
-		gl_FragColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
+		// gl_FragColor = vec4(vec3(maskX / maskSize.x), 1);
+		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
+		fillColor.a *= maskLevel;
+		gl_FragColor = fillColor;
 	}
 `;
 

@@ -25,6 +25,7 @@ stats.dom.style.top = '1rem';
 //stream soundcloud
 var audio = new Audio;
 
+
 /*
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
@@ -93,7 +94,7 @@ test.only('line webgl', function () {
 		smoothing: .5,
 		details: 1,
 		maxDecibels: 0,
-		// mask: null,
+		// mask: createMask(10, 10),
 		align: .5,
 		// background: './images/bg-small.jpg'
 		// viewport: function (w, h) {
@@ -120,7 +121,6 @@ test.only('line webgl', function () {
 test('bars 2d');
 
 test('node');
-
 
 test('viewport');
 

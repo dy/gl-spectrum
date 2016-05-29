@@ -50,6 +50,9 @@ var spectrum = new Spectrum({
 	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
 	align: 0,
 
+	//line, bar or fill
+	style: 'bar',
+
 	//WIP shadow frequencies
 	shadow: [],
 
