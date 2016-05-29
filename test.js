@@ -26,9 +26,10 @@ stats.dom.style.top = '1rem';
 var audio = new Audio;
 
 
-
+/*
 var badge = SCBadge({
 	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
+	// song: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
@@ -46,7 +47,7 @@ var badge = SCBadge({
 		audio.play();
 	}, false);
 });
-
+*/
 
 
 var analyser = Analyser(audio, { audible: true, stereo: false })
@@ -76,12 +77,12 @@ if (isBrowser) {
 test.only('line webgl', function () {
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
-	// var frequencies = ft(noise);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	var frequencies = ft(noise);
+	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
 
-	// frequencies = frequencies
+	frequencies = frequencies
 	// .map((v, i) => v*blackman(i, noise.length))
-	// .map((v) => db.fromGain(v));
+	.map((v) => db.fromGain(v));
 
 	var spectrum = new Spectrum({
 		// autostart: false,
@@ -108,9 +109,9 @@ test.only('line webgl', function () {
 		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 		// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-		analyser.analyser.getFloatFrequencyData(frequencies);
+		// analyser.analyser.getFloatFrequencyData(frequencies);
 
-		spectrum.setFrequencies(frequencies);
+		// spectrum.setFrequencies(frequencies);
 	});
 
 	createColormapSelector(spectrum);

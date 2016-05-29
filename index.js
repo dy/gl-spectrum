@@ -224,9 +224,9 @@ Spectrum.prototype.frag = `
 		float dist = abs(vDist);
 
 		//calc intensity
-		float maxAlign = min(max(align, 1. - align), .75);
-		float minAlign = max(1. - maxAlign, .25);
-		float intensity = (1. - pow((1. - dist), .9)) * maxAlign + minAlign;
+		float maxAlign = min(max(align, 1. - align), .85);
+		float minAlign = max(1. - maxAlign, .15);
+		float intensity = (1. - pow((1. - dist), .85)) * maxAlign + minAlign;
 
 		//apply mask
 		float top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;
@@ -376,9 +376,11 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	}
 
 	//set grid color to colormap’s color
-	if (this.gridComponent) {
+	if (this.freqGridComponent) {
 		var gridColor = this.fill.slice(-4).map((v) => v*255);
-		this.gridComponent.linesContainer.style.color = `rgba(${gridColor})`;
+		this.freqGridComponent.linesContainer.style.color = `rgba(${gridColor})`;
+		this.topGridComponent.linesContainer.style.color = `rgba(${gridColor})`;
+		this.bottomGridComponent.linesContainer.style.color = `rgba(${gridColor})`;
 	}
 
 	return this;
@@ -429,10 +431,10 @@ Spectrum.prototype.update = function () {
 
 	//create grid, if not created yet
 	if (this.grid) {
-		if (!this.gridComponent) {
-			this.gridComponent = createGrid({
+		if (!this.freqGridComponent) {
+			this.freqGridComponent = createGrid({
 				container: this.container,
-				viewport: this.viewport,
+				viewport: () => this.viewport,
 				lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
 					min: this.minFrequency,
 					max: this.maxFrequency,
@@ -440,13 +442,6 @@ Spectrum.prototype.update = function () {
 					logarithmic: this.logarithmic,
 					titles: function (value) {
 						return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
-					}
-				}, {
-					min: this.minDecibels,
-					max: this.maxDecibels,
-					orientation: 'y',
-					titles: function (value) {
-						return value.toLocaleString() + 'dB';
 					}
 				}, this.logarithmic ? {
 					min: this.minFrequency,
@@ -473,29 +468,83 @@ Spectrum.prototype.update = function () {
 						if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
 						return opt.titles[i];
 					}
-				}, {
+				}]
+			});
+
+			this.topGridComponent = createGrid({
+				container: this.container,
+				viewport: () => [
+					this.viewport[0],
+					this.viewport[1],
+					this.viewport[2],
+					this.viewport[3] * (1 - this.align)
+				],
+				lines: [{
+					min: this.minDecibels,
+					max: this.maxDecibels,
+					orientation: 'y',
+					titles: function (value) {
+						return value.toLocaleString() + 'dB';
+					}
+				}],
+				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
 					name: 'Magnitude'
 				}]
 			});
 
-			this.on('resize', () => this.gridComponent.update({
-				viewport: this.viewport
-			}));
-		} else {
-			this.gridComponent.grid.style.display = 'block';
-			this.gridComponent.update({
-				lines: [{logarithmic: this.logarithmic},null,{
-					logarithmic: this.logarithmic,
-					style: {
-						display: this.logarithmic ? null : 'none'
+			//alignment requires additional grid
+			this.bottomGridComponent = createGrid({
+				container: this.container,
+				viewport: () => [
+					this.viewport[0],
+					this.viewport[1] + this.viewport[3] * (1 - this.align),
+					this.viewport[2],
+					this.viewport[3] * this.align
+				],
+				lines: [{
+					min: this.maxDecibels,
+					max: this.minDecibels,
+					orientation: 'y',
+					titles: function (value) {
+						return value.toLocaleString() + 'dB';
 					}
+				}],
+				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
+					name: 'Magnitude'
 				}]
+			});
+
+			this.on('resize', () => {
+				this.topGridComponent.update();
+				this.bottomGridComponent.update();
+				this.freqGridComponent.update();
+			});
+		} else {
+			this.freqGridComponent.linesContainer.style.display = 'block';
+			this.topGridComponent.linesContainer.style.display = 'block';
+			this.bottomGridComponent.linesContainer.style.display = 'block';
+
+			this.topGridComponent.update();
+			this.bottomGridComponent.update();
+
+			this.freqGridComponent.update({
+				lines: [{
+						logarithmic: this.logarithmic
+					}, {
+						logarithmic: this.logarithmic,
+						style: {
+							display: this.logarithmic ? null : 'none'
+						}
+					}
+				]
 			});
 		}
 
 	}
-	else if (this.gridComponent) {
-		this.gridComponent.grid.style.display = 'none';
+	else if (this.freqGridComponent) {
+		this.freqGridComponent.linesContainer.style.display = 'none';
+		this.topGridComponent.linesContainer.style.display = 'none';
+		this.bottomGridComponent.linesContainer.style.display = 'none';
 	}
 
 	//update verteces
