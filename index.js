@@ -146,7 +146,7 @@ Spectrum.prototype.vert = `
 
 		float logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );
 
-		ratio = step(logarithmic, 0.) * ratio + step(0., logarithmic) * (logF - minFrequency) / (maxFrequency - minFrequency);
+		ratio = step(logarithmic, 0.5) * ratio + step(0.5, logarithmic) * (logF - minFrequency) / (maxFrequency - minFrequency);
 
 		float leftF = minFrequency / halfRate;
 		float rightF = maxFrequency / halfRate;
@@ -474,7 +474,8 @@ Spectrum.prototype.update = function () {
 					style: {
 						borderLeftStyle: 'solid',
 						pointerEvents: 'none',
-						opacity: '0.08'
+						opacity: '0.08',
+						display: this.logarithmic ? null :'none'
 					}
 				} : null],
 				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
@@ -494,7 +495,16 @@ Spectrum.prototype.update = function () {
 			}));
 		} else {
 			this.gridComponent.grid.style.display = 'block';
+			this.gridComponent.update({
+				lines: [{logarithmic: this.logarithmic},null,{
+					logarithmic: this.logarithmic,
+					style: {
+						display: this.logarithmic ? null : 'none'
+					}
+				}]
+			});
 		}
+
 	}
 	else if (this.gridComponent) {
 		this.gridComponent.grid.style.display = 'none';

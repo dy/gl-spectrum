@@ -59,7 +59,7 @@ var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(100 * Math.PI * 2 * (i / rate));
+	sine[i] = Math.sin(10000 * Math.PI * 2 * (i / rate));
 	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
@@ -272,6 +272,16 @@ function createColormapSelector (spectrum) {
 			updateView();
 		})
 	);
+
+
+	//inversed colormap checkbox
+	var logSwitch = createSwitch('log', function () {
+		spectrum.logarithmic = this.checked;
+		updateView();
+	});
+	var logCheckbox = logSwitch.querySelector('input');
+	logCheckbox.checked = true;
+	container.appendChild(logSwitch);
 
 
 	updateView();
