@@ -515,9 +515,14 @@ Spectrum.prototype.update = function () {
 			});
 
 			this.on('resize', () => {
-				this.topGridComponent.update();
-				this.bottomGridComponent.update();
-				this.freqGridComponent.update();
+				if (this.isPlannedGridUpdate) return;
+				this.isPlannedGridUpdate = true;
+				this.once('render', () => {
+					this.isPlannedGridUpdate = false;
+					this.topGridComponent.update();
+					this.bottomGridComponent.update();
+					this.freqGridComponent.update();
+				});
 			});
 		} else {
 			this.freqGridComponent.linesContainer.style.display = 'block';
