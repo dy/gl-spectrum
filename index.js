@@ -226,7 +226,7 @@ Spectrum.prototype.frag = `
 		//calc intensity
 		float maxAlign = min(max(align, 1. - align), .75);
 		float minAlign = max(1. - maxAlign, .25);
-		float intensity = (1. - pow((1. - dist), .85)) * maxAlign + minAlign;
+		float intensity = (1. - pow((1. - dist), .9)) * maxAlign + minAlign;
 
 		//apply mask
 		float top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;
