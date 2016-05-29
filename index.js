@@ -107,7 +107,7 @@ Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
 Spectrum.prototype.fill = 'greys';
-Spectrum.prototype.background = null;
+Spectrum.prototype.background = undefined;
 
 //amount of alignment
 Spectrum.prototype.align = .0;
@@ -130,6 +130,9 @@ Spectrum.prototype.vert = `
 	uniform float maxFrequency;
 	uniform float logarithmic;
 	uniform float sampleRate;
+	uniform vec4 viewport;
+
+	varying float vDist;
 
 	const float log10 = ${Math.log(10)};
 
@@ -156,8 +159,12 @@ Spectrum.prototype.vert = `
 	void main () {
 		float mag = texture2D(frequencies, vec2(f(position.x), 0.5)).w;
 
+		mag = clamp(mag, 1./viewport.w, 1.);
+
 		vec2 coord = position;
 		coord.y = coord.y * mag - mag * align + align;
+
+		vDist = (coord.y - align) * (1./max(align, 1. - align));
 
 		gl_Position = vec4(coord*2. - 1., 0, 1);
 	}
@@ -172,6 +179,8 @@ Spectrum.prototype.frag = `
 	uniform vec4 viewport;
 	uniform vec2 maskSize;
 	uniform float align;
+
+	varying float vDist;
 
 	vec2 coord;
 	vec2 bin;
@@ -225,12 +234,12 @@ Spectrum.prototype.frag = `
 		float mag = max(magnitude(maskOutset / viewport.z), 0.);
 
 		//calc dist
-		float dist = abs(align - coord.y);
+		float dist = abs(vDist);
 
 		//calc intensity
 		float maxAlign = min(max(align, 1. - align), .75);
 		float minAlign = max(1. - maxAlign, .25);
-		float intensity = pow(dist / max(align, 1. - align), .85) * (maxAlign) + (minAlign);
+		float intensity = (1. - pow((1. - dist), .85)) * maxAlign + minAlign;
 
 
 		//apply mask
@@ -248,8 +257,7 @@ Spectrum.prototype.frag = `
 		maskLevel *= (1. - active);
 
 		// gl_FragColor = vec4(vec3(intensity), 1);
-		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
-		gl_FragColor = fillColor;
+		gl_FragColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
 	}
 `;
 
@@ -317,6 +325,7 @@ Spectrum.prototype.recalc = function () {
 	for (var i = 0; i < w; i++) {
 		var curr = i/w;
 		var next = (i+1)/w;
+		// var prev = (i-.5)/w;
 
 		data.push(curr);
 		data.push(1);
@@ -332,7 +341,6 @@ Spectrum.prototype.recalc = function () {
 
 	return this;
 };
-
 
 
 /**
@@ -403,6 +411,7 @@ Spectrum.prototype.setBackground = function (bg) {
 
 	return this;
 };
+
 
 /**
  * Set named or array mask
