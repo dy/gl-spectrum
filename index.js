@@ -52,6 +52,7 @@ function Spectrum (options) {
 		this.maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
 		this.logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
 		this.sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
+		this.groupLocation = gl.getUniformLocation(this.program, 'group');
 
 		this.bgComponent = new Component({
 			frag: `
@@ -124,6 +125,9 @@ Spectrum.prototype.shadow = [];
 //mask defines style of bars, dots or line
 Spectrum.prototype.mask = null;
 
+//group freq range by subbands
+Spectrum.prototype.group = false;
+
 //scale verteces to frequencies values and apply alignment
 Spectrum.prototype.vert = `
 	precision lowp float;
@@ -139,6 +143,7 @@ Spectrum.prototype.vert = `
 	uniform float logarithmic;
 	uniform float sampleRate;
 	uniform vec4 viewport;
+	uniform float group;
 
 	varying float vDist;
 	varying float vMag;
@@ -149,13 +154,18 @@ Spectrum.prototype.vert = `
 		return log(x) / log10;
 	}
 
+	//return a or b based on weight
+	float decide (float a, float b, float w) {
+		return step(0.5, w) * b + step(w, 0.5) * a;
+	}
+
 	//get mapped frequency
 	float f (float ratio) {
 		float halfRate = sampleRate * .5;
 
 		float logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );
 
-		ratio = step(logarithmic, 0.5) * ratio + step(0.5, logarithmic) * (logF - minFrequency) / (maxFrequency - minFrequency);
+		ratio = decide(ratio, (logF - minFrequency) / (maxFrequency - minFrequency), logarithmic);
 
 		float leftF = minFrequency / halfRate;
 		float rightF = maxFrequency / halfRate;
@@ -166,22 +176,28 @@ Spectrum.prototype.vert = `
 	}
 
 	void main () {
-		float ratio = position.x;
-		float mag = texture2D(frequencies, vec2(f(ratio), 0.5)).w;
+		vec2 coord = position;
+		float groupRatio = max(group, 0.01) / viewport.z;
 
+		//round x-coord to the step
+		float shift = mod(coord.x, groupRatio);
+		float leftX = coord.x - shift;
+		float rightX = leftX + groupRatio;
+		coord.x = decide(leftX, rightX, step(0.01, shift*viewport.z));
+
+		float mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;
 		mag = clamp(mag, 0., 1.);
 
 		//save mask params
-		float x = ratio * viewport.z + .5;
-		float maskX = mod(x, maskSize.x);
-		mag = texture2D(frequencies, vec2(f((x - maskX) / viewport.z), 0.5)).w;
+		// float x = ratio * viewport.z + .5;
+		// float maskX = mod(x, maskSize.x);
+		// mag = texture2D(frequencies, vec2(f((x - maskX) / viewport.z), 0.5)).w;
 		vMag = mag;
 
 		//ensure mask borders are set
 		mag += maskSize.y / viewport.w;
 
-		//map coord to alignment
-		vec2 coord = position;
+		//map y-coord to alignment
 		coord.y = coord.y * mag - mag * align + align;
 
 		//save distance from the align
@@ -306,19 +322,45 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 Spectrum.prototype.recalc = function () {
 	var data = [], w = this.viewport[2] * this.details;
 
-	for (var i = 0; i < w; i++) {
-		var curr = i/w;
-		var next = (i+1)/w;
-		// var prev = (i-.5)/w;
-
-		data.push(curr);
-		data.push(1);
-		data.push(next);
-		data.push(1);
-		data.push(curr);
-		data.push(0);
-		data.push(next);
-		data.push(0);
+	//no-grouping is simply connected points
+	if (!this.group || this.group <= .5) {
+		for (var i = 0; i < w; i++) {
+			var curr = i/w;
+			var next = (i+1)/w;
+			data.push(curr);
+			data.push(1);
+			data.push(next);
+			data.push(1);
+			data.push(curr);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+		}
+	}
+	//grouping renders bars
+	else {
+		var size = this.group === true ? 1 : this.group;
+		var w = w / size;
+		for (var i = 0; i < w; i++) {
+			var curr = i/(w);
+			var next = (i+.5)/(w);
+			data.push(curr);
+			data.push(1);
+			data.push(curr);
+			data.push(1);
+			data.push(curr);
+			data.push(1);
+			data.push(next);
+			data.push(1);
+			data.push(curr);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+		}
 	}
 
 	this.setAttribute('position', data);
@@ -403,7 +445,7 @@ Spectrum.prototype.setBackground = function (bg) {
  * Set named or array mask
  */
 Spectrum.prototype.setMask = function (mask) {
-	this.mask = mask || [1,1,1,1]
+	this.mask = mask || [1,1,1,1];
 
 	this.setTexture('mask', {
 		data: this.mask,
@@ -562,6 +604,7 @@ Spectrum.prototype.update = function () {
 	this.gl.uniform1f(this.maxFrequencyLocation, this.maxFrequency);
 	this.gl.uniform1f(this.logarithmicLocation, this.logarithmic ? 1 : 0);
 	this.gl.uniform1f(this.sampleRateLocation, this.sampleRate);
+	this.gl.uniform1f(this.groupLocation, this.group || 0);
 
 	return this;
 };
@@ -579,7 +622,14 @@ Spectrum.prototype.draw = function () {
 
 	var count = this.attributes.position.data.length / 2;
 
-	gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+	if (this.group) {
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2 - 0);
+	}
+	else {
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
+	}
 
 	// if (this.trail) {
 	// 	gl.drawElements(gl.LINES, count, gl.UNSIGNED_SHORT, 0);

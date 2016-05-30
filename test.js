@@ -93,10 +93,11 @@ test.only('line webgl', function () {
 		maxFrequency: 20000,
 		logarithmic: true,
 		smoothing: .5,
-		details: 2,
+		details: 1,
 		maxDecibels: 0,
 		mask: null, //createMask(10, 10),
 		align: .5,
+		group: 10,
 		// background: './images/bg-small.jpg'
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
@@ -233,23 +234,8 @@ function createColormapSelector (spectrum) {
 
 
 	//align slider
-	var alignEl = document.createElement('input');
-	alignEl.type = 'range';
-	alignEl.min = 0;
-	alignEl.max = 1;
-	alignEl.step = .01;
-	alignEl.classList.add('align');
-	alignEl.style.width = '5rem';
-	alignEl.style.height = '1rem';
-	alignEl.style.border = '0';
-	alignEl.style.color = 'inherit';
-	alignEl.style.margin = '0 0 0 1rem';
-	alignEl.style.verticalAlign = 'middle';
-	alignEl.style.background = 'none';
-	alignEl.title = 'Align: 0.5';
-	alignEl.addEventListener('input', function () {
-		spectrum.align = parseFloat(alignEl.value);
-		alignEl.title = 'Align: ' + alignEl.value;
+	var alignEl = createSlider('align', function (v) {
+		spectrum.align = v;
 		updateView();
 	});
 	container.appendChild(alignEl);
@@ -264,16 +250,15 @@ function createColormapSelector (spectrum) {
 	gridCheckbox.checked = spectrum.grid;
 	container.appendChild(gridSwitch);
 
-	//bars checkbox
+	//mask checkbox
 	container.appendChild(
-		createSwitch('bars', function () {
+		createSwitch('mask', function () {
 			spectrum.setMask(this.checked ? createMask(10, 10) : null);
 			updateView();
 		})
 	);
 
-
-	//inversed colormap checkbox
+	//logarithmic
 	var logSwitch = createSwitch('log', function () {
 		spectrum.logarithmic = this.checked;
 		updateView();
@@ -281,6 +266,13 @@ function createColormapSelector (spectrum) {
 	var logCheckbox = logSwitch.querySelector('input');
 	logCheckbox.checked = true;
 	container.appendChild(logSwitch);
+
+	//group size
+	var groupEl = createSlider({name: 'group', min: 0, max: 100, step: 1}, function (v) {
+		spectrum.group = v;
+		updateView();
+	});
+	container.appendChild(groupEl);
 
 
 	updateView();
@@ -318,6 +310,31 @@ function createSwitch (name, cb) {
 	return switcher;
 }
 
+
+function createSlider (opts, cb) {
+	opts = (typeof opts === 'string') ? {name: opts} : opts ? opts : {};
+	var sliderEl = document.createElement('input');
+	var title = opts.name.slice(0,1).toUpperCase() + opts.name.slice(1);
+	sliderEl.type = 'range';
+	sliderEl.min = opts.min || 0;
+	sliderEl.max = opts.max || 1;
+	sliderEl.step = opts.step || 0.01;
+	sliderEl.classList.add(opts.name);
+	sliderEl.style.width = '5rem';
+	sliderEl.style.height = '1rem';
+	sliderEl.style.border = '0';
+	sliderEl.style.color = 'inherit';
+	sliderEl.style.margin = '0 0 0 1rem';
+	sliderEl.style.verticalAlign = 'middle';
+	sliderEl.style.background = 'none';
+	sliderEl.title = title + ': 0.5';
+	sliderEl.addEventListener('input', function () {
+		var v = parseFloat(sliderEl.value);
+		sliderEl.title = title + ': ' + v;
+		cb(v);
+	});
+	return sliderEl;
+}
 
 
 //create mask

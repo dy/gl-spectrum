@@ -87,7 +87,10 @@
 	+ CPU allows for dynamic details control - no need to create extra verteces
 	* therefore place frequencies and trail in 2 buffers and that is it
 		+ or even better - place frequencies and trail in element buffers and call referenced drawElements
-	- calc log mapping in CPU is non-parallel, and one idle mapping 4 times slower than texImage2D, therefore use textures and for lines just create a separate buffer
+	- calc log mapping in CPU is non-parallel, and one idle mapping 4 times slower than texImage2D, therefore use textures and for lines just create a separate buffer.
+* We have to do separate bars style, which just sets the verteces layout
+	+ that would allow for combining continuous line view and discrete
+	+ that has continuous regulation scale
 
 ## Q: how do we make x-colormap?
 * Well setting gradient mask a texture would allow for that... Rarely one needs to colorize line, usually just gradient - like phase etc. Basically - mapped colorspace.
