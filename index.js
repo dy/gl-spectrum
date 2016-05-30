@@ -174,11 +174,7 @@ Spectrum.prototype.vert = `
 		//save mask params
 		float x = ratio * viewport.z + .5;
 		float maskX = mod(x, maskSize.x);
-		mag = (
-			texture2D(frequencies, vec2(f((x - maskX) / viewport.z), 0.5)).w +
-			texture2D(frequencies, vec2(f((x - maskX + maskSize.x*.5) / viewport.z), 0.5)).w +
-			texture2D(frequencies, vec2(f((x - maskX + maskSize.x) / viewport.z), 0.5)).w
-		) / 3.;
+		mag = texture2D(frequencies, vec2(f((x - maskX) / viewport.z), 0.5)).w;
 		vMag = mag;
 
 		//ensure mask borders are set
@@ -229,8 +225,8 @@ Spectrum.prototype.frag = `
 		float intensity = (1. - pow((1. - dist), .85)) * maxAlign + minAlign;
 
 		//apply mask
-		float top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;
-		float bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;
+		float top = coord.y - mag + align*mag - align + 1.*maskSize.y/viewport.w;
+		float bottom = -coord.y - align*mag + align + 1.*maskSize.y/viewport.w;
 		float maskY = max(
 			max(top * viewport.w / maskSize.y, .5),
 			max(bottom * viewport.w / maskSize.y, .5)
@@ -580,7 +576,14 @@ Spectrum.prototype.draw = function () {
 	this.bgComponent.render();
 
 	gl.useProgram(this.program);
+
+	var count = this.attributes.position.data.length / 2;
+
 	gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+
+	// if (this.trail) {
+	// 	gl.drawElements(gl.LINES, count, gl.UNSIGNED_SHORT, 0);
+	// }
 
 	return this;
 };

@@ -60,6 +60,34 @@
 	- a texture again...
 		+ To avoid texture squatting we could place all technical textures into a sprite.
 			+ And delegate it to gl-component.
+			- We decided to avoid sprites for now - they require size uniforms and uneasy handling in shaders - there are no API for them. It is easier just to create another webgl instance.
+3. We sould switch mode to line and draw freqs
+	- that would require extra-step of sending textures to GPU.
+
+## Q: how can we avoid sending trail frequencies to GPU?
+1. we could render to a separate texture
+	+ anyways that texture is reserved
+	? is it better that calculating in CPU?
+		+ it is parallel
+		- it switches program
+		+ it does not read texture back, and API is simple
+			* trail: false, 1, 2, 5, 10, etc.
+		- we don’t smooth trail
+			+ due to smoothing main frequencies we don’t need to smooth trail
+		- we have not to only calc trail, but to paint it as well. Therefore, it anyways should be a separate program with it’s own buffer corresponding to line frequencies.
+2. we could use multibuffers
+	- worrisome
+	- badly supported
+
+## Q: how trail painting program should calculate average?
+1. Passing averaged uniform.
+2. Keeping buffer only. Actually we don’t use frequs uniform, only to scale verteces buffer. We could just easily precalc buffer in CPU (not parallel but simplier and allows for averaging at the same time, also use bufferSubData instead of uniformi, saves texture spot.
+	+ bufferSubData is ~5 times faster than texImage2D = setting two buffers is faster than one texture
+	+ CPU processing allows for log-normalize branching
+	+ CPU allows for dynamic details control - no need to create extra verteces
+	* therefore place frequencies and trail in 2 buffers and that is it
+		+ or even better - place frequencies and trail in element buffers and call referenced drawElements
+	- calc log mapping in CPU is non-parallel, and one idle mapping 4 times slower than texImage2D, therefore use textures and for lines just create a separate buffer
 
 ## Q: how do we make x-colormap?
 * Well setting gradient mask a texture would allow for that... Rarely one needs to colorize line, usually just gradient - like phase etc. Basically - mapped colorspace.
@@ -107,7 +135,7 @@
 			+ that is less calcs, and also parallel, which is faster than CPU
 			- that forces conditioning in shader - decision whether log or real subview
 * subview is mapped to 0..1 range, but the fill x-colors are shifted with changing subview.
-* So the answer: we map in vertex shaders, conditionless. Pass whole texture as is.
+* ✔ So we map in vertex shaders, conditionless. Pass whole texture as is.
 
 ## Q: how is it possible - to avoid subviewing in CPU with falsy interpolation - and at the same time avoid log condition in shader?
 * we have to equalize lg(minF) + ratio * (lg(maxF) - lg(minF)) and minF + ratio * (maxF - minF). How to make lg(f) function which with some argument returns f?
