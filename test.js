@@ -97,7 +97,7 @@ test.only('line webgl', function () {
 		maxDecibels: 0,
 		mask: null, //createMask(10, 10),
 		align: .5,
-		group: 10,
+		// group: 12,
 		// background: './images/bg-small.jpg'
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
@@ -233,6 +233,16 @@ function createColormapSelector (spectrum) {
 	container.appendChild(weightingEl);
 
 
+	//logarithmic
+	var logSwitch = createSwitch('log', function () {
+		spectrum.logarithmic = this.checked;
+		updateView();
+	});
+	var logCheckbox = logSwitch.querySelector('input');
+	logCheckbox.checked = true;
+	container.appendChild(logSwitch);
+
+
 	//align slider
 	var alignEl = createSlider('align', function (v) {
 		spectrum.align = v;
@@ -250,6 +260,7 @@ function createColormapSelector (spectrum) {
 	gridCheckbox.checked = spectrum.grid;
 	container.appendChild(gridSwitch);
 
+
 	//mask checkbox
 	container.appendChild(
 		createSwitch('mask', function () {
@@ -258,17 +269,8 @@ function createColormapSelector (spectrum) {
 		})
 	);
 
-	//logarithmic
-	var logSwitch = createSwitch('log', function () {
-		spectrum.logarithmic = this.checked;
-		updateView();
-	});
-	var logCheckbox = logSwitch.querySelector('input');
-	logCheckbox.checked = true;
-	container.appendChild(logSwitch);
-
 	//group size
-	var groupEl = createSlider({name: 'group', min: 0, max: 100, step: 1}, function (v) {
+	var groupEl = createSlider({name: 'group', min: 0, max: 100, step: 1, value: spectrum.group}, function (v) {
 		spectrum.group = v;
 		updateView();
 	});
@@ -319,6 +321,7 @@ function createSlider (opts, cb) {
 	sliderEl.min = opts.min || 0;
 	sliderEl.max = opts.max || 1;
 	sliderEl.step = opts.step || 0.01;
+	sliderEl.value = opts.value || 0.5;
 	sliderEl.classList.add(opts.name);
 	sliderEl.style.width = '5rem';
 	sliderEl.style.height = '1rem';
@@ -327,7 +330,7 @@ function createSlider (opts, cb) {
 	sliderEl.style.margin = '0 0 0 1rem';
 	sliderEl.style.verticalAlign = 'middle';
 	sliderEl.style.background = 'none';
-	sliderEl.title = title + ': 0.5';
+	sliderEl.title = title + ': ' + sliderEl.value;
 	sliderEl.addEventListener('input', function () {
 		var v = parseFloat(sliderEl.value);
 		sliderEl.title = title + ': ' + v;

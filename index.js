@@ -147,6 +147,8 @@ Spectrum.prototype.vert = `
 
 	varying float vDist;
 	varying float vMag;
+	varying float vLeft;
+	varying float vRight;
 
 	const float log10 = ${Math.log(10)};
 
@@ -177,22 +179,21 @@ Spectrum.prototype.vert = `
 
 	void main () {
 		vec2 coord = position;
-		float groupRatio = max(group, 0.01) / viewport.z;
+		float _group = max(group, .5);
+		float groupRatio = _group / viewport.z;
 
-		//round x-coord to the step
-		float shift = mod(coord.x, groupRatio);
-		float leftX = coord.x - shift;
-		float rightX = leftX + groupRatio;
-		coord.x = decide(leftX, rightX, step(0.01, shift*viewport.z));
+		//round x-coord to the step, @c is a precision fix constant
+		float c = .001;
+		float leftX = floor((coord.x * viewport.z + c ) / _group) * _group / viewport.z;
+		float rightX = ceil((coord.x * viewport.z + c ) / _group) * _group / viewport.z;
+		coord.x = decide(leftX, rightX, step(coord.x - leftX + c*.5, groupRatio * .5));
 
 		float mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;
 		mag = clamp(mag, 0., 1.);
 
-		//save mask params
-		// float x = ratio * viewport.z + .5;
-		// float maskX = mod(x, maskSize.x);
-		// mag = texture2D(frequencies, vec2(f((x - maskX) / viewport.z), 0.5)).w;
 		vMag = mag;
+		vLeft = leftX;
+		vRight = rightX;
 
 		//ensure mask borders are set
 		mag += maskSize.y / viewport.w;
@@ -201,7 +202,7 @@ Spectrum.prototype.vert = `
 		coord.y = coord.y * mag - mag * align + align;
 
 		//save distance from the align
-		vDist = (coord.y - align) * (1./max(align, 1. - align));
+		vDist = (coord.y - align) * (1. / max(align, 1. - align));
 
 		gl_Position = vec4(coord*2. - 1., 0, 1);
 	}
@@ -215,19 +216,35 @@ Spectrum.prototype.frag = `
 	uniform vec2 maskSize;
 	uniform vec4 viewport;
 	uniform float align;
+	uniform float group;
 
 	varying float vDist;
 	varying float vMag;
+	varying float vLeft;
+	varying float vRight;
 
 	vec2 coord;
 	vec2 bin;
 
+	float decide (float a, float b, float w) {
+		return step(0.5, w) * b + step(w, 0.5) * a;
+	}
+
 	void main () {
 		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 		bin = vec2(1. / viewport.zw);
+		float groupRatio = group / viewport.z;
+		float maskRatio = maskSize.x / viewport.z;
 
 		//calc mask
-		float maskX = mod(gl_FragCoord.x, maskSize.x);
+		float halfX = min(group * .5 / maskSize.x, .5);
+		float leftX = (coord.x - vLeft) * viewport.z / maskSize.x;
+		float leftPart = step(leftX, halfX) * step(0., leftX);
+		float rightX = 1. - ((vRight - coord.x) * viewport.z) / maskSize.x;
+		float rightPart = step(rightX, 1.) * step(1. - halfX, rightX);
+		float centralPart = 1. - leftPart - rightPart;
+
+		float maskX = decide(.5, centralPart * .5 + leftPart * leftX + rightPart * rightX, step(2., group));
 
 		//find mask’s offset frequency
 		float mag = vMag;
@@ -241,20 +258,16 @@ Spectrum.prototype.frag = `
 		float intensity = (1. - pow((1. - dist), .85)) * maxAlign + minAlign;
 
 		//apply mask
-		float top = coord.y - mag + align*mag - align + 1.*maskSize.y/viewport.w;
-		float bottom = -coord.y - align*mag + align + 1.*maskSize.y/viewport.w;
+		float top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;
+		float bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;
 		float maskY = max(
 			max(top * viewport.w / maskSize.y, .5),
 			max(bottom * viewport.w / maskSize.y, .5)
 		);
-		vec2 maskCoord = vec2(maskX / maskSize.x, maskY);
+		vec2 maskCoord = vec2(maskX, maskY);
 		float maskLevel = texture2D(mask, maskCoord).x;
 
-		//active area limits 0-mask case
-		// float active = smoothstep(-0.001, 0.001, top - maskSize.y/viewport.w) + smoothstep(-0.001, 0.001, bottom - maskSize.y/viewport.w);
-		// maskLevel *= (1. - active);
-
-		// gl_FragColor = vec4(vec3(maskX / maskSize.x), 1);
+		// gl_FragColor = vec4(vec3(maskX), 1);
 		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
 		fillColor.a *= maskLevel;
 		gl_FragColor = fillColor;
