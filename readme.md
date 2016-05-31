@@ -70,6 +70,7 @@ var spectrum = new Spectrum({
 spectrum.setFrequencies(frequencies);
 spectrum.setFill(colors, inverse?);
 spectrum.setMask(mask);
+spectrum.setBackground(image);
 
 //update state according to the params
 spectrum.update();
