@@ -92,9 +92,9 @@ function startEverything () {
 	// var frequencies = ft(noise);
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount).fill(-150);
 
-	frequencies = frequencies
+	// frequencies = frequencies
 	// .map((v, i) => v*blackman(i, noise.length))
-	.map((v) => db.fromGain(v));
+	// .map((v) => db.fromGain(v));
 
 	var spectrum = new Spectrum({
 		// autostart: false,
@@ -104,7 +104,7 @@ function startEverything () {
 		minFrequency: 40,
 		maxFrequency: 20000,
 		logarithmic: true,
-		smoothing: .5,
+		smoothing: .1,
 		details: 1,
 		maxDecibels: 0,
 		mask: createMask(10, 10),
@@ -268,8 +268,8 @@ function createColormapSelector (spectrum) {
 		spectrum.setMask(this.checked ? createMask(10, 10) : null);
 		updateView();
 	});
-	var maskSwitch = gridSwitch.querySelector('input');
-	maskSwitch.checked = spectrum.grid;
+	var maskCb = maskSwitch.querySelector('input');
+	maskCb.checked = true;
 	container.appendChild(
 		maskSwitch
 	);
@@ -293,6 +293,20 @@ function createColormapSelector (spectrum) {
 		updateView();
 	});
 	container.appendChild(trailEl);
+
+
+	//smoothing slider
+	var smoothingEl = createSlider({
+		min: 0,
+		max: 1,
+		value: spectrum.smoothing,
+		name: 'smoothing'
+	}, function (v) {
+		spectrum.smoothing = v;
+		updateView();
+	});
+	container.appendChild(smoothingEl);
+
 
 	updateView();
 

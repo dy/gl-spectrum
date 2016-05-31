@@ -112,7 +112,6 @@ Spectrum.prototype.weighting = 'itu';
 Spectrum.prototype.frequencies = new Float32Array(512);
 for (var i = 0; i < 512; i++) {Spectrum.prototype.frequencies[i] = Spectrum.prototype.minDecibels;};
 
-
 //required to detect frequency resolution
 Spectrum.prototype.sampleRate = 44100;
 
@@ -300,9 +299,10 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 	//choose bigger data
 	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
-	var shorter = bigger === frequencies ? this.frequencies : frequencies;
+	var shorter = (bigger === frequencies ? this.frequencies : frequencies);
+	bigger = bigger.slice();
 
-	var smoothing = bigger === this.frequencies ? this.smoothing : 1 - this.smoothing;
+	var smoothing = (bigger === this.frequencies ? 1 - this.smoothing : this.smoothing);
 
 	for (var i = 0; i < bigger.length; i++) {
 		bigger[i] = clamp(bigger[i], -200, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -200, 0) * (1 - smoothing);
