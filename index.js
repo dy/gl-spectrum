@@ -2309,9 +2309,19 @@ function Spectrum (options) {
 	if (!this.is2d) {
 		var gl = this.gl;
 
+		var gl = this.gl;
 		var float = gl.getExtension('OES_texture_float');
-		if (!float) throw Error('WebGL does not support floats.');
-		var floatLinear = gl.getExtension('OES_texture_float_linear');
+		if (!float) {
+			var float = gl.getExtension('OES_texture_half_float');
+			if (!float) {
+				throw Error('WebGL does not support floats.');
+			}
+			var floatLinear = gl.getExtension('OES_texture_half_float_linear');
+		}
+		else {
+			var floatLinear = gl.getExtension('OES_texture_float_linear');
+
+		}
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
 		//setup alpha
@@ -2399,9 +2409,9 @@ Spectrum.prototype.mask = null;
 Spectrum.prototype.group = false;
 
 //scale verteces to frequencies values and apply alignment
-Spectrum.prototype.vert = "\n\tprecision lowp float;\n\n\tattribute vec2 position;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform float align;\n\tuniform float minFrequency;\n\tuniform float maxFrequency;\n\tuniform float logarithmic;\n\tuniform float sampleRate;\n\tuniform vec4 viewport;\n\tuniform float group;\n\tuniform float peak;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tconst float log10 = " + (Math.log(10)) + ";\n\n\tfloat lg (float x) {\n\t\treturn log(x) / log10;\n\t}\n\n\t//return a or b based on weight\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\t//get mapped frequency\n\tfloat f (float ratio) {\n\t\tfloat halfRate = sampleRate * .5;\n\n\t\tfloat logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\n\t\tratio = decide(ratio, (logF - minFrequency) / (maxFrequency - minFrequency), logarithmic);\n\n\t\tfloat leftF = minFrequency / halfRate;\n\t\tfloat rightF = maxFrequency / halfRate;\n\n\t\tratio = leftF + ratio * (rightF - leftF);\n\n\t\treturn ratio;\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = position;\n\t\tfloat _group = max(group, .5);\n\t\tfloat groupRatio = _group / viewport.z;\n\n\t\t//round x-coord to the step, @c is a precision fix constant\n\t\tfloat c = 1./viewport.z;\n\t\tfloat leftX = floor((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tfloat rightX = ceil((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tcoord.x = decide(leftX, rightX, step(coord.x - leftX + c*.5, groupRatio * .5));\n\n\t\tfloat mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;\n\t\tmag = clamp(mag, 0., 1.);\n\n\t\tvMag = mag;\n\t\tvLeft = leftX;\n\t\tvRight = rightX;\n\n\t\t//ensure mask borders are set\n\t\tmag += maskSize.y / viewport.w;\n\n\t\t//map y-coord to alignment\n\t\tcoord.y = coord.y * mag - mag * align + align;\n\n\t\t//save distance from the align\n\t\tvDist = (coord.y - align) * (1. / max(align, 1. - align));\n\n\t\tgl_Position = vec4(coord*2. - 1., 0, 1);\n\t}\n";
+Spectrum.prototype.vert = "\n\tprecision highp float;\n\n\tattribute vec2 position;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform float align;\n\tuniform float minFrequency;\n\tuniform float maxFrequency;\n\tuniform float logarithmic;\n\tuniform float sampleRate;\n\tuniform vec4 viewport;\n\tuniform float group;\n\tuniform float peak;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tconst float log10 = " + (Math.log(10)) + ";\n\n\tfloat lg (float x) {\n\t\treturn log(x) / log10;\n\t}\n\n\t//return a or b based on weight\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\t//get mapped frequency\n\tfloat f (float ratio) {\n\t\tfloat halfRate = sampleRate * .5;\n\n\t\tfloat logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\n\t\tratio = decide(ratio, (logF - minFrequency) / (maxFrequency - minFrequency), logarithmic);\n\n\t\tfloat leftF = minFrequency / halfRate;\n\t\tfloat rightF = maxFrequency / halfRate;\n\n\t\tratio = leftF + ratio * (rightF - leftF);\n\n\t\treturn ratio;\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = position;\n\t\tfloat _group = max(group, .5);\n\t\tfloat groupRatio = _group / viewport.z;\n\n\t\t//round x-coord to the step, @c is a precision fix constant\n\t\tfloat c = 1./viewport.z;\n\t\tfloat leftX = floor((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tfloat rightX = ceil((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tcoord.x = decide(leftX, rightX, step(coord.x - leftX + c*.5, groupRatio * .5));\n\n\t\tfloat mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;\n\t\tmag = clamp(mag, 0., 1.);\n\n\t\tvMag = mag;\n\t\tvLeft = leftX;\n\t\tvRight = rightX;\n\n\t\t//ensure mask borders are set\n\t\tmag += maskSize.y / viewport.w;\n\n\t\t//map y-coord to alignment\n\t\tcoord.y = coord.y * mag - mag * align + align;\n\n\t\t//save distance from the align\n\t\tvDist = (coord.y - align) * (1. / max(align, 1. - align));\n\n\t\tgl_Position = vec4(coord*2. - 1., 0, 1);\n\t}\n";
 
-Spectrum.prototype.frag = "\n\tprecision lowp float;\n\n\tuniform sampler2D fill;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform vec4 viewport;\n\tuniform float align;\n\tuniform float group;\n\tuniform float trail;\n\tuniform float peak;\n\tuniform float balance;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tvec2 coord;\n\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\tvoid main () {\n\t\tcoord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tfloat groupRatio = group / viewport.z;\n\t\tfloat maskRatio = maskSize.x / viewport.z;\n\n\t\t//calc mask\n\t\tfloat halfX = min(group * .5 / maskSize.x, .5);\n\t\tfloat leftX = ((coord.x - vLeft) * viewport.z) / maskSize.x;\n\t\tfloat leftPart = step(leftX, halfX) * step(0., leftX);\n\t\tfloat rightX = 1. - max(((vRight - coord.x) * viewport.z),0.) / maskSize.x;\n\t\tfloat rightPart = step(rightX, 1.) * step(1. - halfX, rightX);\n\t\t// rightPart -= rightPart * leftPart;\n\t\tfloat centralPart = 1. - leftPart - rightPart;\n\n\t\tfloat maskX = decide(.5, centralPart * .5 + leftPart * leftX + rightPart * rightX, step(4., group));\n\n\t\t//find mask’s offset frequency\n\t\tfloat mag = vMag;\n\n\t\t//calc dist\n\t\tfloat dist = abs(vDist);\n\n\t\t//calc intensity\n\t\tfloat intensity = pow(dist, .85) * balance + pow(mag/peak, 1.25) * (1. - balance);\n\t\tintensity /= (peak * .48 + .5);\n\t\tintensity = intensity * .85 + .15;\n\n\t\t//apply mask\n\t\tfloat top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;\n\t\tfloat bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;\n\t\tfloat maskY = max(\n\t\t\tmax(top * viewport.w / maskSize.y, .5),\n\t\t\tmax(bottom * viewport.w / maskSize.y, .5)\n\t\t);\n\t\tvec2 maskCoord = vec2(maskX, maskY);\n\t\tfloat maskLevel = texture2D(mask, maskCoord).x;\n\n\t\tgl_FragColor = vec4(vec3(1), 1);\n\t\tvec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity) + trail * (mag * .5 / peak + .15 )));\n\t\tfillColor.a *= maskLevel;\n\t\tfillColor.a += trail * texture2D(mask, vec2(maskX, .5)).x;\n\t\tgl_FragColor = fillColor;\n\t}\n";
+Spectrum.prototype.frag = "\n\tprecision highp float;\n\n\tuniform sampler2D fill;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform vec4 viewport;\n\tuniform float align;\n\tuniform float group;\n\tuniform float trail;\n\tuniform float peak;\n\tuniform float balance;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tvec2 coord;\n\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\tvoid main () {\n\t\tcoord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tfloat groupRatio = group / viewport.z;\n\t\tfloat maskRatio = maskSize.x / viewport.z;\n\n\t\t//calc mask\n\t\tfloat halfX = min(group * .5 / maskSize.x, .5);\n\t\tfloat leftX = ((coord.x - vLeft) * viewport.z) / maskSize.x;\n\t\tfloat leftPart = step(leftX, halfX) * step(0., leftX);\n\t\tfloat rightX = 1. - max(((vRight - coord.x) * viewport.z),0.) / maskSize.x;\n\t\tfloat rightPart = step(rightX, 1.) * step(1. - halfX, rightX);\n\t\t// rightPart -= rightPart * leftPart;\n\t\tfloat centralPart = 1. - leftPart - rightPart;\n\n\t\tfloat maskX = decide(.5, centralPart * .5 + leftPart * leftX + rightPart * rightX, step(4., group));\n\n\t\t//find mask’s offset frequency\n\t\tfloat mag = vMag;\n\n\t\t//calc dist\n\t\tfloat dist = abs(vDist);\n\n\t\t//calc intensity\n\t\tfloat intensity = pow(dist, .85) * balance + pow(mag/peak, 1.25) * (1. - balance);\n\t\tintensity /= (peak * .48 + .5);\n\t\tintensity = intensity * .85 + .15;\n\n\t\t//apply mask\n\t\tfloat top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;\n\t\tfloat bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;\n\t\tfloat maskY = max(\n\t\t\tmax(top * viewport.w / maskSize.y, .5),\n\t\t\tmax(bottom * viewport.w / maskSize.y, .5)\n\t\t);\n\t\tvec2 maskCoord = vec2(maskX, maskY);\n\t\tfloat maskLevel = texture2D(mask, maskCoord).x;\n\n\t\tgl_FragColor = vec4(vec3(1), 1);\n\t\tvec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity) + trail * (mag * .5 / peak + .15 )));\n\t\tfillColor.a *= maskLevel;\n\t\tfillColor.a += trail * texture2D(mask, vec2(maskX, .5)).x;\n\t\tgl_FragColor = fillColor;\n\t}\n";
 
 
 /**
@@ -2423,7 +2433,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	//choose bigger data
 	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
 	var shorter = (bigger === frequencies ? this.frequencies : frequencies);
-	bigger = bigger.slice();
+	bigger = [].slice.call(bigger);
 
 	var smoothing = (bigger === this.frequencies ? 1 - this.smoothing : this.smoothing);
 
@@ -2815,6 +2825,7 @@ Spectrum.prototype.draw = function () {
 	}
 
 	if (this.trail) {
+		//TODO: fix this - do not update freqs each draw call
 		gl.uniform1f(this.trailLocation, 1);
 		this.setTexture('frequencies', this.trailFrequencies);
 		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
@@ -5947,8 +5958,6 @@ var db = require('decibels');
 var colorScales = require('colormap/colorScales');
 var tap = require('tap-to-start');
 
-
-
 tap({
 	background: '#2F0F3E',
 	foreground: '#E86F56'
@@ -6023,7 +6032,8 @@ function startEverything () {
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	// var frequencies = ft(noise);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount).fill(-150);
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
 	// frequencies = frequencies
 	// .map((v, i) => v*blackman(i, noise.length))
@@ -6043,6 +6053,7 @@ function startEverything () {
 		mask: createMask(10, 10),
 		align: .5,
 		trail: 38,
+		// autostart: false,
 		// balance: .5,
 		// antialias: true,
 		// fill: [1,1,1,0],
