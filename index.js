@@ -2292,19 +2292,19 @@ module.exports = Spectrum;
  * @contructor
  */
 function Spectrum (options) {
+	var this$1 = this;
+
 	if (!(this instanceof Spectrum)) return new Spectrum(options);
 
 	var that = this;
 
 	options = options || {};
-	options.antialias = true;
 
 	Component.call(this, options);
 
 	if (isBrowser) {
 		this.container.classList.add('gl-spectrum');
 	}
-
 
 	if (!this.is2d) {
 		var gl = this.gl;
@@ -2314,15 +2314,46 @@ function Spectrum (options) {
 		var floatLinear = gl.getExtension('OES_texture_float_linear');
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
+		//setup alpha
+		gl.enable( gl.BLEND );
+		gl.blendEquation( gl.FUNC_ADD );
+		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
 		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
 		this.alignLocation = gl.getUniformLocation(this.program, 'align');
+		this.minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
+		this.maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
+		this.logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
+		this.sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
+		this.groupLocation = gl.getUniformLocation(this.program, 'group');
+		this.trailLocation = gl.getUniformLocation(this.program, 'trail');
+		this.balanceLocation = gl.getUniformLocation(this.program, 'balance');
+		this.peakLocation = gl.getUniformLocation(this.program, 'peak');
+
+		this.bgComponent = new Component({
+			frag: "\n\t\t\tprecision lowp float;\n\t\t\tuniform sampler2D background;\n\t\t\tuniform vec4 viewport;\n\t\t\tvoid main() {\n\t\t\t\tvec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\t\t\tgl_FragColor = texture2D(background, coord);\n\t\t\t}",
+			viewport: function () { return this$1.viewport; },
+			context: this.context,
+			autostart: false,
+			antialias: false
+		});
 	}
+
+	this.freqBuffer = [];
+
+	this.on('resize', function () {
+		this$1.recalc();
+	});
 
 	this.update();
 }
 
 inherits(Spectrum, Component);
 
+
+Spectrum.prototype.antialias = false;
+Spectrum.prototype.premultipliedAlpha = true;
+Spectrum.prototype.alpha = false;
 
 
 Spectrum.prototype.maxDecibels = -30;
@@ -2332,6 +2363,7 @@ Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
 
 Spectrum.prototype.smoothing = 0.5;
+Spectrum.prototype.details = 1;
 
 Spectrum.prototype.snap = null;
 
@@ -2343,33 +2375,34 @@ Spectrum.prototype.logarithmic = true;
 Spectrum.prototype.weighting = 'itu';
 
 //evenly distributed within indicated diapasone
-Spectrum.prototype.frequencies = new Float32Array(512).fill(Spectrum.prototype.minDecibels);
+Spectrum.prototype.frequencies = new Float32Array(512);
+for (var i = 0; i < 512; i++) {Spectrum.prototype.frequencies[i] = Spectrum.prototype.minDecibels;};
 
-
-//TODO
-Spectrum.prototype.orientation = 'horizontal';
 
 //required to detect frequency resolution
 Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
 Spectrum.prototype.fill = 'greys';
-Spectrum.prototype.background = null;
+Spectrum.prototype.balance = .65;
+Spectrum.prototype.background = undefined;
 
 //amount of alignment
 Spectrum.prototype.align = .0;
 
-//TODO implement shadow frequencies, like averaged/max values
-Spectrum.prototype.shadow = [];
+//shadow frequencies, like averaged/max values
+Spectrum.prototype.trail = 1;
 
 //mask defines style of bars, dots or line
 Spectrum.prototype.mask = null;
 
+//group freq range by subbands
+Spectrum.prototype.group = false;
 
-/**
- * Here we might have to do kernel averaging for some
- */
-Spectrum.prototype.frag = "\n\tprecision lowp float;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D fill;\n\tuniform sampler2D mask;\n\tuniform sampler2D background;\n\tuniform vec4 viewport;\n\tuniform vec2 maskSize;\n\tuniform float align;\n\n\tvec2 coord;\n\tvec2 bin;\n\tfloat currMag;\n\tfloat prevMag;\n\tfloat nextMag;\n\tfloat currF;\n\tfloat prevF;\n\tfloat nextF;\n\tfloat maxMag;\n\tfloat minMag;\n\tfloat slope;\n\tfloat alpha;\n\n\t//return magnitude of normalized frequency\n\tfloat magnitude (float nf) {\n\t\treturn texture2D(frequencies, vec2((nf), 0.5)).w;\n\t}\n\n\tfloat within (float x, float left, float right) {\n\t\treturn step(left, x) * step(x, right);\n\t}\n\n\tfloat distToLine(vec2 p1, vec2 p2, vec2 testPt) {\n\t\tvec2 lineDir = p2 - p1;\n\t\tvec2 perpDir = vec2(lineDir.y, -lineDir.x);\n\t\tvec2 dirToPt1 = p1 - testPt;\n\t\treturn abs(dot(normalize(perpDir), dirToPt1));\n\t}\n\n\tvoid main () {\n\t\tcoord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tbin = vec2(1. / viewport.zw);\n\t\t// prevF = coord.x - .5*bin.x;\n\t\t// currF = coord.x;\n\t\t// nextF = coord.x + .5*bin.x;\n\t\t// prevMag = magnitude(prevF);\n\t\t// currMag = magnitude(currF);\n\t\t// nextMag = magnitude(nextF);\n\t\t// maxMag = max(currMag, prevMag);\n\t\t// minMag = min(currMag, prevMag);\n\t\t// slope = (currMag - prevMag) / bin.x;\n\t\t// alpha = atan(currMag - prevMag, bin.x);\n\n\n\t\t//calc mask\n\t\tfloat maskX = mod(gl_FragCoord.x, maskSize.x);\n\t\tfloat maskOutset = gl_FragCoord.x - maskX + .5;\n\n\t\t//find mask’s offset frequency\n\t\tfloat mag = max(magnitude(maskOutset / viewport.z), 0.);\n\n\t\t//calc dist\n\t\tfloat dist = abs(align - coord.y);\n\n\t\t//calc intensity\n\t\tfloat maxAlign = min(max(align, 1. - align), .75);\n\t\tfloat minAlign = max(1. - maxAlign, .25);\n\t\tfloat intensity = pow(dist / max(align, 1. - align), .85) * (maxAlign) + (minAlign);\n\n\n\t\t//apply mask\n\t\tfloat top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;\n\t\tfloat bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;\n\t\tfloat maskY = max(\n\t\t\tmax(top * viewport.w / maskSize.y, .5),\n\t\t\tmax(bottom * viewport.w / maskSize.y, .5)\n\t\t);\n\t\tvec2 maskCoord = vec2(maskX / maskSize.x, maskY);\n\t\tfloat maskLevel = texture2D(mask, maskCoord).x;\n\n\t\t//active area limits 0-mask case\n\t\tfloat active = smoothstep(-0.001, 0.001, top - maskSize.y/viewport.w) + smoothstep(-0.001, 0.001, bottom - maskSize.y/viewport.w);\n\t\tmaskLevel *= (1. - active);\n\n\t\t// gl_FragColor = vec4(vec3(intensity), 1);\n\t\tvec4 bgColor = texture2D(background, coord);\n\t\tvec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));\n\t\tgl_FragColor = fillColor * maskLevel + bgColor * (1. - maskLevel);\n\t}\n";
+//scale verteces to frequencies values and apply alignment
+Spectrum.prototype.vert = "\n\tprecision lowp float;\n\n\tattribute vec2 position;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform float align;\n\tuniform float minFrequency;\n\tuniform float maxFrequency;\n\tuniform float logarithmic;\n\tuniform float sampleRate;\n\tuniform vec4 viewport;\n\tuniform float group;\n\tuniform float peak;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tconst float log10 = " + (Math.log(10)) + ";\n\n\tfloat lg (float x) {\n\t\treturn log(x) / log10;\n\t}\n\n\t//return a or b based on weight\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\t//get mapped frequency\n\tfloat f (float ratio) {\n\t\tfloat halfRate = sampleRate * .5;\n\n\t\tfloat logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\n\t\tratio = decide(ratio, (logF - minFrequency) / (maxFrequency - minFrequency), logarithmic);\n\n\t\tfloat leftF = minFrequency / halfRate;\n\t\tfloat rightF = maxFrequency / halfRate;\n\n\t\tratio = leftF + ratio * (rightF - leftF);\n\n\t\treturn ratio;\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = position;\n\t\tfloat _group = max(group, .5);\n\t\tfloat groupRatio = _group / viewport.z;\n\n\t\t//round x-coord to the step, @c is a precision fix constant\n\t\tfloat c = 1./viewport.z;\n\t\tfloat leftX = floor((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tfloat rightX = ceil((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tcoord.x = decide(leftX, rightX, step(coord.x - leftX + c*.5, groupRatio * .5));\n\n\t\tfloat mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;\n\t\tmag = clamp(mag, 0., 1.);\n\n\t\tvMag = mag;\n\t\tvLeft = leftX;\n\t\tvRight = rightX;\n\n\t\t//ensure mask borders are set\n\t\tmag += maskSize.y / viewport.w;\n\n\t\t//map y-coord to alignment\n\t\tcoord.y = coord.y * mag - mag * align + align;\n\n\t\t//save distance from the align\n\t\tvDist = (coord.y - align) * (1. / max(align, 1. - align));\n\n\t\tgl_Position = vec4(coord*2. - 1., 0, 1);\n\t}\n";
+
+Spectrum.prototype.frag = "\n\tprecision lowp float;\n\n\tuniform sampler2D fill;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform vec4 viewport;\n\tuniform float align;\n\tuniform float group;\n\tuniform float trail;\n\tuniform float peak;\n\tuniform float balance;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tvec2 coord;\n\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\tvoid main () {\n\t\tcoord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tfloat groupRatio = group / viewport.z;\n\t\tfloat maskRatio = maskSize.x / viewport.z;\n\n\t\t//calc mask\n\t\tfloat halfX = min(group * .5 / maskSize.x, .5);\n\t\tfloat leftX = ((coord.x - vLeft) * viewport.z) / maskSize.x;\n\t\tfloat leftPart = step(leftX, halfX) * step(0., leftX);\n\t\tfloat rightX = 1. - max(((vRight - coord.x) * viewport.z),0.) / maskSize.x;\n\t\tfloat rightPart = step(rightX, 1.) * step(1. - halfX, rightX);\n\t\t// rightPart -= rightPart * leftPart;\n\t\tfloat centralPart = 1. - leftPart - rightPart;\n\n\t\tfloat maskX = decide(.5, centralPart * .5 + leftPart * leftX + rightPart * rightX, step(4., group));\n\n\t\t//find mask’s offset frequency\n\t\tfloat mag = vMag;\n\n\t\t//calc dist\n\t\tfloat dist = abs(vDist);\n\n\t\t//calc intensity\n\t\tfloat intensity = pow(dist, .85) * balance + pow(mag/peak, 1.25) * (1. - balance);\n\t\tintensity /= (peak * .48 + .5);\n\t\tintensity = intensity * .85 + .15;\n\n\t\t//apply mask\n\t\tfloat top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;\n\t\tfloat bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;\n\t\tfloat maskY = max(\n\t\t\tmax(top * viewport.w / maskSize.y, .5),\n\t\t\tmax(bottom * viewport.w / maskSize.y, .5)\n\t\t);\n\t\tvec2 maskCoord = vec2(maskX, maskY);\n\t\tfloat maskLevel = texture2D(mask, maskCoord).x;\n\n\t\tgl_FragColor = vec4(vec3(1), 1);\n\t\tvec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity) + trail * (mag * .5 / peak + .15 )));\n\t\tfillColor.a *= maskLevel;\n\t\tfillColor.a += trail * texture2D(mask, vec2(maskX, .5)).x;\n\t\tgl_FragColor = fillColor;\n\t}\n";
 
 
 /**
@@ -2379,6 +2412,8 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	var this$1 = this;
 
 	if (!frequencies) return this;
+
+	this.gl.useProgram(this.program);
 
 	var gl = this.gl;
 	var minF = this.minFrequency, maxF = this.maxFrequency;
@@ -2392,7 +2427,6 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 	var smoothing = bigger === this.frequencies ? this.smoothing : 1 - this.smoothing;
 
-
 	for (var i = 0; i < bigger.length; i++) {
 		bigger[i] = clamp(bigger[i], -200, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -200, 0) * (1 - smoothing);
 	}
@@ -2401,54 +2435,99 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	this.frequencies = bigger;
 
 	//prepare f’s for rendering
-	frequencies = this.frequencies.slice();
+	magnitudes = bigger.slice();
 
 	//apply a-weighting
 	if (weighting[this.weighting]) {
 		var w = weighting[this.weighting];
-		frequencies = frequencies.map(function (mag, i, data) { return clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -100, 0); });
+		magnitudes = magnitudes.map(function (mag, i, data) { return clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -100, 0); });
 	}
 
-	//subview freqs - min/max f, log mapping, db limiting
-	frequencies = frequencies.map(function (mag, i, frequencies) {
-		var ratio = (i + .5) / frequencies.length;
+	//snap magnitudes
+	if (this.snap) {
+		magnitudes = magnitudes.map(function (value) { return Math.round(value * this$1.snap) / this$1.snap; });
+	}
 
-		if (this$1.logarithmic) {
-			var frequency = Math.pow(10., lg(minF) + ratio * (lg(maxF) - lg(minF)) );
-			ratio = (frequency - minF) / (maxF - minF);
+	//convert mags to 0..1 range limiting by db subrange
+	magnitudes = magnitudes.map(function (value) { return (value - minDb) / (maxDb - minDb); });
+
+	//find peak
+	var peak = magnitudes.reduce(function (prev, curr) { return Math.max(curr, prev); }, 0);
+	this.gl.uniform1f(this.peakLocation, peak);
+
+	//calc trail
+	if (this.trail) {
+		this.freqBuffer.unshift(magnitudes);
+		this.freqBuffer = this.freqBuffer.slice(0, this.trail);
+		var trail = magnitudes.slice();
+		for (var k = 1; k < this$1.freqBuffer.length; k++) {
+			for (var i = 0; i < Math.min(trail.length, this$1.freqBuffer[k].length); i++) {
+				trail[i] = Math.max(this$1.freqBuffer[k][i], trail[i]);
+			}
 		}
-
-		var leftF = minF / halfRate;
-		var rightF = maxF / halfRate;
-
-		ratio = leftF + ratio * (rightF - leftF);
-
-		//apply linear interpolation
-		//TODO: implement here another interpolation: hi-f gets lost
-		var left = frequencies[Math.floor(ratio * frequencies.length)];
-		var right = frequencies[Math.ceil(ratio * frequencies.length)];
-		var fract = (ratio * frequencies.length) % 1;
-		var value = left * (1 - fract) + right * fract;
-
-		//closest interpolation
-		// var value = frequencies[Math.round(ratio * frequencies.length)];
-
-		//snap
-		if (this$1.snap) {
-			value = Math.round(value * this$1.snap) / this$1.snap;
-		}
-
-		//sublimit db to 0..1 range
-		return (value - minDb) / (maxDb - minDb);
-	}, this);
+		this.trailFrequencies = trail;
+	}
 
 	return this.setTexture('frequencies', {
-		data: frequencies,
+		data: magnitudes,
 		format: gl.ALPHA,
-		magFilter: this.gl.NEAREST,
-		minFilter: this.gl.NEAREST,
+		magFilter: this.gl.LINEAR,
+		minFilter: this.gl.LINEAR,
 		wrap: this.gl.CLAMP_TO_EDGE
 	});
+};
+
+
+/**
+ * Recalculate number of verteces
+ */
+Spectrum.prototype.recalc = function () {
+	var data = [], w = this.viewport[2] * this.details;
+
+	//no-grouping is simply connected points
+	if (!this.group || this.group <= .5) {
+		for (var i = 0; i < w; i++) {
+			var curr = i/w;
+			var next = (i+1)/w;
+			data.push(curr);
+			data.push(1);
+			data.push(next);
+			data.push(1);
+			data.push(curr);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+		}
+	}
+	//grouping renders bars
+	else {
+		var size = this.group === true ? 1 : this.group;
+		var w = w / size;
+		for (var i = 0; i < w; i++) {
+			var curr = i/(w);
+			var next = (i+.5)/(w);
+			data.push(curr);
+			data.push(1);
+			data.push(curr);
+			data.push(1);
+			data.push(curr);
+			data.push(1);
+			data.push(next);
+			data.push(1);
+			data.push(curr);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+		}
+	}
+
+	this.setAttribute('position', data);
+
+	return this;
 };
 
 
@@ -2459,13 +2538,31 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	//named colormap
 	var this$1 = this;
 
-	if (typeof cm === 'string') {
+	if (typeof cm === 'string' && !/\\|\//.test(cm)) {
 		this.fill = (flatten(colormap({
 			colormap: cm,
 			nshades: 128,
 			format: 'rgba',
 			alpha: 1
 		})).map(function (v,i) { return !((i + 1) % 4) ? v : v/255; }));
+	}
+	else if (!cm) {
+		this.fill = null;
+		if (!this.background) this.setBackground([1,1,1,1]);
+		return this;
+	}
+	//image, canvas etc
+	else if (!Array.isArray(cm)) {
+		this.fill = cm;
+
+		this.setTexture('fill', {
+			data: this.fill,
+			magFilter: this.gl.LINEAR,
+			minFilter: this.gl.LINEAR,
+			wrap: this.gl.CLAMP_TO_EDGE
+		});
+
+		return this;
 	}
 	//custom array
 	else {
@@ -2499,9 +2596,11 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	}
 
 	//set grid color to colormap’s color
-	if (this._grid) {
+	if (this.freqGridComponent) {
 		var gridColor = this.fill.slice(-4).map(function (v) { return v*255; });
-		this._grid.linesContainer.style.color = "rgba(" + gridColor + ")";
+		this.freqGridComponent.linesContainer.style.color = "rgba(" + gridColor + ")";
+		this.topGridComponent.linesContainer.style.color = "rgba(" + gridColor + ")";
+		this.bottomGridComponent.linesContainer.style.color = "rgba(" + gridColor + ")";
 	}
 
 	return this;
@@ -2510,22 +2609,25 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 
 /** Set background */
 Spectrum.prototype.setBackground = function (bg) {
-	this.setTexture('background', {
-		data: bg || this.fill.slice(0, 4),
-		format: this.gl.RGBA,
-		magFilter: this.gl.LINEAR,
-		minFilter: this.gl.LINEAR,
-		wrap: this.gl.CLAMP_TO_EDGE
-	});
+	if (this.background !== null) {
+		this.bgComponent && this.bgComponent.setTexture('background', {
+			data: bg,
+			format: this.gl.RGBA,
+			magFilter: this.gl.LINEAR,
+			minFilter: this.gl.LINEAR,
+			wrap: this.gl.CLAMP_TO_EDGE
+		});
+	}
 
 	return this;
 };
+
 
 /**
  * Set named or array mask
  */
 Spectrum.prototype.setMask = function (mask) {
-	this.mask = mask || [1,1,1,1]
+	this.mask = mask || [1,1,1,1];
 
 	this.setTexture('mask', {
 		data: this.mask,
@@ -2551,10 +2653,10 @@ Spectrum.prototype.update = function () {
 
 	//create grid, if not created yet
 	if (this.grid) {
-		if (!this._grid) {
-			this._grid = createGrid({
+		if (!this.freqGridComponent) {
+			this.freqGridComponent = createGrid({
 				container: this.container,
-				viewport: this.viewport,
+				viewport: function () { return this$1.viewport; },
 				lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
 					min: this.minFrequency,
 					max: this.maxFrequency,
@@ -2562,13 +2664,6 @@ Spectrum.prototype.update = function () {
 					logarithmic: this.logarithmic,
 					titles: function (value) {
 						return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
-					}
-				}, {
-					min: this.minDecibels,
-					max: this.maxDecibels,
-					orientation: 'y',
-					titles: function (value) {
-						return value.toLocaleString() + 'dB';
 					}
 				}, this.logarithmic ? {
 					min: this.minFrequency,
@@ -2584,7 +2679,8 @@ Spectrum.prototype.update = function () {
 					style: {
 						borderLeftStyle: 'solid',
 						pointerEvents: 'none',
-						opacity: '0.08'
+						opacity: '0.08',
+						display: this.logarithmic ? null :'none'
 					}
 				} : null],
 				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
@@ -2594,29 +2690,109 @@ Spectrum.prototype.update = function () {
 						if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
 						return opt.titles[i];
 					}
-				}, {
+				}]
+			});
+
+			this.topGridComponent = createGrid({
+				container: this.container,
+				viewport: function () { return [
+					this$1.viewport[0],
+					this$1.viewport[1],
+					this$1.viewport[2],
+					this$1.viewport[3] * (1 - this$1.align)
+				]; },
+				lines: [{
+					min: this.minDecibels,
+					max: this.maxDecibels,
+					orientation: 'y',
+					titles: function (value) {
+						return value.toLocaleString() + 'dB';
+					}
+				}],
+				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
 					name: 'Magnitude'
 				}]
 			});
 
-			this.on('resize', function () { return this$1._grid.update({
-				viewport: this$1.viewport
-			}); });
+			//alignment requires additional grid
+			this.bottomGridComponent = createGrid({
+				container: this.container,
+				viewport: function () { return [
+					this$1.viewport[0],
+					this$1.viewport[1] + this$1.viewport[3] * (1 - this$1.align),
+					this$1.viewport[2],
+					this$1.viewport[3] * this$1.align
+				]; },
+				lines: [{
+					min: this.maxDecibels,
+					max: this.minDecibels,
+					orientation: 'y',
+					titles: function (value) {
+						return value.toLocaleString() + 'dB';
+					}
+				}],
+				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
+					name: 'Magnitude'
+				}]
+			});
+
+			this.on('resize', function () {
+				if (this$1.isPlannedGridUpdate) return;
+				this$1.isPlannedGridUpdate = true;
+				this$1.once('render', function () {
+					this$1.isPlannedGridUpdate = false;
+					this$1.topGridComponent.update();
+					this$1.bottomGridComponent.update();
+					this$1.freqGridComponent.update();
+				});
+			});
 		} else {
-			this._grid.grid.style.display = 'block';
+			this.freqGridComponent.linesContainer.style.display = 'block';
+			this.topGridComponent.linesContainer.style.display = 'block';
+			this.bottomGridComponent.linesContainer.style.display = 'block';
+
+			this.topGridComponent.update();
+			this.bottomGridComponent.update();
+
+			this.freqGridComponent.update({
+				lines: [{
+						logarithmic: this.logarithmic
+					}, {
+						logarithmic: this.logarithmic,
+						style: {
+							display: this.logarithmic ? null : 'none'
+						}
+					}
+				]
+			});
 		}
+
 	}
-	else if (this._grid) {
-		this._grid.grid.style.display = 'none';
+	else if (this.freqGridComponent) {
+		this.freqGridComponent.linesContainer.style.display = 'none';
+		this.topGridComponent.linesContainer.style.display = 'none';
+		this.bottomGridComponent.linesContainer.style.display = 'none';
 	}
 
+	//preset trail buffer
+	if (this.trail === true) this.trail = Spectrum.prototype.trail;
+
+	//update verteces
+	this.recalc();
+
 	//update textures
+	this.setBackground(this.background);
 	this.setFrequencies(this.frequencies);
 	this.setFill(this.fill);
 	this.setMask(this.mask);
-	this.setBackground(this.background);
 
 	this.gl.uniform1f(this.alignLocation, this.align);
+	this.gl.uniform1f(this.minFrequencyLocation, this.minFrequency);
+	this.gl.uniform1f(this.maxFrequencyLocation, this.maxFrequency);
+	this.gl.uniform1f(this.logarithmicLocation, this.logarithmic ? 1 : 0);
+	this.gl.uniform1f(this.sampleRateLocation, this.sampleRate);
+	this.gl.uniform1f(this.groupLocation, this.group || 0);
+	this.gl.uniform1f(this.balanceLocation, this.balance || 0);
 
 	return this;
 };
@@ -2625,30 +2801,30 @@ Spectrum.prototype.update = function () {
 /**
  * Render main loop
  */
-Spectrum.prototype.render = function () {
-	var this$1 = this;
+Spectrum.prototype.draw = function () {
+	var gl = this.gl;
 
-	Component.prototype.render.call(this);
+	this.bgComponent.render();
 
-	if (this.is2d) {
-		//TODO: 2d rendering?
-		var context = this.context;
-		var fill = this.fill;
+	gl.useProgram(this.program);
 
-		context.fillStyle = 'rgba(' + fill.slice(0,4).join(',') + ')';
-		context.fillRect.apply(context, this.viewport);
+	var count = this.attributes.position.data.length / 2;
 
-		//calculate per-bar averages
-		var bars = [];
-		for (var i = 0; i < this$1.frequencies.length; i++) {
+	if (this.fill) {
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+	}
 
-		}
+	if (this.trail) {
+		gl.uniform1f(this.trailLocation, 1);
+		this.setTexture('frequencies', this.trailFrequencies);
+		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
+		gl.uniform1f(this.trailLocation, 0);
 	}
 
 	return this;
 };
 
-},{"a-weighting":16,"colormap":28,"flatten":36,"gl-component":40,"inherits":43,"is-browser":45,"mumath/clamp":48,"mumath/lg":50,"plot-grid":57,"xtend/mutable":75}],12:[function(require,module,exports){
+},{"a-weighting":16,"colormap":23,"flatten":31,"gl-component":35,"inherits":37,"is-browser":39,"mumath/clamp":41,"mumath/lg":43,"plot-grid":49,"xtend/mutable":66}],12:[function(require,module,exports){
 module.exports = function a (f) {
 	var f2 = f*f;
 	return 1.2588966 * 148840000 * f2*f2 /
@@ -2709,189 +2885,6 @@ module.exports = function (f) {
 };
 
 },{}],19:[function(require,module,exports){
-(function (process){
-'use strict';
-var ESC = '\u001b[';
-var x = module.exports;
-
-x.cursorTo = function (x, y) {
-	if (arguments.length === 0) {
-		return ESC + 'H';
-	}
-
-	if (arguments.length === 1) {
-		return ESC + (x + 1) + 'G';
-	}
-
-	return ESC + (y + 1) + ';' + (x + 1) + 'H';
-};
-
-x.cursorMove = function (x, y) {
-	var ret = '';
-
-	if (x < 0) {
-		ret += ESC + (-x) + 'D';
-	} else if (x > 0) {
-		ret += ESC + x + 'C';
-	}
-
-	if (y < 0) {
-		ret += ESC + (-y) + 'A';
-	} else if (y > 0) {
-		ret += ESC + y + 'B';
-	}
-
-	return ret;
-};
-
-x.cursorUp = function (count) {
-	return ESC + (typeof count === 'number' ? count : 1) + 'A';
-};
-
-x.cursorDown = function (count) {
-	return ESC + (typeof count === 'number' ? count : 1) + 'B';
-};
-
-x.cursorForward = function (count) {
-	return ESC + (typeof count === 'number' ? count : 1) + 'C';
-};
-
-x.cursorBackward = function (count) {
-	return ESC + (typeof count === 'number' ? count : 1) + 'D';
-};
-
-x.cursorLeft = ESC + '1000D';
-x.cursorSavePosition = ESC + 's';
-x.cursorRestorePosition = ESC + 'u';
-x.cursorGetPosition = ESC + '6n';
-x.cursorNextLine = ESC + 'E';
-x.cursorPrevLine = ESC + 'F';
-x.cursorHide = ESC + '?25l';
-x.cursorShow = ESC + '?25h';
-
-x.eraseLines = function (count) {
-	var clear = '';
-
-	for (var i = 0; i < count; i++) {
-		clear += x.cursorLeft + x.eraseEndLine + (i < count - 1 ? x.cursorUp() : '');
-	}
-
-	return clear;
-};
-
-x.eraseEndLine = ESC + 'K';
-x.eraseStartLine = ESC + '1K';
-x.eraseLine = ESC + '2K';
-x.eraseDown = ESC + 'J';
-x.eraseUp = ESC + '1J';
-x.eraseScreen = ESC + '2J';
-x.scrollUp = ESC + 'S';
-x.scrollDown = ESC + 'T';
-
-x.clearScreen = '\u001bc';
-x.beep = '\u0007';
-
-x.image = function (buf, opts) {
-	opts = opts || {};
-
-	var ret = '\u001b]1337;File=inline=1';
-
-	if (opts.width) {
-		ret += ';width=' + opts.width;
-	}
-
-	if (opts.height) {
-		ret += ';height=' + opts.height;
-	}
-
-	if (opts.preserveAspectRatio === false) {
-		ret += ';preserveAspectRatio=0';
-	}
-
-	return ret + ':' + buf.toString('base64') + '\u0007';
-};
-
-x.iTerm = {};
-
-x.iTerm.setCwd = function (cwd) {
-	return '\u001b]50;CurrentDir=' + (cwd || process.cwd()) + '\u0007';
-};
-
-}).call(this,require('_process'))
-},{"_process":7}],20:[function(require,module,exports){
-'use strict';
-module.exports = function () {
-	return /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
-};
-
-},{}],21:[function(require,module,exports){
-'use strict';
-
-function assembleStyles () {
-	var styles = {
-		modifiers: {
-			reset: [0, 0],
-			bold: [1, 22], // 21 isn't widely supported and 22 does the same thing
-			dim: [2, 22],
-			italic: [3, 23],
-			underline: [4, 24],
-			inverse: [7, 27],
-			hidden: [8, 28],
-			strikethrough: [9, 29]
-		},
-		colors: {
-			black: [30, 39],
-			red: [31, 39],
-			green: [32, 39],
-			yellow: [33, 39],
-			blue: [34, 39],
-			magenta: [35, 39],
-			cyan: [36, 39],
-			white: [37, 39],
-			gray: [90, 39]
-		},
-		bgColors: {
-			bgBlack: [40, 49],
-			bgRed: [41, 49],
-			bgGreen: [42, 49],
-			bgYellow: [43, 49],
-			bgBlue: [44, 49],
-			bgMagenta: [45, 49],
-			bgCyan: [46, 49],
-			bgWhite: [47, 49]
-		}
-	};
-
-	// fix humans
-	styles.colors.grey = styles.colors.gray;
-
-	Object.keys(styles).forEach(function (groupName) {
-		var group = styles[groupName];
-
-		Object.keys(group).forEach(function (styleName) {
-			var style = group[styleName];
-
-			styles[styleName] = group[styleName] = {
-				open: '\u001b[' + style[0] + 'm',
-				close: '\u001b[' + style[1] + 'm'
-			};
-		});
-
-		Object.defineProperty(styles, groupName, {
-			value: group,
-			enumerable: false
-		});
-	});
-
-	return styles;
-}
-
-Object.defineProperty(module, 'exports', {
-	enumerable: true,
-	get: assembleStyles
-});
-
-},{}],22:[function(require,module,exports){
 'use strict';
 
 var arraytools  = function () {
@@ -3080,7 +3073,7 @@ var arraytools  = function () {
 
 module.exports = arraytools();
 
-},{}],23:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 var size = require('element-size')
 
 module.exports = fit
@@ -3130,157 +3123,7 @@ function fit(canvas, parent, scale) {
   }
 }
 
-},{"element-size":33}],24:[function(require,module,exports){
-(function (process){
-'use strict';
-var escapeStringRegexp = require('escape-string-regexp');
-var ansiStyles = require('ansi-styles');
-var stripAnsi = require('strip-ansi');
-var hasAnsi = require('has-ansi');
-var supportsColor = require('supports-color');
-var defineProps = Object.defineProperties;
-var isSimpleWindowsTerm = process.platform === 'win32' && !/^xterm/i.test(process.env.TERM);
-
-function Chalk(options) {
-	// detect mode if not set manually
-	this.enabled = !options || options.enabled === undefined ? supportsColor : options.enabled;
-}
-
-// use bright blue on Windows as the normal blue color is illegible
-if (isSimpleWindowsTerm) {
-	ansiStyles.blue.open = '\u001b[94m';
-}
-
-var styles = (function () {
-	var ret = {};
-
-	Object.keys(ansiStyles).forEach(function (key) {
-		ansiStyles[key].closeRe = new RegExp(escapeStringRegexp(ansiStyles[key].close), 'g');
-
-		ret[key] = {
-			get: function () {
-				return build.call(this, this._styles.concat(key));
-			}
-		};
-	});
-
-	return ret;
-})();
-
-var proto = defineProps(function chalk() {}, styles);
-
-function build(_styles) {
-	var builder = function () {
-		return applyStyle.apply(builder, arguments);
-	};
-
-	builder._styles = _styles;
-	builder.enabled = this.enabled;
-	// __proto__ is used because we must return a function, but there is
-	// no way to create a function with a different prototype.
-	/* eslint-disable no-proto */
-	builder.__proto__ = proto;
-
-	return builder;
-}
-
-function applyStyle() {
-	// support varags, but simply cast to string in case there's only one arg
-	var args = arguments;
-	var argsLen = args.length;
-	var str = argsLen !== 0 && String(arguments[0]);
-
-	if (argsLen > 1) {
-		// don't slice `arguments`, it prevents v8 optimizations
-		for (var a = 1; a < argsLen; a++) {
-			str += ' ' + args[a];
-		}
-	}
-
-	if (!this.enabled || !str) {
-		return str;
-	}
-
-	var nestedStyles = this._styles;
-	var i = nestedStyles.length;
-
-	// Turns out that on Windows dimmed gray text becomes invisible in cmd.exe,
-	// see https://github.com/chalk/chalk/issues/58
-	// If we're on Windows and we're dealing with a gray color, temporarily make 'dim' a noop.
-	var originalDim = ansiStyles.dim.open;
-	if (isSimpleWindowsTerm && (nestedStyles.indexOf('gray') !== -1 || nestedStyles.indexOf('grey') !== -1)) {
-		ansiStyles.dim.open = '';
-	}
-
-	while (i--) {
-		var code = ansiStyles[nestedStyles[i]];
-
-		// Replace any instances already present with a re-opening code
-		// otherwise only the part of the string until said closing code
-		// will be colored, and the rest will simply be 'plain'.
-		str = code.open + str.replace(code.closeRe, code.open) + code.close;
-	}
-
-	// Reset the original 'dim' if we changed it to work around the Windows dimmed gray issue.
-	ansiStyles.dim.open = originalDim;
-
-	return str;
-}
-
-function init() {
-	var ret = {};
-
-	Object.keys(styles).forEach(function (name) {
-		ret[name] = {
-			get: function () {
-				return build.call(this, [name]);
-			}
-		};
-	});
-
-	return ret;
-}
-
-defineProps(Chalk.prototype, init());
-
-module.exports = new Chalk();
-module.exports.styles = ansiStyles;
-module.exports.hasColor = hasAnsi;
-module.exports.stripColor = stripAnsi;
-module.exports.supportsColor = supportsColor;
-
-}).call(this,require('_process'))
-},{"_process":7,"ansi-styles":21,"escape-string-regexp":34,"has-ansi":42,"strip-ansi":67,"supports-color":68}],25:[function(require,module,exports){
-(function (process){
-'use strict';
-var restoreCursor = require('restore-cursor');
-var hidden = false;
-
-exports.show = function () {
-	hidden = false;
-	process.stdout.write('\u001b[?25h');
-};
-
-exports.hide = function () {
-	restoreCursor();
-	hidden = true;
-	process.stdout.write('\u001b[?25l');
-};
-
-exports.toggle = function (force) {
-	if (force !== undefined) {
-		hidden = force;
-	}
-
-	if (hidden) {
-		exports.show();
-	} else {
-		exports.hide();
-	}
-};
-
-}).call(this,require('_process'))
-},{"_process":7,"restore-cursor":60}],26:[function(require,module,exports){
+},{"element-size":30}],21:[function(require,module,exports){
 (function (Buffer){
 var clone = (function() {
 'use strict';
@@ -3444,10 +3287,100 @@ if (typeof module === 'object' && module.exports) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":3}],27:[function(require,module,exports){
-module.exports={"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],"hsv":[{"index":0,"rgb":[255,0,0]},{"index":0.169,"rgb":[253,255,2]},{"index":0.173,"rgb":[247,255,2]},{"index":0.337,"rgb":[0,252,4]},{"index":0.341,"rgb":[0,252,10]},{"index":0.506,"rgb":[1,249,255]},{"index":0.671,"rgb":[2,0,253]},{"index":0.675,"rgb":[8,0,253]},{"index":0.839,"rgb":[255,0,251]},{"index":0.843,"rgb":[255,0,245]},{"index":1,"rgb":[255,0,6]}],"hot":[{"index":0,"rgb":[0,0,0]},{"index":0.3,"rgb":[230,0,0]},{"index":0.6,"rgb":[255,210,0]},{"index":1,"rgb":[255,255,255]}],"cool":[{"index":0,"rgb":[0,255,255]},{"index":1,"rgb":[255,0,255]}],"spring":[{"index":0,"rgb":[255,0,255]},{"index":1,"rgb":[255,255,0]}],"summer":[{"index":0,"rgb":[0,128,102]},{"index":1,"rgb":[255,255,102]}],"autumn":[{"index":0,"rgb":[255,0,0]},{"index":1,"rgb":[255,255,0]}],"winter":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[0,255,128]}],"bone":[{"index":0,"rgb":[0,0,0]},{"index":0.376,"rgb":[84,84,116]},{"index":0.753,"rgb":[169,200,200]},{"index":1,"rgb":[255,255,255]}],"copper":[{"index":0,"rgb":[0,0,0]},{"index":0.804,"rgb":[255,160,102]},{"index":1,"rgb":[255,199,127]}],"greys":[{"index":0,"rgb":[0,0,0]},{"index":1,"rgb":[255,255,255]}],"yignbu":[{"index":0,"rgb":[8,29,88]},{"index":0.125,"rgb":[37,52,148]},{"index":0.25,"rgb":[34,94,168]},{"index":0.375,"rgb":[29,145,192]},{"index":0.5,"rgb":[65,182,196]},{"index":0.625,"rgb":[127,205,187]},{"index":0.75,"rgb":[199,233,180]},{"index":0.875,"rgb":[237,248,217]},{"index":1,"rgb":[255,255,217]}],"greens":[{"index":0,"rgb":[0,68,27]},{"index":0.125,"rgb":[0,109,44]},{"index":0.25,"rgb":[35,139,69]},{"index":0.375,"rgb":[65,171,93]},{"index":0.5,"rgb":[116,196,118]},{"index":0.625,"rgb":[161,217,155]},{"index":0.75,"rgb":[199,233,192]},{"index":0.875,"rgb":[229,245,224]},{"index":1,"rgb":[247,252,245]}],"yiorrd":[{"index":0,"rgb":[128,0,38]},{"index":0.125,"rgb":[189,0,38]},{"index":0.25,"rgb":[227,26,28]},{"index":0.375,"rgb":[252,78,42]},{"index":0.5,"rgb":[253,141,60]},{"index":0.625,"rgb":[254,178,76]},{"index":0.75,"rgb":[254,217,118]},{"index":0.875,"rgb":[255,237,160]},{"index":1,"rgb":[255,255,204]}],"bluered":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[255,0,0]}],"rdbu":[{"index":0,"rgb":[5,10,172]},{"index":0.35,"rgb":[106,137,247]},{"index":0.5,"rgb":[190,190,190]},{"index":0.6,"rgb":[220,170,132]},{"index":0.7,"rgb":[230,145,90]},{"index":1,"rgb":[178,10,28]}],"picnic":[{"index":0,"rgb":[0,0,255]},{"index":0.1,"rgb":[51,153,255]},{"index":0.2,"rgb":[102,204,255]},{"index":0.3,"rgb":[153,204,255]},{"index":0.4,"rgb":[204,204,255]},{"index":0.5,"rgb":[255,255,255]},{"index":0.6,"rgb":[255,204,255]},{"index":0.7,"rgb":[255,153,255]},{"index":0.8,"rgb":[255,102,204]},{"index":0.9,"rgb":[255,102,102]},{"index":1,"rgb":[255,0,0]}],"rainbow":[{"index":0,"rgb":[150,0,90]},{"index":0.125,"rgb":[0,0,200]},{"index":0.25,"rgb":[0,25,255]},{"index":0.375,"rgb":[0,152,255]},{"index":0.5,"rgb":[44,255,150]},{"index":0.625,"rgb":[151,255,0]},{"index":0.75,"rgb":[255,234,0]},{"index":0.875,"rgb":[255,111,0]},{"index":1,"rgb":[255,0,0]}],"portland":[{"index":0,"rgb":[12,51,131]},{"index":0.25,"rgb":[10,136,186]},{"index":0.5,"rgb":[242,211,56]},{"index":0.75,"rgb":[242,143,56]},{"index":1,"rgb":[217,30,30]}],"blackbody":[{"index":0,"rgb":[0,0,0]},{"index":0.2,"rgb":[230,0,0]},{"index":0.4,"rgb":[230,210,0]},{"index":0.7,"rgb":[255,255,255]},{"index":1,"rgb":[160,200,255]}],"earth":[{"index":0,"rgb":[0,0,130]},{"index":0.1,"rgb":[0,180,180]},{"index":0.2,"rgb":[40,210,40]},{"index":0.4,"rgb":[230,230,50]},{"index":0.6,"rgb":[120,70,20]},{"index":1,"rgb":[255,255,255]}],"electric":[{"index":0,"rgb":[0,0,0]},{"index":0.15,"rgb":[30,0,100]},{"index":0.4,"rgb":[120,0,100]},{"index":0.6,"rgb":[160,90,0]},{"index":0.8,"rgb":[230,200,0]},{"index":1,"rgb":[255,250,220]}], "alpha": [{"index":0, "rgb": [255,255,255,0]},{"index":0, "rgb": [255,255,255,1]}]};
+},{"buffer":3}],22:[function(require,module,exports){
+module.exports={
+	"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],
 
-},{}],28:[function(require,module,exports){
+	"hsv":[{"index":0,"rgb":[255,0,0]},{"index":0.169,"rgb":[253,255,2]},{"index":0.173,"rgb":[247,255,2]},{"index":0.337,"rgb":[0,252,4]},{"index":0.341,"rgb":[0,252,10]},{"index":0.506,"rgb":[1,249,255]},{"index":0.671,"rgb":[2,0,253]},{"index":0.675,"rgb":[8,0,253]},{"index":0.839,"rgb":[255,0,251]},{"index":0.843,"rgb":[255,0,245]},{"index":1,"rgb":[255,0,6]}],
+
+	"hot":[{"index":0,"rgb":[0,0,0]},{"index":0.3,"rgb":[230,0,0]},{"index":0.6,"rgb":[255,210,0]},{"index":1,"rgb":[255,255,255]}],
+
+	"cool":[{"index":0,"rgb":[0,255,255]},{"index":1,"rgb":[255,0,255]}],
+
+	"spring":[{"index":0,"rgb":[255,0,255]},{"index":1,"rgb":[255,255,0]}],
+
+	"summer":[{"index":0,"rgb":[0,128,102]},{"index":1,"rgb":[255,255,102]}],
+
+	"autumn":[{"index":0,"rgb":[255,0,0]},{"index":1,"rgb":[255,255,0]}],
+
+	"winter":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[0,255,128]}],
+
+	"bone":[{"index":0,"rgb":[0,0,0]},{"index":0.376,"rgb":[84,84,116]},{"index":0.753,"rgb":[169,200,200]},{"index":1,"rgb":[255,255,255]}],
+
+	"copper":[{"index":0,"rgb":[0,0,0]},{"index":0.804,"rgb":[255,160,102]},{"index":1,"rgb":[255,199,127]}],
+
+	"greys":[{"index":0,"rgb":[0,0,0]},{"index":1,"rgb":[255,255,255]}],
+
+	"yignbu":[{"index":0,"rgb":[8,29,88]},{"index":0.125,"rgb":[37,52,148]},{"index":0.25,"rgb":[34,94,168]},{"index":0.375,"rgb":[29,145,192]},{"index":0.5,"rgb":[65,182,196]},{"index":0.625,"rgb":[127,205,187]},{"index":0.75,"rgb":[199,233,180]},{"index":0.875,"rgb":[237,248,217]},{"index":1,"rgb":[255,255,217]}],
+
+	"greens":[{"index":0,"rgb":[0,68,27]},{"index":0.125,"rgb":[0,109,44]},{"index":0.25,"rgb":[35,139,69]},{"index":0.375,"rgb":[65,171,93]},{"index":0.5,"rgb":[116,196,118]},{"index":0.625,"rgb":[161,217,155]},{"index":0.75,"rgb":[199,233,192]},{"index":0.875,"rgb":[229,245,224]},{"index":1,"rgb":[247,252,245]}],
+
+	"yiorrd":[{"index":0,"rgb":[128,0,38]},{"index":0.125,"rgb":[189,0,38]},{"index":0.25,"rgb":[227,26,28]},{"index":0.375,"rgb":[252,78,42]},{"index":0.5,"rgb":[253,141,60]},{"index":0.625,"rgb":[254,178,76]},{"index":0.75,"rgb":[254,217,118]},{"index":0.875,"rgb":[255,237,160]},{"index":1,"rgb":[255,255,204]}],
+
+	"bluered":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[255,0,0]}],
+
+	"rdbu":[{"index":0,"rgb":[5,10,172]},{"index":0.35,"rgb":[106,137,247]},{"index":0.5,"rgb":[190,190,190]},{"index":0.6,"rgb":[220,170,132]},{"index":0.7,"rgb":[230,145,90]},{"index":1,"rgb":[178,10,28]}],
+
+	"picnic":[{"index":0,"rgb":[0,0,255]},{"index":0.1,"rgb":[51,153,255]},{"index":0.2,"rgb":[102,204,255]},{"index":0.3,"rgb":[153,204,255]},{"index":0.4,"rgb":[204,204,255]},{"index":0.5,"rgb":[255,255,255]},{"index":0.6,"rgb":[255,204,255]},{"index":0.7,"rgb":[255,153,255]},{"index":0.8,"rgb":[255,102,204]},{"index":0.9,"rgb":[255,102,102]},{"index":1,"rgb":[255,0,0]}],
+
+	"rainbow":[{"index":0,"rgb":[150,0,90]},{"index":0.125,"rgb":[0,0,200]},{"index":0.25,"rgb":[0,25,255]},{"index":0.375,"rgb":[0,152,255]},{"index":0.5,"rgb":[44,255,150]},{"index":0.625,"rgb":[151,255,0]},{"index":0.75,"rgb":[255,234,0]},{"index":0.875,"rgb":[255,111,0]},{"index":1,"rgb":[255,0,0]}],
+
+	"portland":[{"index":0,"rgb":[12,51,131]},{"index":0.25,"rgb":[10,136,186]},{"index":0.5,"rgb":[242,211,56]},{"index":0.75,"rgb":[242,143,56]},{"index":1,"rgb":[217,30,30]}],
+
+	"blackbody":[{"index":0,"rgb":[0,0,0]},{"index":0.2,"rgb":[230,0,0]},{"index":0.4,"rgb":[230,210,0]},{"index":0.7,"rgb":[255,255,255]},{"index":1,"rgb":[160,200,255]}],
+
+	"earth":[{"index":0,"rgb":[0,0,130]},{"index":0.1,"rgb":[0,180,180]},{"index":0.2,"rgb":[40,210,40]},{"index":0.4,"rgb":[230,230,50]},{"index":0.6,"rgb":[120,70,20]},{"index":1,"rgb":[255,255,255]}],
+
+	"electric":[{"index":0,"rgb":[0,0,0]},{"index":0.15,"rgb":[30,0,100]},{"index":0.4,"rgb":[120,0,100]},{"index":0.6,"rgb":[160,90,0]},{"index":0.8,"rgb":[230,200,0]},{"index":1,"rgb":[255,250,220]}],
+
+	"alpha": [{"index":0, "rgb": [255,255,255,0]},{"index":0, "rgb": [255,255,255,1]}],
+
+	"viridis": [{"index":0,"rgb":[68,1,84]},{"index":0.13,"rgb":[71,44,122]},{"index":0.25,"rgb":[59,81,139]},{"index":0.38,"rgb":[44,113,142]},{"index":0.5,"rgb":[33,144,141]},{"index":0.63,"rgb":[39,173,129]},{"index":0.75,"rgb":[92,200,99]},{"index":0.88,"rgb":[170,220,50]},{"index":1,"rgb":[253,231,37]}],
+
+	"inferno": [{"index":0,"rgb":[0,0,4]},{"index":0.13,"rgb":[31,12,72]},{"index":0.25,"rgb":[85,15,109]},{"index":0.38,"rgb":[136,34,106]},{"index":0.5,"rgb":[186,54,85]},{"index":0.63,"rgb":[227,89,51]},{"index":0.75,"rgb":[249,140,10]},{"index":0.88,"rgb":[249,201,50]},{"index":1,"rgb":[252,255,164]}],
+
+	"magma": [{"index":0,"rgb":[0,0,4]},{"index":0.13,"rgb":[28,16,68]},{"index":0.25,"rgb":[79,18,123]},{"index":0.38,"rgb":[129,37,129]},{"index":0.5,"rgb":[181,54,122]},{"index":0.63,"rgb":[229,80,100]},{"index":0.75,"rgb":[251,135,97]},{"index":0.88,"rgb":[254,194,135]},{"index":1,"rgb":[252,253,191]}],
+
+	"plasma": [{"index":0,"rgb":[13,8,135]},{"index":0.13,"rgb":[75,3,161]},{"index":0.25,"rgb":[125,3,168]},{"index":0.38,"rgb":[168,34,150]},{"index":0.5,"rgb":[203,70,121]},{"index":0.63,"rgb":[229,107,93]},{"index":0.75,"rgb":[248,148,65]},{"index":0.88,"rgb":[253,195,40]},{"index":1,"rgb":[240,249,33]}],
+
+	"warm": [{"index":0,"rgb":[125,0,179]},{"index":0.13,"rgb":[172,0,187]},{"index":0.25,"rgb":[219,0,170]},{"index":0.38,"rgb":[255,0,130]},{"index":0.5,"rgb":[255,63,74]},{"index":0.63,"rgb":[255,123,0]},{"index":0.75,"rgb":[234,176,0]},{"index":0.88,"rgb":[190,228,0]},{"index":1,"rgb":[147,255,0]}],
+
+	"cool": [{"index":0,"rgb":[125,0,179]},{"index":0.13,"rgb":[116,0,218]},{"index":0.25,"rgb":[98,74,237]},{"index":0.38,"rgb":[68,146,231]},{"index":0.5,"rgb":[0,204,197]},{"index":0.63,"rgb":[0,247,146]},{"index":0.75,"rgb":[0,255,88]},{"index":0.88,"rgb":[40,255,8]},{"index":1,"rgb":[147,255,0]}],
+
+	"rainbow-soft": [{"index":0,"rgb":[125,0,179]},{"index":0.1,"rgb":[199,0,180]},{"index":0.2,"rgb":[255,0,121]},{"index":0.3,"rgb":[255,108,0]},{"index":0.4,"rgb":[222,194,0]},{"index":0.5,"rgb":[150,255,0]},{"index":0.6,"rgb":[0,255,55]},{"index":0.7,"rgb":[0,246,150]},{"index":0.8,"rgb":[50,167,222]},{"index":0.9,"rgb":[103,51,235]},{"index":1,"rgb":[124,0,186]}],
+
+	"bathymetry": [{"index":0,"rgb":[40,26,44]},{"index":0.13,"rgb":[59,49,90]},{"index":0.25,"rgb":[64,76,139]},{"index":0.38,"rgb":[63,110,151]},{"index":0.5,"rgb":[72,142,158]},{"index":0.63,"rgb":[85,174,163]},{"index":0.75,"rgb":[120,206,163]},{"index":0.88,"rgb":[187,230,172]},{"index":1,"rgb":[253,254,204]}],
+
+	"cdom": [{"index":0,"rgb":[47,15,62]},{"index":0.13,"rgb":[87,23,86]},{"index":0.25,"rgb":[130,28,99]},{"index":0.38,"rgb":[171,41,96]},{"index":0.5,"rgb":[206,67,86]},{"index":0.63,"rgb":[230,106,84]},{"index":0.75,"rgb":[242,149,103]},{"index":0.88,"rgb":[249,193,135]},{"index":1,"rgb":[254,237,176]}],
+
+	"chlorophyll": [{"index":0,"rgb":[18,36,20]},{"index":0.13,"rgb":[25,63,41]},{"index":0.25,"rgb":[24,91,59]},{"index":0.38,"rgb":[13,119,72]},{"index":0.5,"rgb":[18,148,80]},{"index":0.63,"rgb":[80,173,89]},{"index":0.75,"rgb":[132,196,122]},{"index":0.88,"rgb":[175,221,162]},{"index":1,"rgb":[215,249,208]}],
+
+	"density": [{"index":0,"rgb":[54,14,36]},{"index":0.13,"rgb":[89,23,80]},{"index":0.25,"rgb":[110,45,132]},{"index":0.38,"rgb":[120,77,178]},{"index":0.5,"rgb":[120,113,213]},{"index":0.63,"rgb":[115,151,228]},{"index":0.75,"rgb":[134,185,227]},{"index":0.88,"rgb":[177,214,227]},{"index":1,"rgb":[230,241,241]}],
+
+	"freesurface-blue": [{"index":0,"rgb":[30,4,110]},{"index":0.13,"rgb":[47,14,176]},{"index":0.25,"rgb":[41,45,236]},{"index":0.38,"rgb":[25,99,212]},{"index":0.5,"rgb":[68,131,200]},{"index":0.63,"rgb":[114,156,197]},{"index":0.75,"rgb":[157,181,203]},{"index":0.88,"rgb":[200,208,216]},{"index":1,"rgb":[241,237,236]}],
+
+	"freesurface-red": [{"index":0,"rgb":[60,9,18]},{"index":0.13,"rgb":[100,17,27]},{"index":0.25,"rgb":[142,20,29]},{"index":0.38,"rgb":[177,43,27]},{"index":0.5,"rgb":[192,87,63]},{"index":0.63,"rgb":[205,125,105]},{"index":0.75,"rgb":[216,162,148]},{"index":0.88,"rgb":[227,199,193]},{"index":1,"rgb":[241,237,236]}],
+
+	"oxygen": [{"index":0,"rgb":[64,5,5]},{"index":0.13,"rgb":[106,6,15]},{"index":0.25,"rgb":[144,26,7]},{"index":0.38,"rgb":[168,64,3]},{"index":0.5,"rgb":[188,100,4]},{"index":0.63,"rgb":[206,136,11]},{"index":0.75,"rgb":[220,174,25]},{"index":0.88,"rgb":[231,215,44]},{"index":1,"rgb":[248,254,105]}],
+
+	"par": [{"index":0,"rgb":[51,20,24]},{"index":0.13,"rgb":[90,32,35]},{"index":0.25,"rgb":[129,44,34]},{"index":0.38,"rgb":[159,68,25]},{"index":0.5,"rgb":[182,99,19]},{"index":0.63,"rgb":[199,134,22]},{"index":0.75,"rgb":[212,171,35]},{"index":0.88,"rgb":[221,210,54]},{"index":1,"rgb":[225,253,75]}],
+
+	"phase": [{"index":0,"rgb":[145,105,18]},{"index":0.13,"rgb":[184,71,38]},{"index":0.25,"rgb":[186,58,115]},{"index":0.38,"rgb":[160,71,185]},{"index":0.5,"rgb":[110,97,218]},{"index":0.63,"rgb":[50,123,164]},{"index":0.75,"rgb":[31,131,110]},{"index":0.88,"rgb":[77,129,34]},{"index":1,"rgb":[145,105,18]}],
+
+	"salinity": [{"index":0,"rgb":[42,24,108]},{"index":0.13,"rgb":[33,50,162]},{"index":0.25,"rgb":[15,90,145]},{"index":0.38,"rgb":[40,118,137]},{"index":0.5,"rgb":[59,146,135]},{"index":0.63,"rgb":[79,175,126]},{"index":0.75,"rgb":[120,203,104]},{"index":0.88,"rgb":[193,221,100]},{"index":1,"rgb":[253,239,154]}],
+
+	"temperature": [{"index":0,"rgb":[4,35,51]},{"index":0.13,"rgb":[23,51,122]},{"index":0.25,"rgb":[85,59,157]},{"index":0.38,"rgb":[129,79,143]},{"index":0.5,"rgb":[175,95,130]},{"index":0.63,"rgb":[222,112,101]},{"index":0.75,"rgb":[249,146,66]},{"index":0.88,"rgb":[249,196,65]},{"index":1,"rgb":[232,250,91]}],
+
+	"turbidity": [{"index":0,"rgb":[34,31,27]},{"index":0.13,"rgb":[65,50,41]},{"index":0.25,"rgb":[98,69,52]},{"index":0.38,"rgb":[131,89,57]},{"index":0.5,"rgb":[161,112,59]},{"index":0.63,"rgb":[185,140,66]},{"index":0.75,"rgb":[202,174,88]},{"index":0.88,"rgb":[216,209,126]},{"index":1,"rgb":[233,246,171]}],
+
+	"velocity-blue": [{"index":0,"rgb":[17,32,64]},{"index":0.13,"rgb":[35,52,116]},{"index":0.25,"rgb":[29,81,156]},{"index":0.38,"rgb":[31,113,162]},{"index":0.5,"rgb":[50,144,169]},{"index":0.63,"rgb":[87,173,176]},{"index":0.75,"rgb":[149,196,189]},{"index":0.88,"rgb":[203,221,211]},{"index":1,"rgb":[254,251,230]}],
+
+	"velocity-green": [{"index":0,"rgb":[23,35,19]},{"index":0.13,"rgb":[24,64,38]},{"index":0.25,"rgb":[11,95,45]},{"index":0.38,"rgb":[39,123,35]},{"index":0.5,"rgb":[95,146,12]},{"index":0.63,"rgb":[152,165,18]},{"index":0.75,"rgb":[201,186,69]},{"index":0.88,"rgb":[233,216,137]},{"index":1,"rgb":[255,253,205]}],
+
+	"cubehelix": [{"index":0,"rgb":[0,0,0]},{"index":0.07,"rgb":[22,5,59]},{"index":0.13,"rgb":[60,4,105]},{"index":0.2,"rgb":[109,1,135]},{"index":0.27,"rgb":[161,0,147]},{"index":0.33,"rgb":[210,2,142]},{"index":0.4,"rgb":[251,11,123]},{"index":0.47,"rgb":[255,29,97]},{"index":0.53,"rgb":[255,54,69]},{"index":0.6,"rgb":[255,85,46]},{"index":0.67,"rgb":[255,120,34]},{"index":0.73,"rgb":[255,157,37]},{"index":0.8,"rgb":[241,191,57]},{"index":0.87,"rgb":[224,220,93]},{"index":0.93,"rgb":[218,241,142]},{"index":1,"rgb":[227,253,198]}]
+};
+
+},{}],23:[function(require,module,exports){
 /*
  * Ben Postlethwaite
  * January 2013
@@ -3459,8 +3392,9 @@ var at = require('arraytools');
 var clone = require('clone');
 var colorScale = require('./colorScales');
 
-module.exports = function (spec) {
+module.exports = createColormap;
 
+function createColormap (spec) {
     /*
      * Default Options
      */
@@ -3583,43 +3517,154 @@ function rgbaStr (rgba) {
     return 'rgba(' + rgba.join(',') + ')';
 }
 
-},{"./colorScales":27,"arraytools":22,"clone":26}],29:[function(require,module,exports){
+},{"./colorScales":22,"arraytools":19,"clone":21}],24:[function(require,module,exports){
 module.exports = function gainToDecibels(value) {
   if (value == null) return 0
   return Math.round(Math.round(20 * (0.43429 * Math.log(value)) * 100) / 100 * 10) / 10
 }
-},{}],30:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 module.exports = {
   fromGain: require('./from-gain'),
   toGain: require('./to-gain')
 }
-},{"./from-gain":29,"./to-gain":31}],31:[function(require,module,exports){
+},{"./from-gain":24,"./to-gain":26}],26:[function(require,module,exports){
 module.exports = function decibelsToGain(value){
   if (value <= -40){
     return 0
   }
   return Math.round(Math.exp(value / 8.6858) * 10000) / 10000
 }
-},{}],32:[function(require,module,exports){
-(function (process){
-'use strict';
+},{}],27:[function(require,module,exports){
 
-var frames = process.platform === 'win32' ?
-	['-', '\\', '|', '/'] :
-	['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+/**
+ * Expose `parse`.
+ */
 
-module.exports = function () {
-	var i = 0;
+module.exports = parse;
 
-	return function () {
-		return frames[i = ++i % frames.length];
-	};
+/**
+ * Tests for browser support.
+ */
+
+var innerHTMLBug = false;
+var bugTestDiv;
+if (typeof document !== 'undefined') {
+  bugTestDiv = document.createElement('div');
+  // Setup
+  bugTestDiv.innerHTML = '  <link/><table></table><a href="/a">a</a><input type="checkbox"/>';
+  // Make sure that link elements get serialized correctly by innerHTML
+  // This requires a wrapper element in IE
+  innerHTMLBug = !bugTestDiv.getElementsByTagName('link').length;
+  bugTestDiv = undefined;
+}
+
+/**
+ * Wrap map from jquery.
+ */
+
+var map = {
+  legend: [1, '<fieldset>', '</fieldset>'],
+  tr: [2, '<table><tbody>', '</tbody></table>'],
+  col: [2, '<table><tbody></tbody><colgroup>', '</colgroup></table>'],
+  // for script/link/style tags to work in IE6-8, you have to wrap
+  // in a div with a non-whitespace character in front, ha!
+  _default: innerHTMLBug ? [1, 'X<div>', '</div>'] : [0, '', '']
 };
 
-module.exports.frames = frames;
+map.td =
+map.th = [3, '<table><tbody><tr>', '</tr></tbody></table>'];
 
-}).call(this,require('_process'))
-},{"_process":7}],33:[function(require,module,exports){
+map.option =
+map.optgroup = [1, '<select multiple="multiple">', '</select>'];
+
+map.thead =
+map.tbody =
+map.colgroup =
+map.caption =
+map.tfoot = [1, '<table>', '</table>'];
+
+map.polyline =
+map.ellipse =
+map.polygon =
+map.circle =
+map.text =
+map.line =
+map.path =
+map.rect =
+map.g = [1, '<svg xmlns="http://www.w3.org/2000/svg" version="1.1">','</svg>'];
+
+/**
+ * Parse `html` and return a DOM Node instance, which could be a TextNode,
+ * HTML DOM Node of some kind (<div> for example), or a DocumentFragment
+ * instance, depending on the contents of the `html` string.
+ *
+ * @param {String} html - HTML string to "domify"
+ * @param {Document} doc - The `document` instance to create the Node for
+ * @return {DOMNode} the TextNode, DOM Node, or DocumentFragment instance
+ * @api private
+ */
+
+function parse(html, doc) {
+  if ('string' != typeof html) throw new TypeError('String expected');
+
+  // default to the global `document` object
+  if (!doc) doc = document;
+
+  // tag name
+  var m = /<([\w:]+)/.exec(html);
+  if (!m) return doc.createTextNode(html);
+
+  html = html.replace(/^\s+|\s+$/g, ''); // Remove leading/trailing whitespace
+
+  var tag = m[1];
+
+  // body support
+  if (tag == 'body') {
+    var el = doc.createElement('html');
+    el.innerHTML = html;
+    return el.removeChild(el.lastChild);
+  }
+
+  // wrap map
+  var wrap = map[tag] || map._default;
+  var depth = wrap[0];
+  var prefix = wrap[1];
+  var suffix = wrap[2];
+  var el = doc.createElement('div');
+  el.innerHTML = prefix + html + suffix;
+  while (depth--) el = el.lastChild;
+
+  // one element
+  if (el.firstChild == el.lastChild) {
+    return el.removeChild(el.firstChild);
+  }
+
+  // several elements
+  var fragment = doc.createDocumentFragment();
+  while (el.firstChild) {
+    fragment.appendChild(el.removeChild(el.firstChild));
+  }
+
+  return fragment;
+}
+
+},{}],28:[function(require,module,exports){
+function circOut(t) {
+  return Math.sqrt(1 - ( --t * t ))
+}
+
+module.exports = circOut
+},{}],29:[function(require,module,exports){
+function expoInOut(t) {
+  return (t === 0.0 || t === 1.0)
+    ? t
+    : t < 0.5
+      ? +0.5 * Math.pow(2.0, (20.0 * t) - 10.0)
+      : -0.5 * Math.pow(2.0, 10.0 - (t * 20.0)) + 1.0
+}
+
+module.exports = expoInOut
+},{}],30:[function(require,module,exports){
 module.exports = getSize
 
 function getSize(element) {
@@ -3655,54 +3700,7 @@ function parse(prop) {
   return parseFloat(prop) || 0
 }
 
-},{}],34:[function(require,module,exports){
-'use strict';
-
-var matchOperatorsRe = /[|\\{}()[\]^$+*?.]/g;
-
-module.exports = function (str) {
-	if (typeof str !== 'string') {
-		throw new TypeError('Expected a string');
-	}
-
-	return str.replace(matchOperatorsRe, '\\$&');
-};
-
-},{}],35:[function(require,module,exports){
-(function (process){
-'use strict';
-
-var cbs = [];
-var called = false;
-
-function exit(exit, signal) {
-	if (called) {
-		return;
-	}
-
-	called = true;
-
-	cbs.forEach(function (el) {
-		el();
-	});
-
-	if (exit === true) {
-		process.exit(128 + signal);
-	}
-};
-
-module.exports = function (cb) {
-	cbs.push(cb);
-
-	if (cbs.length === 1) {
-		process.once('exit', exit);
-		process.once('SIGINT', exit.bind(null, true, 2));
-		process.once('SIGTERM', exit.bind(null, true, 15));
-	}
-};
-
-}).call(this,require('_process'))
-},{"_process":7}],36:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 module.exports = function flatten(list, depth) {
   depth = (typeof depth == 'number') ? depth : Infinity;
 
@@ -3727,7 +3725,7 @@ module.exports = function flatten(list, depth) {
   }
 };
 
-},{}],37:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 /**
  * Real values fourier transform.
  *
@@ -3951,7 +3949,7 @@ function reverseBinPermute (N, dest, source) {
 
 	dest[nm1] = source[nm1];
 };
-},{}],38:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 module.exports = getCanvasContext
 function getCanvasContext (type, opts) {
   if (typeof type !== 'string') {
@@ -3989,14 +3987,14 @@ function getCanvasContext (type, opts) {
   return (gl || null) // ensure null on fail
 }
 
-},{}],39:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 /** generate unique id for selector */
 var counter = Date.now() % 1e9;
 
 module.exports = function getUid(){
 	return (Math.random() * 1e9 >>> 0) + (counter++);
 };
-},{}],40:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 /**
  * @module  gl-spectrum
  */
@@ -4011,6 +4009,11 @@ var inherits = require('inherits');
 var isPlainObject = require('mutype/is-object');
 
 module.exports = Component;
+
+
+//per-context cache of texture/attributes
+var texturesCache = new WeakMap();
+var attributesCache = new WeakMap();
 
 
 /**
@@ -4030,37 +4033,42 @@ function Component (options) {
 	extend(this, options);
 
 	//preserve initial viewport argument
-	this._viewport = this.viewport;
-
-	if (!this.container) {
-		this.container = isBrowser ? document.body : {};
-	}
+	this.initialViewport = this.viewport;
 
 	//if no canvas defined - create new fullscreen canvas
 	if (!this.canvas) {
-		if (isBrowser) {
+		if (this.context && this.context.canvas) {
+			this.canvas = this.context.canvas;
+		}
+		else if (isBrowser) {
 			this.canvas = document.createElement('canvas');
-			this.container.appendChild(this.canvas);
 		} else {
 			this.canvas = {};
 		}
 	}
 
-	//obtain context
 	if (typeof this.context === 'string') {
 		this.context = getContext(this.context, {
 			canvas: this.canvas,
-			premultipliedAlpha: this.premultipliedAlpha !== false,
-			antialias: this.antialias !== false
+			premultipliedAlpha: !!this.premultipliedAlpha,
+			antialias: !!this.antialias,
+			alpha: !!this.alpha
 		});
+	}
+
+	//null-container means background renderer, so only undefined is recognized as default
+	if (this.container === undefined) {
+		this.container = this.canvas.parentNode || (isBrowser ? document.body : {});
+		this.container.appendChild(this.canvas);
 	}
 
 	this.is2d = !this.context.drawingBufferHeight;
 
 	var gl = this.gl = this.context;
 
-	//cache of textures
-	this.textures = {};
+	//cache of textures/attributes
+	this.textures = extend({}, this.textures);
+	this.attributes = extend({position: [-1,-1, -1,4, 4,-1]}, this.attributes);
 
 	//setup webgl context
 	if (!this.is2d) {
@@ -4073,13 +4081,8 @@ function Component (options) {
 
 		this.program = this.createProgram(this.vert, this.frag);
 
-		//FIXME: ensure that buffer spot does not interfere with other occupied spots
-		var buffer = gl.createBuffer();
-		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,-1,4,4,-1]), gl.STATIC_DRAW);
-		gl.enableVertexAttribArray(0);
-		gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-		gl.bindAttribLocation(this.program, 0, 'position');
+		//preset passed attributes
+		this.setAttribute(this.attributes);
 
 		gl.linkProgram(this.program);
 
@@ -4088,9 +4091,17 @@ function Component (options) {
 		for(var i=0; i<numUniforms; ++i) {
 			var info = gl.getActiveUniform(this$1.program, i);
 			if (info && info.type === gl.SAMPLER_2D) {
-				this$1.setTexture(info.name, null);
+				if (!this$1.textures[info.name]) {
+					this$1.textures[info.name] = null
+				}
 			}
 		}
+		//preset textures
+		this.setTexture(this.textures);
+
+		gl.useProgram(this.program);
+
+		this.viewportLocation = gl.getUniformLocation(this.program, 'viewport');
 	}
 
 	//set canvas fit container size
@@ -4104,7 +4115,8 @@ function Component (options) {
 
 
 	//create raf loop
-	this.engine = loop(function (dt) { return this$1.render(); }).start();
+	this.engine = loop(function (dt) { return this$1.render(); });
+	this.autostart && this.start();
 }
 
 
@@ -4116,6 +4128,12 @@ inherits(Component, Emitter);
  */
 Component.prototype.context = 'webgl';
 
+Component.prototype.autostart = true;
+
+Component.prototype.antialias = true;
+Component.prototype.alpha = true;
+Component.prototype.premultipliedAlpha = true;
+
 
 Component.prototype.vert = "\n\tattribute vec2 position;\n\tvoid main () {\n\t\tgl_Position = vec4(position, 0, 1);\n\t}\n";
 
@@ -4126,17 +4144,16 @@ Component.prototype.frag = "\n\tprecision mediump float;\n\tuniform vec4 viewpor
 //enable floating-point textures
 Component.prototype.float = true;
 
-//Increased each time new texture added
-Component.prototype.texturesCount = 0;
-
 
 /**
  * Set texture
  */
 Component.prototype.setTexture = function (a, b) {
+	var this$1 = this;
+
 	if (this.is2d) return this;
 
-	if (arguments.length === 2) {
+	if (arguments.length === 2 || typeof a === 'string') {
 		var opts = {};
 		opts[a] = b;
 	}
@@ -4150,6 +4167,12 @@ Component.prototype.setTexture = function (a, b) {
 
 	for (var name in opts) {
 		var obj = this.textures[name];
+		if (obj && !isPlainObject(obj)) {
+			obj = this.textures[name] = {name: name, data: obj};
+		}
+		else if (obj && obj.data === opts[name]) {
+			continue;
+		}
 
 		//check if passed some data/image-like object for the texture or settings object
 		var opt = isPlainObject(opts[name]) ? opts[name] : {data: opts[name]};
@@ -4158,6 +4181,8 @@ Component.prototype.setTexture = function (a, b) {
 		if (!obj) {
 			obj = this.textures[name] = {name: name};
 		}
+
+		if (!obj.name) obj.name = name;
 
 		if (!obj.texture) {
 			obj.texture = gl.createTexture();
@@ -4168,8 +4193,10 @@ Component.prototype.setTexture = function (a, b) {
 		}
 
 		if (obj.unit == null || opt.unit != null) {
-			obj.unit = opt.unit != null ? opt.unit : this.texturesCount++;
-			this.texturesCount = Math.max(this.texturesCount, obj.unit);
+			var textureCount = texturesCache.get(this.context) || 0;
+			obj.unit = opt.unit != null ? opt.unit : textureCount++;
+			textureCount = Math.max(textureCount, obj.unit);
+			texturesCache.set(this.context, textureCount);
 			gl.activeTexture(gl.TEXTURE0 + obj.unit);
 			gl.bindTexture(gl.TEXTURE_2D, obj.texture);
 			gl.uniform1i(obj.location, obj.unit);
@@ -4206,6 +4233,29 @@ Component.prototype.setTexture = function (a, b) {
 		}
 
 		var data = opt.data || [0, 0, 0, 1];
+		if (isBrowser) {
+			if (typeof data === 'string') {
+				if (data === (obj.data && obj.data._src) || data === (obj.data && obj.data.src)) {
+					return this;
+				}
+				var image = new Image;
+				image.src = data;
+				image._src = data;
+			}
+			else if (data instanceof Image && !data.complete) {
+				var image = data;
+			}
+
+			if (image) {
+				if (image.complete && image === obj.data || image.src === obj.data.src) {
+					return this;
+				}
+				image.addEventListener('load', function () {
+					this$1.setTexture(obj.name, image)
+				});
+				data = [0, 0, 0, 1];
+			}
+		}
 
 		//handle raw data case
 		if (Array.isArray(data) || ArrayBuffer.isView(data)) {
@@ -4234,6 +4284,126 @@ Component.prototype.setTexture = function (a, b) {
 };
 
 
+
+//create and set buffer
+Component.prototype.setAttribute = function (a, b) {
+	if (this.is2d) return this;
+
+	if (arguments.length === 2 || typeof a === 'string') {
+		var opts = {};
+		opts[a] = b;
+	}
+	else {
+		var opts = a || {position: [-1,-1, -1,4, 4,-1]};
+	}
+
+	var gl = this.context;
+
+	gl.useProgram(this.program);
+
+	for (var name in opts) {
+		var obj = this.attributes[name];
+		if (obj && !isPlainObject(obj)) {
+			obj = this.attributes[name] = {name: name, data: obj};
+		}
+		else if (obj && obj.data === opts[name]) {
+			continue;
+		}
+
+		//if object exists and ony the data passed - just update buffer data
+		if (obj) {
+			if (opts[name] && obj.data && !isPlainObject(opts[name]) && opts[name].length <= obj.data.length) {
+				if (obj.target === gl.ELEMENT_ARRAY_BUFFER) {
+					obj.data = new Uint16Array(opts[name]);
+				}
+				else if (obj.type === gl.FLOAT) {
+					obj.data = new Float32Array(opts[name]);
+				}
+				else if (obj.type === gl.UNSIGNED_BYTE) {
+					obj.data = new Uint8Array(opts[name]);
+				}
+
+				gl.bufferSubData(obj.target, 0, obj.data);
+				return this;
+			}
+		}
+		//if no object - create and bind texture
+		else {
+			obj = this.attributes[name] = {name: name};
+		}
+
+		if (!obj.name) obj.name = name;
+
+		//check if passed some data/image-like object for the texture or settings object
+		var opt = isPlainObject(opts[name]) ? opts[name] : {data: opts[name]};
+
+		extend(obj, opt);
+
+		if (!obj.target) {
+			obj.target = gl.ARRAY_BUFFER;
+		}
+
+		if (!obj.data) {
+			obj.data = [-1,-1,-1,4,4,-1]
+		}
+
+		if (!obj.buffer) {
+			obj.buffer = gl.createBuffer();
+		}
+
+		if (!obj.usage) {
+			obj.usage = gl.STATIC_DRAW;
+		}
+
+		if (obj.index == null) {
+			var attrCount = attributesCache.get(this.context) || 0;
+			obj.index = attrCount++;
+			attrCount = Math.max(attrCount, obj.index);
+			attributesCache.set(this.context, attrCount);
+		}
+
+		if (!obj.size) {
+			obj.size = 2;
+		}
+
+		if (!obj.type) {
+			obj.type = obj.target === gl.ELEMENT_ARRAY_BUFFER ? gl.UNSIGNED_SHORT : gl.FLOAT;
+		}
+
+		if (obj.type === gl.FLOAT) {
+			obj.data = new Float32Array(obj.data);
+		}
+		else if (obj.type === gl.UNSIGNED_BYTE) {
+			obj.data = new Uint8Array(obj.data);
+		}
+		else if (obj.type === gl.UNSIGNED_SHORT) {
+			obj.data =  new Uint16Array(obj.data);
+		}
+
+		if (obj.normalized == null) {
+			obj.normalized = false;
+		}
+
+		if (obj.stride == null) {
+			obj.stride = 0;
+		}
+
+		if (obj.offset == null) {
+			obj.offset = 0;
+		}
+
+		gl.bindBuffer(obj.target, obj.buffer);
+		gl.bufferData(obj.target, obj.data, obj.usage);
+		gl.enableVertexAttribArray(obj.index);
+		gl.vertexAttribPointer(obj.index, obj.size, obj.type, obj.normalized, obj.stride, obj.offset);
+		gl.bindAttribLocation(this.program, obj.index, obj.name);
+	}
+
+	return this;
+}
+
+
+
 /**
  * Do resize routine
  */
@@ -4245,27 +4415,23 @@ Component.prototype.resize = function () {
 	var w = this.canvas.width, h = this.canvas.height;
 
 	//if vp is undefined - set it as full-height
-	if (!this._viewport) {
+	if (!this.initialViewport) {
 		this.viewport = [0, 0, w, h];
 	}
-	else if (this._viewport instanceof Function) {
-		this.viewport = this._viewport(w, h);
+	else if (this.initialViewport instanceof Function) {
+		this.viewport = this.initialViewport(w, h);
 	}
 	else {
-		this.viewport = this._viewport;
+		this.viewport = this.initialViewport;
 	}
 
 	if (!this.is2d) {
-		gl.useProgram(this.program);
-
-		var viewportLocation = gl.getUniformLocation(this.program, 'viewport');
-
 		//this trickery inverts viewport Y
 		var top = h-(this.viewport[3]+this.viewport[1]);
-		var vp = [this.viewport[0], top, this.viewport[2], this.viewport[3] + Math.min(top, 0)];
+		this.glViewport = [this.viewport[0], top, this.viewport[2], this.viewport[3] + Math.min(top, 0)];
 
-		gl.viewport(vp[0], vp[1], vp[2], vp[3]);
-		gl.uniform4fv(viewportLocation, vp);
+		gl.useProgram(this.program);
+		gl.uniform4fv(this.viewportLocation, this.glViewport);
 	}
 
 	this.emit('resize');
@@ -4281,6 +4447,10 @@ Component.prototype.stop = function () {
 	this.engine.stop();
 	return this;
 };
+Component.prototype.start = function () {
+	this.engine.start();
+	return this;
+};
 
 
 /**
@@ -4289,15 +4459,47 @@ Component.prototype.stop = function () {
 Component.prototype.render = function () {
 	var gl = this.context;
 
-	this.emit('render');
 
 	if (!this.is2d) {
-		gl.useProgram(this.program);
-		gl.drawArrays(gl.TRIANGLES, 0, 3);
+		//save viewport
+		// var viewport = gl.getParameter(gl.VIEWPORT);
+
+		gl.viewport.apply(gl, this.glViewport);
+
+		this.emit('render');
+		this.draw();
+
+		// gl.viewport.apply(gl, viewport);
+	}
+	else {
+		this.emit('render');
 	}
 
 	return this;
 };
+
+/**
+ * A specific way to draw data.
+ */
+Component.prototype.draw = function () {
+
+	this.gl.useProgram(this.program);
+	//Q: how should we organize drawArrays method?
+	//1. we may want to avoid calling it - how?
+	//2. we may want to change draw mode
+	//3. we may want to draw a specific subset of data
+	//a. place everything to event loop, cept this method
+	//   - that disables outside `.render` invocation
+	//b. provide `.drawMode` param
+	//   - that is a bad pattern (diff to remember, god object, too declarative)
+	//   - still unable to cancel invocation
+	//c. how about a separate `.draw` method?
+	//   - a bit of a headache for users to discern render and draw
+	//   + though pattern is simple: .render for call, not overriding, draw is for redefinition, not call. Also draw may take params.
+	this.gl.drawArrays(this.gl.TRIANGLES, 0, this.attributes.position.data.length / this.attributes.position.size);
+
+	return this;
+}
 
 
 //create program (2 shaders)
@@ -4339,7 +4541,8 @@ Component.prototype.createProgram = function (vSrc, fSrc) {
 	return program;
 }
 
-},{"canvas-fit":23,"events":5,"get-canvas-context":38,"inherits":43,"is-browser":45,"mutype/is-object":54,"raf-loop":58,"xtend/mutable":75}],41:[function(require,module,exports){
+
+},{"canvas-fit":20,"events":5,"get-canvas-context":33,"inherits":37,"is-browser":39,"mutype/is-object":47,"raf-loop":50,"xtend/mutable":66}],36:[function(require,module,exports){
 module.exports = asString
 module.exports.add = append
 
@@ -4379,13 +4582,7 @@ function makeArray(arr) {
   return Array.isArray(arr) ? arr : [arr]
 }
 
-},{}],42:[function(require,module,exports){
-'use strict';
-var ansiRegex = require('ansi-regex');
-var re = new RegExp(ansiRegex().source); // remove the `g` flag
-module.exports = re.test.bind(re);
-
-},{"ansi-regex":20}],43:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -4410,7 +4607,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],44:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -4434,43 +4631,9 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],45:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 module.exports = true;
-},{}],46:[function(require,module,exports){
-(function (process){
-'use strict';
-var ansiEscapes = require('ansi-escapes');
-var cliCursor = require('cli-cursor');
-
-function main(stream) {
-	var prevLineCount = 0;
-
-	var render = function () {
-		cliCursor.hide();
-		var out = [].join.call(arguments, ' ') + '\n';
-		stream.write(ansiEscapes.eraseLines(prevLineCount) + out);
-		prevLineCount = out.split('\n').length;
-	};
-
-	render.clear = function () {
-		stream.write(ansiEscapes.eraseLines(prevLineCount));
-		prevLineCount = 0;
-	};
-
-	render.done = function () {
-		prevLineCount = 0;
-		cliCursor.show();
-	};
-
-	return render;
-}
-
-module.exports = main(process.stdout);
-module.exports.stderr = main(process.stderr);
-module.exports.create = main;
-
-}).call(this,require('_process'))
-},{"_process":7,"ansi-escapes":19,"cli-cursor":25}],47:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 
 /**
  * Expose `render()`.`
@@ -4621,7 +4784,7 @@ function escape(html) {
     .replace(/>/g, '&gt;');
 }
 
-},{}],48:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 /**
  * Clamp value.
  * Detects proper clamp min/max.
@@ -4636,7 +4799,7 @@ function escape(html) {
 module.exports = require('./wrap')(function(a, min, max){
 	return max > min ? Math.max(Math.min(a,max),min) : Math.max(Math.min(a,min),max);
 });
-},{"./wrap":53}],49:[function(require,module,exports){
+},{"./wrap":46}],42:[function(require,module,exports){
 /**
  * @module  mumath/closest
  */
@@ -4653,7 +4816,7 @@ module.exports = function closest (num, arr) {
 	}
 	return curr;
 }
-},{}],50:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 /**
  * Base 10 logarithm
  *
@@ -4662,7 +4825,7 @@ module.exports = function closest (num, arr) {
 module.exports = require('./wrap')(function (a) {
 	return Math.log(a) / Math.log(10);
 });
-},{"./wrap":53}],51:[function(require,module,exports){
+},{"./wrap":46}],44:[function(require,module,exports){
 /**
  * @module mumath/order
  */
@@ -4671,7 +4834,7 @@ module.exports = require('./wrap')(function (n) {
 	var order = Math.floor(Math.log(n) / Math.LN10 + 0.000000001);
 	return Math.pow(10,order);
 });
-},{"./wrap":53}],52:[function(require,module,exports){
+},{"./wrap":46}],45:[function(require,module,exports){
 /**
  * Whether element is between left & right including
  *
@@ -4690,7 +4853,7 @@ module.exports = require('./wrap')(function(a, left, right){
 	if (a <= right && a >= left) return true;
 	return false;
 });
-},{"./wrap":53}],53:[function(require,module,exports){
+},{"./wrap":46}],46:[function(require,module,exports){
 /**
  * Get fn wrapped with array/object attrs recognition
  *
@@ -4732,7 +4895,7 @@ module.exports = function(fn){
 		}
 	};
 };
-},{}],54:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 /**
  * @module mutype/is-object
  */
@@ -4745,40 +4908,7 @@ module.exports = function(o){
 	return !!o && typeof o === 'object' && o.constructor === Object;
 };
 
-},{}],55:[function(require,module,exports){
-'use strict';
-module.exports = function (fn, errMsg) {
-	if (typeof fn !== 'function') {
-		throw new TypeError('Expected a function');
-	}
-
-	var ret;
-	var called = false;
-	var fnName = fn.displayName || fn.name || (/function ([^\(]+)/.exec(fn.toString()) || [])[1];
-
-	var onetime = function () {
-		if (called) {
-			if (errMsg === true) {
-				fnName = fnName ? fnName + '()' : 'Function';
-				throw new Error(fnName + ' can only be called once.');
-			}
-
-			return ret;
-		}
-
-		called = true;
-		ret = fn.apply(this, arguments);
-		fn = null;
-
-		return ret;
-	};
-
-	onetime.displayName = fnName;
-
-	return onetime;
-};
-
-},{}],56:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 (function (process){
 // Generated by CoffeeScript 1.7.1
 (function() {
@@ -4814,7 +4944,7 @@ module.exports = function (fn, errMsg) {
 }).call(this);
 
 }).call(this,require('_process'))
-},{"_process":7}],57:[function(require,module,exports){
+},{"_process":7}],49:[function(require,module,exports){
 /**
  * @module  plot-grid
  */
@@ -4825,7 +4955,7 @@ var lg = require('mumath/lg');
 var Emitter = require('events').EventEmitter;
 var inherits = require('inherits');
 var sf = 0;
-var className = ((require('insert-css')("._8bdd9f94 {\r\n\tposition: relative;\r\n}\r\n\r\n._8bdd9f94 .grid {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tfont-family: sans-serif;\r\n}\r\n\r\n._8bdd9f94 .grid-lines {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\toverflow: hidden;\r\n}\r\n\r\n._8bdd9f94 .grid-line {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\twidth: .5rem;\r\n\theight: .5rem;\r\n\topacity: .135;\r\n}\r\n._8bdd9f94 .grid-line[hidden] {\r\n\tdisplay: none;\r\n}\r\n._8bdd9f94 .grid-line:hover {\r\n\topacity: .27;\r\n}\r\n\r\n._8bdd9f94 .grid-line-x {\r\n\theight: 100%;\r\n\twidth: 0;\r\n\tborder-left: 1px dotted;\r\n\tmargin-left: -1px;\r\n}\r\n._8bdd9f94 .grid-line-x:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -.25rem;\r\n}\r\n._8bdd9f94 .grid-line-x.grid-line-min {\r\n\tmargin-left: 0px;\r\n}\r\n\r\n._8bdd9f94 .grid-line-y {\r\n\twidth: 100%;\r\n\theight: 0;\r\n\tmargin-top: -1px;\r\n\tborder-top: 1px dotted;\r\n}\r\n._8bdd9f94 .grid-line-y:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\tleft: 0;\r\n\tright: 0;\r\n\ttop: -.25rem;\r\n}\r\n._8bdd9f94 .grid-line-y.grid-line-max {\r\n\tmargin-top: 0px;\r\n}\r\n\r\n._8bdd9f94 .grid-axis {\r\n\tposition: absolute;\r\n}\r\n._8bdd9f94 .grid-axis-x {\r\n\ttop: auto;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tborder-bottom: 2px solid;\r\n\tmargin-bottom: -.5rem;\r\n}\r\n._8bdd9f94 .grid-axis-y {\r\n\tborder-left: 2px solid;\r\n\tright: auto;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -1px;\r\n    margin-left: -.5rem;\r\n}\r\n\r\n._8bdd9f94 .grid-label {\r\n\tposition: absolute;\r\n\ttop: auto;\r\n\tleft: auto;\r\n\tmin-height: 1rem;\r\n\tfont-size: .8rem;\r\n}\r\n._8bdd9f94 .grid-label-x {\r\n\tbottom: auto;\r\n\ttop: 100%;\r\n\tmargin-top: 1.5rem;\r\n\twidth: 2rem;\r\n\tmargin-left: -1rem;\r\n\ttext-align: center;\r\n}\r\n._8bdd9f94 .grid-label-x:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\twidth: 0;\r\n\tborder-left: 2px solid;\r\n\ttop: -1rem;\r\n\tmargin-left: -1px;\r\n\tmargin-top: -2px;\r\n\tleft: 1rem;\r\n}\r\n\r\n._8bdd9f94 .grid-label-y {\r\n    right: 100%;\r\n    margin-right: 1.5rem;\r\n    margin-top: -.5rem;\r\n}\r\n._8bdd9f94 .grid-label-y:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\theight: 0;\r\n\tborder-top: 2px solid;\r\n\tright: -1rem;\r\n\ttop: .4rem;\r\n\tmargin-right: -1px;\r\n}\r\n") || true) && "_8bdd9f94");
+var className = ((require('insert-css')("._6290cd5b {\r\n\tposition: relative;\r\n}\r\n\r\n._6290cd5b .grid {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tpointer-events: none;\r\n}\r\n._6290cd5b .grid-lines {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\toverflow: hidden;\r\n\tpointer-events: none;\r\n}\r\n\r\n._6290cd5b .grid-line {\r\n\tpointer-events: all;\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\twidth: .5rem;\r\n\theight: .5rem;\r\n\topacity: .135;\r\n}\r\n._6290cd5b .grid-line[hidden] {\r\n\tdisplay: none;\r\n}\r\n._6290cd5b .grid-line:hover {\r\n\topacity: .27;\r\n}\r\n\r\n._6290cd5b .grid-line-x {\r\n\theight: 100%;\r\n\twidth: 0;\r\n\tborder-left: 1px dotted;\r\n\tmargin-left: -1px;\r\n}\r\n._6290cd5b .grid-line-x:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -.25rem;\r\n}\r\n._6290cd5b .grid-line-x.grid-line-min {\r\n\tmargin-left: 0px;\r\n}\r\n\r\n._6290cd5b .grid-line-y {\r\n\twidth: 100%;\r\n\theight: 0;\r\n\tmargin-top: -1px;\r\n\tborder-top: 1px dotted;\r\n}\r\n._6290cd5b .grid-line-y:after {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\tleft: 0;\r\n\tright: 0;\r\n\ttop: -.25rem;\r\n}\r\n._6290cd5b .grid-line-y.grid-line-max {\r\n\tmargin-top: 0px;\r\n}\r\n\r\n._6290cd5b .grid-axis {\r\n\tposition: absolute;\r\n}\r\n._6290cd5b .grid-axis-x {\r\n\ttop: auto;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tborder-bottom: 2px solid;\r\n\tmargin-bottom: -.5rem;\r\n}\r\n._6290cd5b .grid-axis-y {\r\n\tborder-left: 2px solid;\r\n\tright: auto;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: -1px;\r\n    margin-left: -.5rem;\r\n}\r\n\r\n._6290cd5b .grid-label {\r\n\tposition: absolute;\r\n\ttop: auto;\r\n\tleft: auto;\r\n\tmin-height: 1rem;\r\n\tfont-size: .8rem;\r\n\tfont-family: sans-serif;\r\n\tpointer-events: all;\r\n}\r\n._6290cd5b .grid-label-x {\r\n\tbottom: auto;\r\n\ttop: 100%;\r\n\tmargin-top: 1.5rem;\r\n\twidth: 2rem;\r\n\tmargin-left: -1rem;\r\n\ttext-align: center;\r\n}\r\n._6290cd5b .grid-label-x:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\theight: .5rem;\r\n\twidth: 0;\r\n\tborder-left: 2px solid;\r\n\ttop: -1rem;\r\n\tmargin-left: -1px;\r\n\tmargin-top: -2px;\r\n\tleft: 1rem;\r\n}\r\n\r\n._6290cd5b .grid-label-y {\r\n    right: 100%;\r\n    margin-right: 1.5rem;\r\n    margin-top: -.5rem;\r\n}\r\n._6290cd5b .grid-label-y:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\twidth: .5rem;\r\n\theight: 0;\r\n\tborder-top: 2px solid;\r\n\tright: -1rem;\r\n\ttop: .4rem;\r\n\tmargin-right: -1px;\r\n}\r\n") || true) && "_6290cd5b");
 var closestNumber = require('mumath/closest');
 var mag = require('mumath/order');
 var within = require('mumath/within');
@@ -4850,10 +4980,9 @@ function Grid (options) {
 	this.container = options.container || document.body;
 	this.container.classList.add(className);
 
-	//display grid
-	this.grid = document.createElement('div');
-	this.grid.classList.add('grid');
-	this.container.appendChild(this.grid);
+	this.gridElement = document.createElement('div');
+	this.gridElement.classList.add('grid');
+	this.container.appendChild(this.gridElement);
 
 	//ensure lines values
 	this.lines = (options.lines || []).map(function (lines) { return lines && extend(this$1.defaultLines, lines); });
@@ -4861,8 +4990,8 @@ function Grid (options) {
 
 	//create lines container
 	this.linesContainer = document.createElement('div');
+	this.gridElement.appendChild(this.linesContainer);
 	this.linesContainer.classList.add('grid-lines');
-	this.grid.appendChild(this.linesContainer);
 
 	this.update(options);
 }
@@ -4901,7 +5030,7 @@ Grid.prototype.defaultAxis = {
 Grid.prototype.update = function (options) {
 	options = options || {};
 
-	var grid = this.grid;
+	var gridElement = this.gridElement;
 	var linesContainer = this.linesContainer;
 	var id = this.id;
 
@@ -4918,17 +5047,27 @@ Grid.prototype.update = function (options) {
 
 	if (!viewport) viewport = [0,0,w,h];
 
-	grid.style.left = viewport[0] + (typeof viewport[0] === 'number' ? 'px' : '');
-	grid.style.top = viewport[1] + (typeof viewport[1] === 'number' ? 'px' : '');
-	grid.style.width = viewport[2] + (typeof viewport[2] === 'number' ? 'px' : '');
-	grid.style.height = viewport[3] + (typeof viewport[3] === 'number' ? 'px' : '');
+	gridElement.style.left = viewport[0] + (typeof viewport[0] === 'number' ? 'px' : '');
+	gridElement.style.top = viewport[1] + (typeof viewport[1] === 'number' ? 'px' : '');
+	gridElement.style.width = viewport[2] + (typeof viewport[2] === 'number' ? 'px' : '');
+	gridElement.style.height = viewport[3] + (typeof viewport[3] === 'number' ? 'px' : '');
+
+	//exceptional case of overflow:hidden
+	// if (this.container === document.body) {
+	// 	if (viewport[2] >= window.innerWidth || viewport[3] >= window.innerHeight) {
+	// 		linesContainer.style.overflow = 'hidden';
+	// 	}
+	// 	else {
+	// 		linesContainer.style.overflow = 'visible';
+	// 	}
+	// }
 
 	//hide all lines first
-	var lines = grid.querySelectorAll('.grid-line');
+	var lines = gridElement.querySelectorAll('.grid-line');
 	for (var i = 0; i < lines.length; i++) {
 		lines[i].setAttribute('hidden', true);
 	}
-	var labels = grid.querySelectorAll('.grid-label');
+	var labels = gridElement.querySelectorAll('.grid-label');
 	for (var i = 0; i < labels.length; i++) {
 		labels[i].setAttribute('hidden', true);
 	}
@@ -4944,7 +5083,13 @@ Grid.prototype.update = function (options) {
 			id: id
 		};
 
-		if (options.lines) lines = extend(this.lines[idx], options.lines[idx]);
+		if (options.lines) {
+			if (options.lines[idx] && options.lines[idx].style) {
+				this.lines[idx].style = extend(this.lines[idx].style, options.lines[idx].style);
+				delete options.lines[idx].style;
+			}
+			lines = extend(this.lines[idx], options.lines[idx]);
+		}
 		stats.lines = lines;
 
 		var linesMin = Math.min(lines.max, lines.min);
@@ -4999,11 +5144,11 @@ Grid.prototype.update = function (options) {
 
 		//draw lines
 		var offsets = values.map(function (value, i) {
-			var line = linesContainer.querySelector(("#grid-line-" + (lines.orientation) + "-" + (value|0) + "-" + idx + "-" + id));
+			var line = linesContainer.querySelector(("#grid-line-" + (lines.orientation) + (lines.logarithmic?'-log':'') + "-" + (value|0) + "-" + idx + "-" + id));
 			var ratio;
 			if (!line) {
 				line = document.createElement('span');
-				line.id = "grid-line-" + (lines.orientation) + "-" + (value|0) + "-" + idx + "-" + id;
+				line.id = "grid-line-" + (lines.orientation) + (lines.logarithmic?'-log':'') + "-" + (value|0) + "-" + idx + "-" + id;
 				line.classList.add('grid-line');
 				line.classList.add(("grid-line-" + (lines.orientation)));
 				if (value === linesMin) line.classList.add('grid-line-min');
@@ -5026,7 +5171,6 @@ Grid.prototype.update = function (options) {
 				else {
 					line.style.top = (100 - ratio) + '%';
 				}
-
 				if (lines.style) {
 					for (var prop in lines.style) {
 						var val = lines.style[prop];
@@ -5070,15 +5214,15 @@ Grid.prototype.update = function (options) {
 
 
 		//put axis properly
-		var axisEl = grid.querySelector(("#grid-axis-" + (lines.orientation) + "-" + idx + "-" + id));
+		var axisEl = gridElement.querySelector(("#grid-axis-" + (lines.orientation) + (lines.logarithmic?'-log':'') + "-" + idx + "-" + id));
 		if (!axisEl) {
 			axisEl = document.createElement('span');
-			axisEl.id = "grid-axis-" + (lines.orientation) + "-" + idx + "-" + id;
+			axisEl.id = "grid-axis-" + (lines.orientation) + (lines.logarithmic?'-log':'') + "-" + idx + "-" + id;
 			axisEl.classList.add('grid-axis');
 			axisEl.classList.add(("grid-axis-" + (lines.orientation)));
 			axisEl.setAttribute('data-name', axis.name);
 			axisEl.setAttribute('title', axis.name);
-			grid.appendChild(axisEl);
+			gridElement.appendChild(axisEl);
 		}
 		axisEl.removeAttribute('hidden');
 
@@ -5086,17 +5230,17 @@ Grid.prototype.update = function (options) {
 		axisValues.forEach(function (value, i) {
 			if (value == null || labels[i] == null) return;
 
-			var label = grid.querySelector(("#grid-label-" + (lines.orientation) + "-" + (value|0) + "-" + idx + "-" + id));
+			var label = gridElement.querySelector(("#grid-label-" + (lines.orientation) + (lines.logarithmic?'-log':'') + "-" + (value|0) + "-" + idx + "-" + id));
 			if (!label) {
 				label = document.createElement('label');
-				label.id = "grid-label-" + (lines.orientation) + "-" + (value|0) + "-" + idx + "-" + id;
+				label.id = "grid-label-" + (lines.orientation) + (lines.logarithmic?'-log':'') + "-" + (value|0) + "-" + idx + "-" + id;
 				label.classList.add('grid-label');
 				label.classList.add(("grid-label-" + (lines.orientation)));
 				label.setAttribute('data-value', value);
-				label.setAttribute('for', ("grid-line-" + (lines.orientation)));
+				label.setAttribute('for', ("grid-line-" + (lines.orientation) + (lines.logarithmic?'-log':'') + "-" + (value|0) + "-" + idx + "-" + id));
 				axisTitles && label.setAttribute('title', axisTitles[i]);
 				label.innerHTML = labels[i];
-				grid.appendChild(label);
+				gridElement.appendChild(label);
 				if (lines.orientation === 'x') {
 					label.style.left = offsets[i] + '%';
 				}
@@ -5118,7 +5262,7 @@ Grid.prototype.update = function (options) {
 
 	return this;
 };
-},{"events":5,"get-uid":39,"inherits":43,"insert-css":44,"is-browser":45,"mumath/closest":49,"mumath/lg":50,"mumath/order":51,"mumath/within":52,"xtend":74}],58:[function(require,module,exports){
+},{"events":5,"get-uid":34,"inherits":37,"insert-css":38,"is-browser":39,"mumath/closest":42,"mumath/lg":43,"mumath/order":44,"mumath/within":45,"xtend":65}],50:[function(require,module,exports){
 var inherits = require('inherits')
 var EventEmitter = require('events').EventEmitter
 var now = require('right-now')
@@ -5163,7 +5307,7 @@ Engine.prototype.tick = function() {
     this.emit('tick', dt)
     this.last = time
 }
-},{"events":5,"inherits":43,"raf":59,"right-now":61}],59:[function(require,module,exports){
+},{"events":5,"inherits":37,"raf":51,"right-now":52}],51:[function(require,module,exports){
 (function (global){
 var now = require('performance-now')
   , root = typeof window === 'undefined' ? global : window
@@ -5239,20 +5383,7 @@ module.exports.polyfill = function() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"performance-now":56}],60:[function(require,module,exports){
-(function (process){
-'use strict';
-var onetime = require('onetime');
-var exitHook = require('exit-hook');
-
-module.exports = onetime(function () {
-	exitHook(function () {
-		process.stdout.write('\u001b[?25h');
-	});
-});
-
-}).call(this,require('_process'))
-},{"_process":7,"exit-hook":35,"onetime":55}],61:[function(require,module,exports){
+},{"performance-now":48}],52:[function(require,module,exports){
 (function (global){
 module.exports =
   global.performance &&
@@ -5263,7 +5394,7 @@ module.exports =
   }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],62:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 'use strict'
 
 function blackmanHarris (i,N) {
@@ -5278,7 +5409,7 @@ function blackmanHarris (i,N) {
 
 module.exports = blackmanHarris
 
-},{}],63:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 var resolve = require('soundcloud-resolve')
 var fonts = require('google-fonts')
 var minstache = require('minstache')
@@ -5343,7 +5474,7 @@ function badge(options, callback) {
   return div
 }
 
-},{"fs":1,"google-fonts":41,"insert-css":64,"minstache":47,"soundcloud-resolve":65}],64:[function(require,module,exports){
+},{"fs":1,"google-fonts":36,"insert-css":55,"minstache":40,"soundcloud-resolve":56}],55:[function(require,module,exports){
 var inserted = [];
 
 module.exports = function (css) {
@@ -5362,7 +5493,7 @@ module.exports = function (css) {
     }
 };
 
-},{}],65:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 var qs  = require('querystring')
 var xhr = require('xhr')
 
@@ -5395,740 +5526,146 @@ function resolve(id, goal, callback) {
   })
 }
 
-},{"querystring":10,"xhr":71}],66:[function(require,module,exports){
+},{"querystring":10,"xhr":62}],57:[function(require,module,exports){
 // stats.js - http://github.com/mrdoob/stats.js
 var Stats=function(){function h(a){c.appendChild(a.dom);return a}function k(a){for(var d=0;d<c.children.length;d++)c.children[d].style.display=d===a?"block":"none";l=a}var l=0,c=document.createElement("div");c.style.cssText="position:fixed;top:0;left:0;cursor:pointer;opacity:0.9;z-index:10000";c.addEventListener("click",function(a){a.preventDefault();k(++l%c.children.length)},!1);var g=(performance||Date).now(),e=g,a=0,r=h(new Stats.Panel("FPS","#0ff","#002")),f=h(new Stats.Panel("MS","#0f0","#020"));
 if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
 Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
 v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
 
-},{}],67:[function(require,module,exports){
-'use strict';
-var ansiRegex = require('ansi-regex')();
+},{}],58:[function(require,module,exports){
+var has = require('has');
 
-module.exports = function (str) {
-	return typeof str === 'string' ? str.replace(ansiRegex, '') : str;
-};
-
-},{"ansi-regex":20}],68:[function(require,module,exports){
-(function (process){
-'use strict';
-var argv = process.argv;
-
-var terminator = argv.indexOf('--');
-var hasFlag = function (flag) {
-	flag = '--' + flag;
-	var pos = argv.indexOf(flag);
-	return pos !== -1 && (terminator !== -1 ? pos < terminator : true);
-};
-
-module.exports = (function () {
-	if ('FORCE_COLOR' in process.env) {
-		return true;
-	}
-
-	if (hasFlag('no-color') ||
-		hasFlag('no-colors') ||
-		hasFlag('color=false')) {
-		return false;
-	}
-
-	if (hasFlag('color') ||
-		hasFlag('colors') ||
-		hasFlag('color=true') ||
-		hasFlag('color=always')) {
-		return true;
-	}
-
-	if (process.stdout && !process.stdout.isTTY) {
-		return false;
-	}
-
-	if (process.platform === 'win32') {
-		return true;
-	}
-
-	if ('COLORTERM' in process.env) {
-		return true;
-	}
-
-	if (process.env.TERM === 'dumb') {
-		return false;
-	}
-
-	if (/^screen|^xterm|^vt100|color|ansi|cygwin|linux/i.test(process.env.TERM)) {
-		return true;
-	}
-
-	return false;
-})();
-
-}).call(this,require('_process'))
-},{"_process":7}],69:[function(require,module,exports){
-(function (process){
-/**
- * Simple node/browser test runner
- *
- * @module tst
- */
-
-var chalk = require('chalk');
-var isBrowser = require('is-browser');
-var now = require('performance-now');
-var elegantSpinner = require('elegant-spinner');
-var logUpdate = require('log-update');
-var ansi = require('ansi-escapes');
-var inherits = require('inherits');
-var Emitter = require('events');
-var extend = require('xtend/mutable');
-
-
-// Error.stackTraceLimit = 10;
-
-
-//default indentation
-test.INDENT = '  ';
-
-//whether we run the only test, forcefully
-test.ONLY_MODE = false;
-
-//default timeout for async tests
-test.TIMEOUT = 2000;
-
-//max timeout
-test.MAX_TIMEOUT = 10e5;
-
-//chain of nested test calls
-var tests = [];
-var testCount = 0;
-
-//planned tests to run
-var testQueue = [];
-
-//flag indicating that since some time tests are run in deferred fashion
-//i.e. lost their stack in browser :(
-var DEFERRED = false;
-
-//indicate whether we are in only-detection mode (tests are just planned, not run)
-//or we are in a forced full-bundle run. Unlikely user will ever touch this flag.
-test.DETECT_ONLY = true;
-
-//detect whether at least one test failed
-test.ERROR = false;
-
-
-//end with error, if any
-process.on('exit', function () {
-    if (test.ERROR) process.exit(1);
-});
-
-
-//run execution after all sync tests are registered
-if (test.DETECT_ONLY) {
-    setTimeout(function () {
-        //if only detection mode wasn’t changed by user
-        //which means sync tests are run already - run the thing
-        if (test.DETECT_ONLY) {
-            run();
-        }
-    });
-}
-
-
-/**
- * Test enqueuer
- */
-function test (message, fn, only) {
-    //if run in exclusive mode - allow only `test.only` calls
-    if (test.ONLY_MODE && !only) {
-        //but if test is run within the parent - allow it
-        if (!tests.length) return test;
-    }
-
-    //ignore bad args
-    if (!message) return test;
-
-    //init test object params
-    var testObj = new Test({
-        id: testCount++,
-        title: message,
-
-        //pending, success, error, group
-        status: null,
-
-        //test function
-        fn: fn,
-
-        //nested tests
-        children: [],
-
-        //whether test should be resolved
-        async: undefined,
-
-        //whether the test is last child within the group
-        last: false,
-
-        //timeout for the async
-        _timeout: test.TIMEOUT,
-
-        //whether the test is the only to run (launched via .only method)
-        only: !!only,
-
-        //whether the test was started in deferred fashion
-        //it can be sync, but launched after async
-        deferred: DEFERRED
-    });
-
-    //handle args
-    if (!fn) {
-        //if only message passed - do skip
-        if (!fn && typeof message === 'string') {
-            testObj.status = 'skip';
-        }
-        else {
-            //detect test name
-            testObj.fn = message;
-            message = message.name;
-            if (!message) message = 'Test #' + testObj.id;
-
-            //update test title
-            testObj.title = message;
-        }
-    }
-
-    //detect async as at least one function argument
-    //NOTE: tests returning promise will set async flag here
-    if (testObj.async == null) {
-        testObj.async = !!(testObj.fn && testObj.fn.length);
-    }
-
-    //also detect promise, if passed one
-    if (testObj.fn && testObj.fn.then) {
-        //also that means that the test is run already
-        //and tests within the promise executor are already detected it’s parent wrongly
-        //nothing we can do. Redefining parent is not an option -
-        //we don’t know which tests were of this parent, which were not.
-        testObj.promise = testObj.fn;
-        testObj.async = true;
-        testObj.time = now();
-    }
-
-    //nested tests are detected here
-    //because calls to `.test` from children happen only when some test is active
-    testObj.parent = tests[tests.length - 1];
-
-    //register children - supposed that parent will run all the children after fin
-    if (testObj.parent) {
-        testObj.parent.children.push(testObj);
-    }
-    //if test has no parent - plan it's separate run
-    else {
-        testQueue.push(testObj);
-    }
-
-    //if detecion only mode - ignore execution
-    //if ONLY_MODE - execute it at instant
-    if (!test.DETECT_ONLY || test.ONLY_MODE) {
-        run();
-    }
-
-    return testObj;
-}
-
-/**
- * Tests queue runner
- */
-var currentTest;
-function run () {
-    //ignore active run
-    if (currentTest) return;
-
-    //get the planned test
-    currentTest = testQueue.shift();
-
-    //if the queue is empty - return
-    if (!currentTest) return;
-
-    //ignore test if it is not the only run
-    if (test.ONLY_MODE && !currentTest.only) {
-        return planRun();
-    }
-
-    //exec it, the promise will be formed
-    currentTest.exec();
-
-    //at the moment test is run, we know all it’s children
-    //push all the children to the queue, after the current test
-    //FIXME: this guy erases good stacktrace :< Maybe call asyncs last?
-    var children = currentTest.children;
-
-    //mind the case if no only children test is selected - run them all instead of none
-    if (children.every(function (child) {return !child.only})) {
-        children.forEach(function (child) {
-            child.only = true;
+module.exports = function (name, attr) {
+    var elem = document.createElementNS('http://www.w3.org/2000/svg', name);
+    if (!attr) return elem;
+    for (var key in attr) {
+        if (!has(attr, key)) continue;
+        var nkey = key.replace(/([a-z])([A-Z])/g, function (_, a, b) {
+            return a + '-' + b.toLowerCase();
         });
+        elem.setAttribute(nkey, attr[key]);
     }
-
-    for (var i = children.length; i--;){
-        testQueue.unshift(children[i]);
-    }
-
-    //mark last kid
-    if (children.length) {
-        children[children.length - 1].last = true;
-    }
-
-    //if test is not async - run results at instant to avoid losing stacktrace
-    if (!currentTest.async) {
-        currentTest = null;
-        run();
-    }
-    //plan running next test after the promise
-    else {
-        DEFERRED = true;
-        currentTest.promise.then(planRun, planRun);
-    }
-
-    function planRun () {
-        currentTest = null;
-        run();
-    }
+    return elem;
 }
 
+},{"has":59}],59:[function(require,module,exports){
+var hasOwn = Object.prototype.hasOwnProperty;
 
 
-/**
- * A test object constructor
- */
-function Test (opts) {
-    extend(this, opts);
-}
-
-inherits(Test, Emitter);
-
-
-/**
- * Call before exec
- */
-Test.prototype.after = function (cb) {
-    this.once('after', cb);
-    return this;
+module.exports = function has(obj, property) {
+  return hasOwn.call(obj, property);
 };
 
-/**
- * Call after exec
- */
-Test.prototype.before = function (cb) {
-    this.once('before', cb);
-    return this;
-};
+},{}],60:[function(require,module,exports){
+module.exports = tapToStart
 
-/**
- * Bind promise-like
- */
-Test.prototype.then = function (resolve, reject) {
-    this.once('success', resolve);
-    this.once('error', reject);
-    return this;
-};
+var domify = require('domify')
+var circ = require('eases/circ-out')
+var expo = require('eases/expo-in-out')
+var SVG = require('svg-create-element')
+var raf = require('raf')
 
-/**
- * Mocha-compat timeout setter
- */
-Test.prototype.timeout = function (value) {
-    if (value == null) return this._timeout;
-    if (value === false) this._timeout = test.MAX_TIMEOUT;
-    else if (value === Infinity) this._timeout = test.MAX_TIMEOUT;
-    else this._timeout = value;
-    return this;
+function tapToStart (options, done) {
+  options = options || {}
+
+  var bgColor = options.background || 'transparent'
+  var fgColor = options.foreground || '#000'
+  var acColor = options.accent || options.background || '#fff'
+  if (options.skip) return raf(done)
+
+  var container = SVG('svg')
+  var pulser = container.appendChild(SVG('circle'))
+  var circle = container.appendChild(SVG('circle'))
+  var start = Date.now()
+  var touchTime = null
+
+  container.style.position = 'absolute'
+  container.style.width = '100%'
+  container.style.height = '100%'
+  container.style.left = 0
+  container.style.top = 0
+  container.style.background = bgColor
+  container.style.cursor = 'pointer'
+
+  circle.setAttribute('r', 50)
+  circle.setAttribute('fill', fgColor)
+  pulser.setAttribute('fill', fgColor)
+
+  // Thanks for the icon Nick Bluth!
+  // https://thenounproject.com/npbluth/collection/cursors/?oq=cursor&cidx=1&i=415116
+  var icon = domify('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" x="0px" y="0px" viewBox="0 0 100 100" style="enable-background:new 0 0 100 100;" xml:space="preserve"><g><path d="M72.3,43.2c-1.1-0.1-2.1,0.1-3,0.5c-0.9-2.5-3.1-4.4-5.9-4.5c-1.3-0.1-2.5,0.2-3.6,0.8c-1.1-1.9-3.1-3.2-5.3-3.4   c-0.9-0.1-1.8,0.1-2.6,0.4v-6.5c0-3.7-2.8-6.7-6.3-6.9c-1.8-0.1-3.6,0.5-4.9,1.8c-1.3,1.2-2.1,3-2.1,4.8v24.6l-1.9-1.7   c-3.1-2.5-5.9-3-8.4-1.6c-1.5,0.9-2.6,2.4-3,4.2c-0.4,1.8-0.1,3.8,1,5.4l15.6,23.5v6.2c0,1.2,1,2.2,2.2,2.2h26.7   c1.2,0,2.2-1,2.2-2.2v-8.3l4.5-8.3c0.8-1.4,1.1-2.9,1.1-4.5V50C78.6,46.4,75.8,43.4,72.3,43.2z M74.6,61.1l-0.4,8.7   c0,0.9-0.2,1.7-0.6,2.4L68.8,81c-0.2,0.3-0.3,0.7-0.3,1v6.7H46.2V84c0-0.4-0.1-0.8-0.4-1.2l-16-24c-0.4-0.6-0.5-1.3-0.4-2   c0.1-0.3,0.3-1,1-1.4c0.4-0.2,1.2-0.7,3.5,1.1l3.7,3.2c0.6,0.6,1,1.4,1,2.2v1.4c0,1.2,1,2.2,2.2,2.2s2.2-1,2.2-2.2v-3.7V57V30.3   c0-0.6,0.3-1.2,0.7-1.7c0.5-0.4,1.1-0.7,1.7-0.6c1.2,0.1,2.2,1.2,2.2,2.5v7.8v4.9v10.1c0,1.2,1,2.2,2.2,2.2c1.2,0,2.2-1,2.2-2.2   v-10c0-0.6,0.3-1.2,0.7-1.7c0.4-0.4,1.1-0.7,1.7-0.6c1.2,0.1,2.2,1.2,2.2,2.5v0.6v1.7v7.6c0,1.2,1,2.2,2.2,2.2c1.2,0,2.2-1,2.2-2.2   v-7.6c0-0.6,0.3-1.2,0.7-1.7c0.5-0.4,1.1-0.6,1.7-0.6c1.2,0.1,2.2,1.2,2.2,2.5v1v2.7v6.5c0,1.2,1,2.2,2.2,2.2c1.2,0,2.2-1,2.2-2.2   v-6.5c0-0.6,0.3-1.2,0.7-1.7c0.5-0.4,1.1-0.6,1.7-0.6c1.2,0.1,2.2,1.2,2.2,2.5V61.1z"></path><path d="M45,18.5c1.1,0,2-0.9,2-1.9V7.8c0-1.1-0.9-2-2-2s-2,0.9-2,2v8.7C43,17.6,43.9,18.5,45,18.5z"></path><path d="M53.9,21.2c0.5,0,1-0.2,1.4-0.6l6.2-6.2c0.8-0.8,0.8-2,0-2.8c-0.8-0.8-2-0.8-2.8,0l-6.2,6.2c-0.8,0.8-0.8,2,0,2.8   C52.9,21,53.4,21.2,53.9,21.2z"></path><path d="M34.7,20.6c0.4,0.4,0.9,0.6,1.4,0.6s1-0.2,1.4-0.6c0.8-0.8,0.8-2,0-2.8l-6.2-6.2c-0.8-0.8-2-0.8-2.8,0   c-0.8,0.8-0.8,2,0,2.8L34.7,20.6z"></path><path d="M34.3,27.1c0-1.1-0.9-2-2-2h-8.8c-1.1,0-2,0.9-2,2c0,1.1,0.9,2,2,2h8.8C33.4,29.1,34.3,28.2,34.3,27.1z"></path><path d="M55.5,27.1c0,1.1,0.9,2,2,2h8.8c1.1,0,2-0.9,2-2c0-1.1-0.9-2-2-2h-8.8C56.4,25.1,55.5,26,55.5,27.1z"></path></g></svg>')
+    .querySelector('g')
+
+  var iconPaths = icon.querySelectorAll('path')
+  for (var i = 0; i < iconPaths.length; i++) {
+    iconPaths[i].setAttribute('fill', acColor)
+  }
+  container.appendChild(icon)
+  icon.setAttribute('opacity', 0.9)
+
+  render()
+  resize()
+
+  document.body.appendChild(container)
+
+  window.addEventListener('resize', resize, false)
+  window.addEventListener('touchstart', tap, false)
+  window.addEventListener('mousedown', tap, false)
+
+  function tap (e) {
+    window.removeEventListener('touchstart', tap, false)
+    window.removeEventListener('mousedown', tap, false)
+    touchTime = Date.now()
+    done()
+    e && e.preventDefault()
+    return false
+  }
+
+  function render () {
+    var currTime = Date.now()
+    if (touchTime && currTime - touchTime > 800) return cleanup()
+    raf(render)
+
+    var tp = circ(((currTime - start - 350) / 1500) % 1) || 0
+    var tt = expo(Math.max(0, (currTime - touchTime) / 800)) || 0
+    var ts = expo(Math.min(1, (currTime - start) / 500)) || 0
+
+    if (touchTime !== null) {
+      var tt1 = Math.min(1, tt * 2)
+      var tt2 = Math.max(0, tt * 2 - 1)
+
+      circle.setAttribute('r', 50 * (1 - tt))
+      icon.setAttribute('opacity', 1 - tt1)
+      container.style.opacity = 1 - tt2
+    } else {
+      tt = 0
+      circle.setAttribute('r', 50 * ts)
+      icon.setAttribute('opacity', ts)
+    }
+
+    pulser.setAttribute('opacity', ts * (1 - tp) * 0.5 * (1 - tt))
+    pulser.setAttribute('r', 50 + tp * 70)
+  }
+
+  function cleanup () {
+    window.removeEventListener('resize', resize, false)
+    document.body.removeChild(container)
+  }
+
+  function resize () {
+    circle.setAttribute('cx', window.innerWidth / 2)
+    circle.setAttribute('cy', window.innerHeight / 2)
+    pulser.setAttribute('cx', window.innerWidth / 2)
+    pulser.setAttribute('cy', window.innerHeight / 2)
+
+    var ix = window.innerWidth / 2 - 37
+    var iy = window.innerHeight / 2 - 36
+    icon.setAttribute('transform', 'translate(' + ix + ',' + iy + ') scale(0.7)')
+  }
 }
 
-/**
- * Prototype props
- *
- * @True {[type]}
- */
-extend(Test.prototype, {
-    id: testCount,
-    title: 'Undefined test',
-
-    //pending, success, error, group
-    status: null,
-
-    //test function
-    fn: null,
-
-    //nested tests
-    children: [],
-
-    //whether test should be resolved
-    async: undefined,
-
-    //whether the test is last child within the group
-    last: false,
-
-    //timeout for the async
-    _timeout: test.TIMEOUT,
-
-    //whether the test is the only to run (launched via .only method)
-    only: false,
-
-    //whether the test was started in deferred fashion
-    //it can be sync, but launched after async
-    deferred: DEFERRED
-});
-
-/**
- * Execute main test function
- */
-Test.prototype.exec = function () {
-    var self = this;
-
-    //ignore skipping test
-    if (self.status === 'skip') {
-        self.promise = Promise.resolve();
-        self.print();
-        return self;
-    }
-
-    //save test to the chain
-    tests.push(self);
-
-    //display title of the test
-    self.printTitle();
-
-    //timeout promise timeout id
-    var toId;
-
-    //prepare test
-    self.emit('before');
-
-    //exec sync test
-    if (!self.async) {
-        self.promise = Promise.resolve();
-
-        var time;
-        try {
-
-            self.time = now();
-            var result = self.fn.call(self);
-            time = now() - self.time;
-
-        } catch (e) {
-            self.fail(e);
-        }
-
-        //if the result is promise - whoops, we need to run async
-        if (result && result.then) {
-            self.async = true;
-            self.promise = result;
-            //FIXME: this guy violates the order of nesting
-            //because so far it was thought as sync
-            self.execAsync();
-        }
-
-        //if result is not error - do finish
-        else {
-            self.time = time;
-            self.emit('after');
-
-            if (!self.error) {
-                if (!self.status !== 'group') self.status = 'success';
-
-                self.emit('success');
-                self.print();
-            }
-        }
-
-    }
-    else {
-        self.execAsync();
-    }
-
-    //after promise’s executor, but before promise then’s
-    //so user can’t create tests asynchronously, they should be created at once
-    tests.pop();
-
-    return self;
-};
-
-
-/*
- * Exec async test - it should be run in promise
- * sorry about the stacktrace, nothing I can do...
- */
-Test.prototype.execAsync = function () {
-    var self = this;
-
-    //if promise is already created (by user) - race with timeout
-    //FIXME: add time measure
-    if (self.promise) {
-        self.promise = Promise.race([
-            self.promise,
-            new Promise(execTimeout)
-        ]);
-    }
-    //else - invoke function
-    else {
-        self.promise = Promise.race([
-            new Promise(function (resolve, reject) {
-                self.status = 'pending';
-                self.time = now();
-                return self.fn.call(self, resolve);
-            }),
-            new Promise(execTimeout)
-        ])
-    }
-
-    self.promise.then(function () {
-        self.time = now() - self.time;
-
-        clearTimeout(toId);
-        if (self.status !== 'group') self.status = 'success';
-
-        self.emit('after');
-        self.emit('success');
-
-        self.print();
-    }, function (e) {
-        self.fail(e)
-    });
-
-    function execTimeout (resolve, reject) {
-        toId = setTimeout(function () {
-            reject(new Error('Timeout ' + self._timeout + 'ms reached. Please fix the test or set `this.timeout(' + (self._timeout + 1000) + ');`.'));
-        }, self._timeout);
-    }
-};
-
-
-/**
- * Resolve to error (error handler)
- */
-Test.prototype.fail = function (e) {
-    var self = this;
-
-    if (typeof e !== 'object') e = Error(e);
-
-    //grab stack (the most actual is here, further is mystically lost)
-    self.stack = e.stack;
-
-    //set flag that bundle is failed
-    test.ERROR = true;
-
-    var parent = self.parent;
-    while (parent) {
-        parent.status = 'group';
-        parent = parent.parent;
-    }
-
-    //update test status
-    self.status = 'error';
-    self.error = e;
-
-    self.emit('fail', e);
-
-    self.print();
-};
-
-
-Test.prototype.printTitle = function () {
-    var self = this;
-
-    if (!isBrowser) {
-        var frame = elegantSpinner();
-
-        //print title (indicator of started, now current test)
-        updateTitle();
-        self.titleInterval = setInterval(updateTitle, 50);
-
-        //update title frame
-        function updateTitle () {
-            //FIXME: this is the most undestructive for logs way of rendering, but crappy
-            process.stdout.write(ansi.cursorLeft);
-            process.stdout.write(ansi.eraseEndLine);
-            process.stdout.write(chalk.white(indent(self) + ' ' + frame() + ' ' + self.title) + test.INDENT);
-            // logUpdate(chalk.white(indent(test.indent) + ' ' + frame() + ' ' + test.title));
-        }
-    }
-}
-//clear printed title (node)
-Test.prototype.clearTitle = function () {
-    if (!isBrowser && this.titleInterval) {
-        clearInterval(this.titleInterval);
-        process.stdout.write(ansi.cursorLeft);
-        process.stdout.write(ansi.eraseEndLine);
-    }
-}
-
-//universal printer dependent on resolved test
-Test.prototype.print = function () {
-    var self = this;
-
-    this.clearTitle();
-
-    var single = self.children && self.children.length ? false : true;
-
-    if (self.status === 'error') {
-        self.printError();
-    }
-    else if (self.status === 'group') {
-        self.printGroup(single);
-    }
-    else if (self.status === 'success') {
-        self.printSuccess(single);
-    }
-    else if (self.status === 'skip') {
-        self.printSkip(single);
-    }
-
-    //last child should close parent’s group in browser
-    if (self.last) {
-        if (isBrowser) {
-            //if truly last - create as many groups as many last parents
-            if (!self.children.length) {
-                console.groupEnd();
-                var parent = self.parent;
-                while (parent && parent.last) {
-                    console.groupEnd();
-                    parent = parent.parent;
-                }
-            }
-        } else {
-            //create padding
-            if (!self.children.length) console.log();
-        }
-    }
-}
-
-//print pure red error
-Test.prototype.printError = function () {
-    var self = this;
-
-    //browser shows errors better
-    if (isBrowser) {
-        console.group('%c× ' + self.title, 'color: red; font-weight: normal');
-        if (self.error) {
-            if (self.error.name === 'AssertionError') {
-                if (typeof self.error.expected !== 'object') {
-                    var msg = '%cAssertionError:\n%c' + self.error.expected + '\n' + '%c' + self.error.operator + '\n' + '%c' + self.error.actual;
-                    console.groupCollapsed(msg, 'color: red; font-weight: normal', 'color: green; font-weight: normal', 'color: gray; font-weight: normal', 'color: red; font-weight: normal');
-                }
-                else {
-                    var msg = '%cAssertionError: ' + self.error.message;
-                    console.groupCollapsed(msg, 'color: red; font-weight: normal');
-                }
-                console.error(self.stack);
-                console.groupEnd();
-            }
-            else {
-                var msg = typeof self.error === 'string' ? self.error : self.error.message;
-                console.groupCollapsed('%c' + msg, 'color: red; font-weight: normal');
-                console.error(self.stack);
-                console.groupEnd();
-            }
-        }
-        console.groupEnd();
-    }
-    else {
-        console.log(chalk.red(indent(self) + ' × ') + chalk.red(self.title));
-
-        if (self.error.stack) {
-            if (self.error.name === 'AssertionError') {
-                console.error(chalk.gray('AssertionError: ') + chalk.green(self.error.expected) + '\n' + chalk.gray(self.error.operator) + '\n' + chalk.red(self.error.actual));
-            } else {
-                //NOTE: node prints e.stack along with e.message
-                var stack = self.error.stack.replace(/^\s*/gm, indent(self) + '   ');
-                console.error(chalk.gray(stack));
-            }
-        }
-    }
-}
-
-//print green success
-Test.prototype.printSuccess = function (single) {
-    var self = this;
-
-    if (isBrowser) {
-        if (single) {
-            console.log('%c√ ' + self.title + '%c  ' + self.time.toFixed(2) + 'ms', 'color: green; font-weight: normal', 'color:rgb(150,150,150); font-size:0.9em');
-        } else {
-            self.printGroup();
-        }
-    }
-    else {
-        if (!single) {
-            self.printGroup();
-        }
-        else {
-            console.log(chalk.green(indent(self) + ' √ ') + chalk.green.dim(self.title) + chalk.gray(' ' + self.time.toFixed(2) + 'ms'));
-        }
-    }
-}
-
-//print yellow warning (not all tests are passed or it is container)
-Test.prototype.printGroup = function () {
-    var self = this;
-
-    if (isBrowser) {
-        console.group('%c+ ' + self.title + '%c  ' + self.time.toFixed(2) + 'ms', 'color: orange; font-weight: normal', 'color:rgb(150,150,150); font-size:0.9em');
-    }
-    else {
-        console.log();
-        console.log(indent(self) +' ' + chalk.yellow('+') + ' ' + chalk.yellow(self.title) + chalk.gray(' ' + self.time.toFixed(2) + 'ms'));
-    }
-}
-
-//print blue skip
-Test.prototype.printSkip = function (single) {
-    var self = this;
-
-    if (isBrowser) {
-        console[single ? 'log' : 'group']('%c- ' + self.title, 'color: blue');
-    }
-    else {
-        console.log(chalk.cyan(indent(self) + ' - ') + chalk.cyan.dim(self.title));
-    }
-}
-
-
-//return indentation of for a test, based on nestedness
-function indent (testObj) {
-    var parent = testObj.parent;
-    var str = '';
-    while (parent) {
-        str += test.INDENT;
-        parent = parent.parent;
-    }
-    return str;
-}
-
-
-
-
-//skip alias
-test.skip = function skip (message) {
-   return test(message);
-};
-
-//only alias
-test.only = function only (message, fn) {
-    //indicate that only is detected, except for the case of intentional run
-    if (fn) test.DETECT_ONLY = false;
-    //change only mode to true
-    test.ONLY_MODE = true;
-
-    var result = test(message, fn, true);
-    return result;
-}
-
-//more obvious chain
-test.test = test;
-
-
-module.exports = test;
-}).call(this,require('_process'))
-},{"_process":7,"ansi-escapes":19,"chalk":24,"elegant-spinner":32,"events":5,"inherits":43,"is-browser":45,"log-update":46,"performance-now":56,"xtend/mutable":75}],70:[function(require,module,exports){
+},{"domify":27,"eases/circ-out":28,"eases/expo-in-out":29,"raf":51,"svg-create-element":58}],61:[function(require,module,exports){
 var AudioContext = window.AudioContext || window.webkitAudioContext
 
 module.exports = WebAudioAnalyser
@@ -6137,8 +5674,9 @@ function WebAudioAnalyser(audio, ctx, opts) {
   var this$1 = this;
 
   if (!(this instanceof WebAudioAnalyser)) return new WebAudioAnalyser(audio, ctx, opts)
+    try {
   if (!(ctx instanceof AudioContext)) (opts = ctx), (ctx = null)
-
+} catch (e) {return;}
   opts = opts || {}
   this.ctx = ctx = ctx || new AudioContext
 
@@ -6210,7 +5748,7 @@ WebAudioAnalyser.prototype.frequencies = function(output, channel) {
   return output
 }
 
-},{}],71:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 var window = require("global/window")
 var once = require("once")
 
@@ -6316,7 +5854,7 @@ function createXHR(options, callback) {
 
 function noop() {}
 
-},{"global/window":72,"once":73}],72:[function(require,module,exports){
+},{"global/window":63,"once":64}],63:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
     module.exports = window
@@ -6327,7 +5865,7 @@ if (typeof window !== "undefined") {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],73:[function(require,module,exports){
+},{}],64:[function(require,module,exports){
 module.exports = once
 
 once.proto = once(function () {
@@ -6348,7 +5886,7 @@ function once (fn) {
   }
 }
 
-},{}],74:[function(require,module,exports){
+},{}],65:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -6371,7 +5909,7 @@ function extend() {
     return target
 }
 
-},{}],75:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -6392,13 +5930,13 @@ function extend(target) {
     return target
 }
 
-},{}],76:[function(require,module,exports){
-var test = require('tst');
-var Spectrum = require('./');
+},{}],67:[function(require,module,exports){
+// var test = require('tst');
 // var Formant = require('audio-formant');
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
+var Spectrum = require('./');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -6406,84 +5944,112 @@ var SCBadge = require('soundcloud-badge');
 var Analyser = require('web-audio-analyser');
 var Stats = require('stats.js');
 var db = require('decibels');
+var colorScales = require('colormap/colorScales');
+var tap = require('tap-to-start');
 
 
-var stats = new Stats();
-stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-document.body.appendChild( stats.dom );
-stats.begin();
-stats.dom.style.left = 'auto';
-stats.dom.style.right = '1rem';
-stats.dom.style.top = '1rem';
+
+tap({
+	background: '#2F0F3E',
+	foreground: '#E86F56'
+}, startEverything);
 
 
-//stream soundcloud
-var audio = new Audio;
-
-var badge = SCBadge({
-	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
-	song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
-	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
-	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
-	// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
-	// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
-	dark: false,
-	getFonts: false
-}, function(err, src, data, div) {
-	if (err) throw err;
-
-	//TODO: read url from href here
-	audio.src = src;
-	audio.crossOrigin = 'Anonymous';
-	audio.addEventListener('canplay', function() {
-		audio.play();
-	}, false);
-});
+function startEverything () {
+	var stats = new Stats();
+	stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
+	document.body.appendChild( stats.dom );
+	stats.begin();
+	stats.dom.style.left = 'auto';
+	stats.dom.style.right = '1rem';
+	stats.dom.style.top = '1rem';
 
 
-var analyser = Analyser(audio, { audible: true, stereo: false })
+	//stream soundcloud
+	var audio = new Audio;
+
+	try {
+	var badge = SCBadge({
+		client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
+		// song: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
+		// song: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+		song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+		// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
+		// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+		// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
+		// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
+		dark: false,
+		getFonts: false
+	}, function(err, src, data, div) {
+		if (err) throw err;
+
+		//TODO: read url from href here
+		audio.src = src;
+		audio.crossOrigin = 'Anonymous';
+		audio.addEventListener('canplay', function() {
+			audio.play();
+		}, false);
+	});
+	} catch (e) {
+		//IE of course...
+	}
 
 
-//generate input sine
-var N = 2048;
-var sine = new Float32Array(N);
-var saw = new Float32Array(N);
-var noise = new Float32Array(N);
-var rate = 44100;
 
-for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(1000 * Math.PI * 2 * (i / rate));
-	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
-	noise[i] = Math.random() * 2 - 1;
-}
-
-//normalize browser style
-if (isBrowser) {
-	document.body.style.margin = '0';
-	document.body.style.boxSizing = 'border-box';
-	document.body.style.fontFamily = 'sans-serif';
-}
+	var analyser = Analyser(audio, { audible: true, stereo: false })
 
 
-test('line webgl', function () {
+	//generate input sine
+	var N = 2048;
+	var sine = new Float32Array(N);
+	var saw = new Float32Array(N);
+	var noise = new Float32Array(N);
+	var rate = 44100;
+
+	for (var i = 0; i < N; i++) {
+		sine[i] = Math.sin(10000 * Math.PI * 2 * (i / rate));
+		saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
+		noise[i] = Math.random() * 2 - 1;
+	}
+
+	//normalize browser style
+	if (isBrowser) {
+		document.body.style.margin = '0';
+		document.body.style.boxSizing = 'border-box';
+		document.body.style.fontFamily = 'sans-serif';
+	}
+
+
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	var frequencies = ft(noise);
+	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount).fill(-150);
 
-	// var frequencies = ft(noise);
-	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
+	frequencies = frequencies
+	// .map((v, i) => v*blackman(i, noise.length))
+	.map(function (v) { return db.fromGain(v); });
 
 	var spectrum = new Spectrum({
+		// autostart: false,
 		frequencies: frequencies,
-		fill: 'yignbu',
+		fill: 'cdom',
 		grid: true,
 		minFrequency: 40,
 		maxFrequency: 20000,
 		logarithmic: true,
 		smoothing: .5,
+		details: 1,
 		maxDecibels: 0,
-		// mask: null,
-		align: 0.5,
+		mask: createMask(10, 10),
+		align: .5,
+		trail: 38,
+		// balance: .5,
+		// antialias: true,
+		// fill: [1,1,1,0],
+		// fill: './images/stretch.png',
+		group: 6,
+		// background: [27/255,0/255,37/255, 1],
+		//background: [1,0,0,1]//'./images/bg-small.jpg'
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
@@ -6495,67 +6061,42 @@ test('line webgl', function () {
 		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 		// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-		analyser.analyser.getFloatFrequencyData(frequencies);
+		// analyser.analyser.getFloatFrequencyData(frequencies);
 
 		spectrum.setFrequencies(frequencies);
 	});
 
 	createColormapSelector(spectrum);
-});
-
-test.skip('bars 2d', function () {
-	var frequencies = ft(sine);
-	// var frequencies = new Float32Array(1024).fill(0.5);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
-
-	// var frequencies = ft(noise);
-	// frequencies = frequencies.map((v, i) => v*blackman(i, noise.length)).map((v) => db.fromGain(v));
-
-	var spectrum = new Spectrum({
-		mask: createMask(10, 10),
-		// mask: null,
-		frequencies: frequencies,
-		maxDecibels: 0,
-		maxFrequency: 20000,
-		grid: false,
-		align: 0.5,
-		// background: [1,0,0,1],
-		// fill: [1,1,1,1],
-		logarithmic: true
-	}).on('render', function () {
-		stats.end();
-		stats.begin();
-		analyser.analyser.getFloatFrequencyData(frequencies);
-		spectrum.setFrequencies(frequencies);
-	});
-
-	createColormapSelector(spectrum);
-});
-
-test.skip('node', function () {});
+};
 
 
-test.skip('viewport', function () {});
+// test('line webgl');
 
-test('clannels');
+// test('bars 2d');
 
-test('classic');
+// test('node');
 
-test('bars');
+// test('viewport');
 
-test('bars line');
+// test('clannels');
 
-test('dots');
+// test('classic');
 
-test('dots line');
+// test('bars');
 
-test('colormap (heatmap)');
+// test('bars line');
 
-test('multilayered (max values)');
+// test('dots');
 
-test('line');
+// test('dots line');
 
-test('oscilloscope');
+// test('colormap (heatmap)');
+
+// test('multilayered (max values)');
+
+// test('line');
+
+// test('oscilloscope');
 
 
 
@@ -6580,7 +6121,12 @@ function createColormapSelector (spectrum) {
 	switcher.style.border = '0';
 	switcher.style.background = 'none';
 	switcher.title = 'Colormap';
-	switcher.innerHTML = "\n\t\t<option value=\"jet\">jet</option>\n\t\t<option value=\"hsv\">hsv</option>\n\t\t<option value=\"hot\">hot</option>\n\t\t<option value=\"cool\">cool</option>\n\t\t<option value=\"spring\">spring</option>\n\t\t<option value=\"summer\">summer</option>\n\t\t<option value=\"autumn\">autumn</option>\n\t\t<option value=\"winter\">winter</option>\n\t\t<option value=\"bone\">bone</option>\n\t\t<option value=\"copper\">copper</option>\n\t\t<option value=\"greys\">greys</option>\n\t\t<option value=\"yignbu\" selected>yignbu</option>\n\t\t<option value=\"greens\">greens</option>\n\t\t<option value=\"yiorrd\">yiorrd</option>\n\t\t<option value=\"bluered\">bluered</option>\n\t\t<option value=\"rdbu\">rdbu</option>\n\t\t<option value=\"picnic\">picnic</option>\n\t\t<option value=\"rainbow\">rainbow</option>\n\t\t<option value=\"portland\">portland</option>\n\t\t<option value=\"blackbody\">blackbody</option>\n\t\t<option value=\"earth\">earth</option>\n\t\t<option value=\"electric\">electric</option>\n\t\t<!--<option value=\"alpha\">alpha</option>-->\n\t";
+	var html = '';
+	for (var name in colorScales ) {
+		if (name === 'alpha') continue;
+		html += "<option value=\"" + name + "\"" + ((name === 'cdom') ? 'selected' : '') + ">" + name + "</option>"
+	}
+	switcher.innerHTML = html;
 	switcher.addEventListener('input', function () {
 		spectrum.setFill(switcher.value, inverseCheckbox.checked);
 		updateView();
@@ -6615,24 +6161,19 @@ function createColormapSelector (spectrum) {
 	container.appendChild(weightingEl);
 
 
+	//logarithmic
+	var logSwitch = createSwitch('log', function () {
+		spectrum.logarithmic = this.checked;
+		updateView();
+	});
+	var logCheckbox = logSwitch.querySelector('input');
+	logCheckbox.checked = true;
+	container.appendChild(logSwitch);
+
+
 	//align slider
-	var alignEl = document.createElement('input');
-	alignEl.type = 'range';
-	alignEl.min = 0;
-	alignEl.max = 1;
-	alignEl.step = .01;
-	alignEl.classList.add('align');
-	alignEl.style.width = '5rem';
-	alignEl.style.height = '1rem';
-	alignEl.style.border = '0';
-	alignEl.style.color = 'inherit';
-	alignEl.style.margin = '0 0 0 1rem';
-	alignEl.style.verticalAlign = 'middle';
-	alignEl.style.background = 'none';
-	alignEl.title = 'Align: 0.5';
-	alignEl.addEventListener('input', function () {
-		spectrum.align = parseFloat(alignEl.value);
-		alignEl.title = 'Align: ' + alignEl.value;
+	var alignEl = createSlider('align', function (v) {
+		spectrum.align = v;
 		updateView();
 	});
 	container.appendChild(alignEl);
@@ -6647,22 +6188,48 @@ function createColormapSelector (spectrum) {
 	gridCheckbox.checked = spectrum.grid;
 	container.appendChild(gridSwitch);
 
-	//bars checkbox
+
+	//mask checkbox
+	var maskSwitch = createSwitch('mask', function () {
+		spectrum.setMask(this.checked ? createMask(10, 10) : null);
+		updateView();
+	});
+	var maskSwitch = gridSwitch.querySelector('input');
+	maskSwitch.checked = spectrum.grid;
 	container.appendChild(
-		createSwitch('bars', function () {
-			spectrum.setMask(this.checked ? createMask(10, 10) : null);
-			updateView();
-		})
+		maskSwitch
 	);
 
+	//group size
+	var groupEl = createSlider({name: 'group', min: 0, max: 50, step: 1, value: spectrum.group}, function (v) {
+		spectrum.group = v;
+		updateView();
+	});
+	container.appendChild(groupEl);
+
+
+	//trail slider
+	var trailEl = createSlider({
+		min: 0,
+		max: 50,
+		value: spectrum.trail,
+		name: 'trail'
+	}, function (v) {
+		spectrum.trail = v;
+		updateView();
+	});
+	container.appendChild(trailEl);
 
 	updateView();
 
 	function updateView () {
 		spectrum.update();
-		container.style.color = 'rgb(' + spectrum.fill.slice(-4, -1).map(function (v) { return v*255; }).join(', ') + ')';
+		if (Array.isArray(spectrum.fill)) {
+			container.style.color = 'rgb(' + spectrum.fill.slice(-4, -1).map(function (v) { return v*255; }).join(', ') + ')';
+		}
 	}
 }
+
 
 
 function createSwitch (name, cb) {
@@ -6689,13 +6256,39 @@ function createSwitch (name, cb) {
 }
 
 
+function createSlider (opts, cb) {
+	opts = (typeof opts === 'string') ? {name: opts} : opts ? opts : {};
+	var sliderEl = document.createElement('input');
+	var title = opts.name.slice(0,1).toUpperCase() + opts.name.slice(1);
+	sliderEl.type = 'range';
+	sliderEl.min = opts.min || 0;
+	sliderEl.max = opts.max || 1;
+	sliderEl.step = opts.step || 0.01;
+	sliderEl.value = opts.value || 0.5;
+	sliderEl.classList.add(opts.name);
+	sliderEl.style.width = '5rem';
+	sliderEl.style.height = '1rem';
+	sliderEl.style.border = '0';
+	sliderEl.style.color = 'inherit';
+	sliderEl.style.margin = '0 0 0 1rem';
+	sliderEl.style.verticalAlign = 'middle';
+	sliderEl.style.background = 'none';
+	sliderEl.title = title + ': ' + sliderEl.value;
+	sliderEl.addEventListener('input', function () {
+		var v = parseFloat(sliderEl.value);
+		sliderEl.title = title + ': ' + v;
+		cb(v);
+	});
+	return sliderEl;
+}
+
 
 //create mask
 function createMask (w, h) {
 	w = w || 10;
 	h = h || 10;
 	var rect = [w, h];
-	var radius = w/2;
+	var radius = w/1.5;
 	var canvas = document.createElement('canvas');
 	canvas.width = rect[0] + 2;
 	canvas.height = rect[1] + 2;
@@ -6718,4 +6311,5 @@ function createMask (w, h) {
 
 	return canvas;
 }
-},{"./":11,"decibels":30,"fourier-transform":37,"is-browser":45,"scijs-window-functions/blackman-harris":62,"soundcloud-badge":63,"stats.js":66,"tst":69,"web-audio-analyser":70}]},{},[76]);
+
+},{"./":11,"colormap/colorScales":22,"decibels":25,"fourier-transform":32,"is-browser":39,"scijs-window-functions/blackman-harris":53,"soundcloud-badge":54,"stats.js":57,"tap-to-start":60,"web-audio-analyser":61}]},{},[67]);
