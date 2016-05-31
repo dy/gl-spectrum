@@ -89,8 +89,8 @@ function startEverything () {
 
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
-	var frequencies = ft(noise);
-	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount).fill(-150);
+	// var frequencies = ft(noise);
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount).fill(-150);
 
 	frequencies = frequencies
 	// .map((v, i) => v*blackman(i, noise.length))
@@ -128,7 +128,7 @@ function startEverything () {
 		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 		// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-		// analyser.analyser.getFloatFrequencyData(frequencies);
+		analyser.analyser.getFloatFrequencyData(frequencies);
 
 		spectrum.setFrequencies(frequencies);
 	});
