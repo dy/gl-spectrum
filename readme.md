@@ -29,7 +29,9 @@ var spectrum = new Spectrum({
 	minFrequency: 20,
 	sampleRate: 44100,
 
-	//show logarithmic frequencies
+	//draw frequency/decibels grid
+	grid: true,
+	axes: false,
 	logarithmic: true,
 
 	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
@@ -38,17 +40,9 @@ var spectrum = new Spectrum({
 	//rendering settings
 	smoothing: 0.5,
 	details: 1,
+
+	//hits FPS twice, so performance is over aesthetics
 	antialias: false,
-
-	//draw frequency/decibels grid
-	grid: true,
-	axes: false,
-
-	//The levels of magnitude/frequency - a colormap name, colormap, pixels array, imageData, imageElement or canvas. Null disables fill.
-	fill: 'greys',
-
-	//A color tuple, imageData, imageElement, canvas or url. Default is 0-level of the fill
-	background: null,
 
 	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
 	align: 0,
@@ -61,6 +55,12 @@ var spectrum = new Spectrum({
 
 	//the width of a bar. Affects the mask.
 	group: 0,
+
+	//The levels of magnitude/frequency - a colormap name, colormap, pixels array, imageData, imageElement or canvas. Null disables fill.
+	fill: 'greys',
+
+	//A color tuple, imageData, imageElement, canvas or url. Default is 0-level of the fill
+	background: null,
 
 	//defines mask image for a bar. Image, imageData or canvasElement.
 	mask: null
