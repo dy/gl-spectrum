@@ -2378,7 +2378,6 @@ Spectrum.prototype.weighting = 'itu';
 Spectrum.prototype.frequencies = new Float32Array(512);
 for (var i = 0; i < 512; i++) {Spectrum.prototype.frequencies[i] = Spectrum.prototype.minDecibels;};
 
-
 //required to detect frequency resolution
 Spectrum.prototype.sampleRate = 44100;
 
@@ -2423,9 +2422,10 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 
 	//choose bigger data
 	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
-	var shorter = bigger === frequencies ? this.frequencies : frequencies;
+	var shorter = (bigger === frequencies ? this.frequencies : frequencies);
+	bigger = bigger.slice();
 
-	var smoothing = bigger === this.frequencies ? this.smoothing : 1 - this.smoothing;
+	var smoothing = (bigger === this.frequencies ? 1 - this.smoothing : this.smoothing);
 
 	for (var i = 0; i < bigger.length; i++) {
 		bigger[i] = clamp(bigger[i], -200, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -200, 0) * (1 - smoothing);
@@ -6025,9 +6025,9 @@ function startEverything () {
 	// var frequencies = ft(noise);
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount).fill(-150);
 
-	frequencies = frequencies
+	// frequencies = frequencies
 	// .map((v, i) => v*blackman(i, noise.length))
-	.map(function (v) { return db.fromGain(v); });
+	// .map((v) => db.fromGain(v));
 
 	var spectrum = new Spectrum({
 		// autostart: false,
@@ -6037,7 +6037,7 @@ function startEverything () {
 		minFrequency: 40,
 		maxFrequency: 20000,
 		logarithmic: true,
-		smoothing: .5,
+		smoothing: .1,
 		details: 1,
 		maxDecibels: 0,
 		mask: createMask(10, 10),
@@ -6194,8 +6194,8 @@ function createColormapSelector (spectrum) {
 		spectrum.setMask(this.checked ? createMask(10, 10) : null);
 		updateView();
 	});
-	var maskSwitch = gridSwitch.querySelector('input');
-	maskSwitch.checked = spectrum.grid;
+	var maskCb = maskSwitch.querySelector('input');
+	maskCb.checked = true;
 	container.appendChild(
 		maskSwitch
 	);
@@ -6219,6 +6219,20 @@ function createColormapSelector (spectrum) {
 		updateView();
 	});
 	container.appendChild(trailEl);
+
+
+	//smoothing slider
+	var smoothingEl = createSlider({
+		min: 0,
+		max: 1,
+		value: spectrum.smoothing,
+		name: 'smoothing'
+	}, function (v) {
+		spectrum.smoothing = v;
+		updateView();
+	});
+	container.appendChild(smoothingEl);
+
 
 	updateView();
 
