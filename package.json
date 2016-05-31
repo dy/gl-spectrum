@@ -31,8 +31,9 @@
   "scripts": {
     "test": "budo test",
     "test:browser": "budo test",
-    "test:iphone": "budo test -- -g bubleify",
-    "build": "browserify test.js -g bubleify -o demo/index.js"
+    "test:iphone": "budo test.js -- -g bubleify",
+    "build": "browserify test.js -g bubleify -o demo/index.js",
+    "watch": "watchify test.js -g bubleify -o demo/index.js"
   },
   "repository": {
     "type": "git",

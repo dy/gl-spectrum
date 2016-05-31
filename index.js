@@ -36,9 +36,19 @@ function Spectrum (options) {
 	if (!this.is2d) {
 		var gl = this.gl;
 
+		var gl = this.gl;
 		var float = gl.getExtension('OES_texture_float');
-		if (!float) throw Error('WebGL does not support floats.');
-		var floatLinear = gl.getExtension('OES_texture_float_linear');
+		if (!float) {
+			var float = gl.getExtension('OES_texture_half_float');
+			if (!float) {
+				throw Error('WebGL does not support floats.');
+			}
+			var floatLinear = gl.getExtension('OES_texture_half_float_linear');
+		}
+		else {
+			var floatLinear = gl.getExtension('OES_texture_float_linear');
+
+		}
 		if (!floatLinear) throw Error('WebGL does not support floats.');
 
 		//setup alpha
@@ -134,7 +144,7 @@ Spectrum.prototype.group = false;
 
 //scale verteces to frequencies values and apply alignment
 Spectrum.prototype.vert = `
-	precision lowp float;
+	precision highp float;
 
 	attribute vec2 position;
 
@@ -214,7 +224,7 @@ Spectrum.prototype.vert = `
 `;
 
 Spectrum.prototype.frag = `
-	precision lowp float;
+	precision highp float;
 
 	uniform sampler2D fill;
 	uniform sampler2D mask;
@@ -300,7 +310,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	//choose bigger data
 	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
 	var shorter = (bigger === frequencies ? this.frequencies : frequencies);
-	bigger = bigger.slice();
+	bigger = [].slice.call(bigger);
 
 	var smoothing = (bigger === this.frequencies ? 1 - this.smoothing : this.smoothing);
 
@@ -688,6 +698,7 @@ Spectrum.prototype.draw = function () {
 	}
 
 	if (this.trail) {
+		//TODO: fix this - do not update freqs each draw call
 		gl.uniform1f(this.trailLocation, 1);
 		this.setTexture('frequencies', this.trailFrequencies);
 		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);

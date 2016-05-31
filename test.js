@@ -14,8 +14,6 @@ var db = require('decibels');
 var colorScales = require('colormap/colorScales');
 var tap = require('tap-to-start');
 
-
-
 tap({
 	background: '#2F0F3E',
 	foreground: '#E86F56'
@@ -90,7 +88,8 @@ function startEverything () {
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	// var frequencies = ft(noise);
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount).fill(-150);
+	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
 	// frequencies = frequencies
 	// .map((v, i) => v*blackman(i, noise.length))
@@ -110,6 +109,7 @@ function startEverything () {
 		mask: createMask(10, 10),
 		align: .5,
 		trail: 38,
+		// autostart: false,
 		// balance: .5,
 		// antialias: true,
 		// fill: [1,1,1,0],
