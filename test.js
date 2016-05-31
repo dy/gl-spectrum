@@ -1,9 +1,9 @@
-var test = require('tst');
-var Spectrum = require('./');
+// var test = require('tst');
 // var Formant = require('audio-formant');
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
+var Spectrum = require('./');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -11,74 +11,86 @@ var SCBadge = require('soundcloud-badge');
 var Analyser = require('web-audio-analyser');
 var Stats = require('stats.js');
 var db = require('decibels');
+var colorScales = require('colormap/colorScales');
+var tap = require('tap-to-start');
 
 
-var stats = new Stats();
-stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-document.body.appendChild( stats.dom );
-stats.begin();
-stats.dom.style.left = 'auto';
-stats.dom.style.right = '1rem';
-stats.dom.style.top = '1rem';
+
+tap({
+	background: '#2F0F3E',
+	foreground: '#E86F56'
+}, startEverything);
 
 
-//stream soundcloud
-var audio = new Audio;
+function startEverything () {
+	var stats = new Stats();
+	stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
+	document.body.appendChild( stats.dom );
+	stats.begin();
+	stats.dom.style.left = 'auto';
+	stats.dom.style.right = '1rem';
+	stats.dom.style.top = '1rem';
 
 
-/*
-var badge = SCBadge({
-	client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
-	// song: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
-	song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
-	// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
-	// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
-	// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
-	// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
-	dark: false,
-	getFonts: false
-}, function(err, src, data, div) {
-	if (err) throw err;
+	//stream soundcloud
+	var audio = new Audio;
 
-	//TODO: read url from href here
-	audio.src = src;
-	audio.crossOrigin = 'Anonymous';
-	audio.addEventListener('canplay', function() {
-		audio.play();
-	}, false);
-});
-*/
+	try {
+	var badge = SCBadge({
+		client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
+		// song: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
+		// song: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+		song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+		// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
+		// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+		// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
+		// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
+		dark: false,
+		getFonts: false
+	}, function(err, src, data, div) {
+		if (err) throw err;
 
-
-var analyser = Analyser(audio, { audible: true, stereo: false })
-
-
-//generate input sine
-var N = 2048;
-var sine = new Float32Array(N);
-var saw = new Float32Array(N);
-var noise = new Float32Array(N);
-var rate = 44100;
-
-for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(10000 * Math.PI * 2 * (i / rate));
-	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
-	noise[i] = Math.random() * 2 - 1;
-}
-
-//normalize browser style
-if (isBrowser) {
-	document.body.style.margin = '0';
-	document.body.style.boxSizing = 'border-box';
-	document.body.style.fontFamily = 'sans-serif';
-}
+		//TODO: read url from href here
+		audio.src = src;
+		audio.crossOrigin = 'Anonymous';
+		audio.addEventListener('canplay', function() {
+			audio.play();
+		}, false);
+	});
+	} catch (e) {
+		//IE of course...
+	}
 
 
-test.only('line webgl', function () {
+
+	var analyser = Analyser(audio, { audible: true, stereo: false })
+
+
+	//generate input sine
+	var N = 2048;
+	var sine = new Float32Array(N);
+	var saw = new Float32Array(N);
+	var noise = new Float32Array(N);
+	var rate = 44100;
+
+	for (var i = 0; i < N; i++) {
+		sine[i] = Math.sin(10000 * Math.PI * 2 * (i / rate));
+		saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
+		noise[i] = Math.random() * 2 - 1;
+	}
+
+	//normalize browser style
+	if (isBrowser) {
+		document.body.style.margin = '0';
+		document.body.style.boxSizing = 'border-box';
+		document.body.style.fontFamily = 'sans-serif';
+	}
+
+
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	var frequencies = ft(noise);
-	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	// var frequencies = new Float32Array(analyser.analyser.frequencyBinCount).fill(-150);
 
 	frequencies = frequencies
 	// .map((v, i) => v*blackman(i, noise.length))
@@ -87,7 +99,7 @@ test.only('line webgl', function () {
 	var spectrum = new Spectrum({
 		// autostart: false,
 		frequencies: frequencies,
-		fill: 'yignbu',
+		fill: 'cdom',
 		grid: true,
 		minFrequency: 40,
 		maxFrequency: 20000,
@@ -95,10 +107,16 @@ test.only('line webgl', function () {
 		smoothing: .5,
 		details: 1,
 		maxDecibels: 0,
-		mask: null, //createMask(10, 10),
+		mask: createMask(10, 10),
 		align: .5,
-		// group: 12,
-		// background: './images/bg-small.jpg'
+		trail: 38,
+		// balance: .5,
+		// antialias: true,
+		// fill: [1,1,1,0],
+		// fill: './images/stretch.png',
+		group: 6,
+		// background: [27/255,0/255,37/255, 1],
+		//background: [1,0,0,1]//'./images/bg-small.jpg'
 		// viewport: function (w, h) {
 		// 	return [50,20,w-70,h-60];
 		// }
@@ -112,37 +130,40 @@ test.only('line webgl', function () {
 
 		// analyser.analyser.getFloatFrequencyData(frequencies);
 
-		// spectrum.setFrequencies(frequencies);
+		spectrum.setFrequencies(frequencies);
 	});
 
 	createColormapSelector(spectrum);
-});
+};
 
-test('bars 2d');
 
-test('node');
+// test('line webgl');
 
-test('viewport');
+// test('bars 2d');
 
-test('clannels');
+// test('node');
 
-test('classic');
+// test('viewport');
 
-test('bars');
+// test('clannels');
 
-test('bars line');
+// test('classic');
 
-test('dots');
+// test('bars');
 
-test('dots line');
+// test('bars line');
 
-test('colormap (heatmap)');
+// test('dots');
 
-test('multilayered (max values)');
+// test('dots line');
 
-test('line');
+// test('colormap (heatmap)');
 
-test('oscilloscope');
+// test('multilayered (max values)');
+
+// test('line');
+
+// test('oscilloscope');
 
 
 
@@ -167,31 +188,12 @@ function createColormapSelector (spectrum) {
 	switcher.style.border = '0';
 	switcher.style.background = 'none';
 	switcher.title = 'Colormap';
-	switcher.innerHTML = `
-		<option value="jet">jet</option>
-		<option value="hsv">hsv</option>
-		<option value="hot">hot</option>
-		<option value="cool">cool</option>
-		<option value="spring">spring</option>
-		<option value="summer">summer</option>
-		<option value="autumn">autumn</option>
-		<option value="winter">winter</option>
-		<option value="bone">bone</option>
-		<option value="copper">copper</option>
-		<option value="greys">greys</option>
-		<option value="yignbu" selected>yignbu</option>
-		<option value="greens">greens</option>
-		<option value="yiorrd">yiorrd</option>
-		<option value="bluered">bluered</option>
-		<option value="rdbu">rdbu</option>
-		<option value="picnic">picnic</option>
-		<option value="rainbow">rainbow</option>
-		<option value="portland">portland</option>
-		<option value="blackbody">blackbody</option>
-		<option value="earth">earth</option>
-		<option value="electric">electric</option>
-		<!--<option value="alpha">alpha</option>-->
-	`;
+	var html = '';
+	for (var name in colorScales ) {
+		if (name === 'alpha') continue;
+		html += `<option value="${name}"${(name === 'cdom') ? 'selected' : ''}>${name}</option>`
+	}
+	switcher.innerHTML = html;
 	switcher.addEventListener('input', function () {
 		spectrum.setFill(switcher.value, inverseCheckbox.checked);
 		updateView();
@@ -262,28 +264,46 @@ function createColormapSelector (spectrum) {
 
 
 	//mask checkbox
+	var maskSwitch = createSwitch('mask', function () {
+		spectrum.setMask(this.checked ? createMask(10, 10) : null);
+		updateView();
+	});
+	var maskSwitch = gridSwitch.querySelector('input');
+	maskSwitch.checked = spectrum.grid;
 	container.appendChild(
-		createSwitch('mask', function () {
-			spectrum.setMask(this.checked ? createMask(10, 10) : null);
-			updateView();
-		})
+		maskSwitch
 	);
 
 	//group size
-	var groupEl = createSlider({name: 'group', min: 0, max: 100, step: 1, value: spectrum.group}, function (v) {
+	var groupEl = createSlider({name: 'group', min: 0, max: 50, step: 1, value: spectrum.group}, function (v) {
 		spectrum.group = v;
 		updateView();
 	});
 	container.appendChild(groupEl);
 
 
+	//trail slider
+	var trailEl = createSlider({
+		min: 0,
+		max: 50,
+		value: spectrum.trail,
+		name: 'trail'
+	}, function (v) {
+		spectrum.trail = v;
+		updateView();
+	});
+	container.appendChild(trailEl);
+
 	updateView();
 
 	function updateView () {
 		spectrum.update();
-		container.style.color = 'rgb(' + spectrum.fill.slice(-4, -1).map((v) => v*255).join(', ') + ')';
+		if (Array.isArray(spectrum.fill)) {
+			container.style.color = 'rgb(' + spectrum.fill.slice(-4, -1).map((v) => v*255).join(', ') + ')';
+		}
 	}
 }
+
 
 
 function createSwitch (name, cb) {

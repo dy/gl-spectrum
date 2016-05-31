@@ -53,6 +53,9 @@ function Spectrum (options) {
 		this.logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
 		this.sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
 		this.groupLocation = gl.getUniformLocation(this.program, 'group');
+		this.trailLocation = gl.getUniformLocation(this.program, 'trail');
+		this.balanceLocation = gl.getUniformLocation(this.program, 'balance');
+		this.peakLocation = gl.getUniformLocation(this.program, 'peak');
 
 		this.bgComponent = new Component({
 			frag: `
@@ -65,9 +68,12 @@ function Spectrum (options) {
 			}`,
 			viewport: () => this.viewport,
 			context: this.context,
-			autostart: false
+			autostart: false,
+			antialias: false
 		});
 	}
+
+	this.freqBuffer = [];
 
 	this.on('resize', () => {
 		this.recalc();
@@ -79,7 +85,7 @@ function Spectrum (options) {
 inherits(Spectrum, Component);
 
 
-Spectrum.prototype.antialias = true;
+Spectrum.prototype.antialias = false;
 Spectrum.prototype.premultipliedAlpha = true;
 Spectrum.prototype.alpha = false;
 
@@ -103,24 +109,23 @@ Spectrum.prototype.logarithmic = true;
 Spectrum.prototype.weighting = 'itu';
 
 //evenly distributed within indicated diapasone
-Spectrum.prototype.frequencies = new Float32Array(512).fill(Spectrum.prototype.minDecibels);
+Spectrum.prototype.frequencies = new Float32Array(512);
+for (var i = 0; i < 512; i++) {Spectrum.prototype.frequencies[i] = Spectrum.prototype.minDecibels;};
 
-
-//TODO
-Spectrum.prototype.orientation = 'horizontal';
 
 //required to detect frequency resolution
 Spectrum.prototype.sampleRate = 44100;
 
 //colors to map spectrum against
 Spectrum.prototype.fill = 'greys';
+Spectrum.prototype.balance = .65;
 Spectrum.prototype.background = undefined;
 
 //amount of alignment
 Spectrum.prototype.align = .0;
 
-//TODO implement shadow frequencies, like averaged/max values
-Spectrum.prototype.shadow = [];
+//shadow frequencies, like averaged/max values
+Spectrum.prototype.trail = 1;
 
 //mask defines style of bars, dots or line
 Spectrum.prototype.mask = null;
@@ -144,6 +149,7 @@ Spectrum.prototype.vert = `
 	uniform float sampleRate;
 	uniform vec4 viewport;
 	uniform float group;
+	uniform float peak;
 
 	varying float vDist;
 	varying float vMag;
@@ -183,7 +189,7 @@ Spectrum.prototype.vert = `
 		float groupRatio = _group / viewport.z;
 
 		//round x-coord to the step, @c is a precision fix constant
-		float c = .001;
+		float c = 1./viewport.z;
 		float leftX = floor((coord.x * viewport.z + c ) / _group) * _group / viewport.z;
 		float rightX = ceil((coord.x * viewport.z + c ) / _group) * _group / viewport.z;
 		coord.x = decide(leftX, rightX, step(coord.x - leftX + c*.5, groupRatio * .5));
@@ -217,6 +223,9 @@ Spectrum.prototype.frag = `
 	uniform vec4 viewport;
 	uniform float align;
 	uniform float group;
+	uniform float trail;
+	uniform float peak;
+	uniform float balance;
 
 	varying float vDist;
 	varying float vMag;
@@ -224,7 +233,6 @@ Spectrum.prototype.frag = `
 	varying float vRight;
 
 	vec2 coord;
-	vec2 bin;
 
 	float decide (float a, float b, float w) {
 		return step(0.5, w) * b + step(w, 0.5) * a;
@@ -232,19 +240,19 @@ Spectrum.prototype.frag = `
 
 	void main () {
 		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
-		bin = vec2(1. / viewport.zw);
 		float groupRatio = group / viewport.z;
 		float maskRatio = maskSize.x / viewport.z;
 
 		//calc mask
 		float halfX = min(group * .5 / maskSize.x, .5);
-		float leftX = (coord.x - vLeft) * viewport.z / maskSize.x;
+		float leftX = ((coord.x - vLeft) * viewport.z) / maskSize.x;
 		float leftPart = step(leftX, halfX) * step(0., leftX);
-		float rightX = 1. - ((vRight - coord.x) * viewport.z) / maskSize.x;
+		float rightX = 1. - max(((vRight - coord.x) * viewport.z),0.) / maskSize.x;
 		float rightPart = step(rightX, 1.) * step(1. - halfX, rightX);
+		// rightPart -= rightPart * leftPart;
 		float centralPart = 1. - leftPart - rightPart;
 
-		float maskX = decide(.5, centralPart * .5 + leftPart * leftX + rightPart * rightX, step(2., group));
+		float maskX = decide(.5, centralPart * .5 + leftPart * leftX + rightPart * rightX, step(4., group));
 
 		//find mask’s offset frequency
 		float mag = vMag;
@@ -253,9 +261,9 @@ Spectrum.prototype.frag = `
 		float dist = abs(vDist);
 
 		//calc intensity
-		float maxAlign = min(max(align, 1. - align), .85);
-		float minAlign = max(1. - maxAlign, .15);
-		float intensity = (1. - pow((1. - dist), .85)) * maxAlign + minAlign;
+		float intensity = pow(dist, .85) * balance + pow(mag/peak, 1.25) * (1. - balance);
+		intensity /= (peak * .48 + .5);
+		intensity = intensity * .85 + .15;
 
 		//apply mask
 		float top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;
@@ -267,9 +275,10 @@ Spectrum.prototype.frag = `
 		vec2 maskCoord = vec2(maskX, maskY);
 		float maskLevel = texture2D(mask, maskCoord).x;
 
-		// gl_FragColor = vec4(vec3(maskX), 1);
-		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity)));
+		gl_FragColor = vec4(vec3(1), 1);
+		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity) + trail * (mag * .5 / peak + .15 )));
 		fillColor.a *= maskLevel;
+		fillColor.a += trail * texture2D(mask, vec2(maskX, .5)).x;
 		gl_FragColor = fillColor;
 	}
 `;
@@ -280,6 +289,8 @@ Spectrum.prototype.frag = `
  */
 Spectrum.prototype.setFrequencies = function (frequencies) {
 	if (!frequencies) return this;
+
+	this.gl.useProgram(this.program);
 
 	var gl = this.gl;
 	var minF = this.minFrequency, maxF = this.maxFrequency;
@@ -292,7 +303,6 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	var shorter = bigger === frequencies ? this.frequencies : frequencies;
 
 	var smoothing = bigger === this.frequencies ? this.smoothing : 1 - this.smoothing;
-
 
 	for (var i = 0; i < bigger.length; i++) {
 		bigger[i] = clamp(bigger[i], -200, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -200, 0) * (1 - smoothing);
@@ -318,6 +328,22 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	//convert mags to 0..1 range limiting by db subrange
 	magnitudes = magnitudes.map((value) => (value - minDb) / (maxDb - minDb));
 
+	//find peak
+	var peak = magnitudes.reduce((prev, curr) => Math.max(curr, prev), 0);
+	this.gl.uniform1f(this.peakLocation, peak);
+
+	//calc trail
+	if (this.trail) {
+		this.freqBuffer.unshift(magnitudes);
+		this.freqBuffer = this.freqBuffer.slice(0, this.trail);
+		var trail = magnitudes.slice();
+		for (var k = 1; k < this.freqBuffer.length; k++) {
+			for (var i = 0; i < Math.min(trail.length, this.freqBuffer[k].length); i++) {
+				trail[i] = Math.max(this.freqBuffer[k][i], trail[i]);
+			}
+		}
+		this.trailFrequencies = trail;
+	}
 
 	return this.setTexture('frequencies', {
 		data: magnitudes,
@@ -387,13 +413,31 @@ Spectrum.prototype.recalc = function () {
  */
 Spectrum.prototype.setFill = function (cm, inverse) {
 	//named colormap
-	if (typeof cm === 'string') {
+	if (typeof cm === 'string' && !/\\|\//.test(cm)) {
 		this.fill = (flatten(colormap({
 			colormap: cm,
 			nshades: 128,
 			format: 'rgba',
 			alpha: 1
 		})).map((v,i) => !((i + 1) % 4) ? v : v/255));
+	}
+	else if (!cm) {
+		this.fill = null;
+		if (!this.background) this.setBackground([1,1,1,1]);
+		return this;
+	}
+	//image, canvas etc
+	else if (!Array.isArray(cm)) {
+		this.fill = cm;
+
+		this.setTexture('fill', {
+			data: this.fill,
+			magFilter: this.gl.LINEAR,
+			minFilter: this.gl.LINEAR,
+			wrap: this.gl.CLAMP_TO_EDGE
+		});
+
+		return this;
 	}
 	//custom array
 	else {
@@ -603,6 +647,9 @@ Spectrum.prototype.update = function () {
 		this.bottomGridComponent.linesContainer.style.display = 'none';
 	}
 
+	//preset trail buffer
+	if (this.trail === true) this.trail = Spectrum.prototype.trail;
+
 	//update verteces
 	this.recalc();
 
@@ -618,6 +665,7 @@ Spectrum.prototype.update = function () {
 	this.gl.uniform1f(this.logarithmicLocation, this.logarithmic ? 1 : 0);
 	this.gl.uniform1f(this.sampleRateLocation, this.sampleRate);
 	this.gl.uniform1f(this.groupLocation, this.group || 0);
+	this.gl.uniform1f(this.balanceLocation, this.balance || 0);
 
 	return this;
 };
@@ -635,18 +683,16 @@ Spectrum.prototype.draw = function () {
 
 	var count = this.attributes.position.data.length / 2;
 
-	if (this.group) {
+	if (this.fill) {
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
-		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2 - 0);
-	}
-	else {
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
-		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
 	}
 
-	// if (this.trail) {
-	// 	gl.drawElements(gl.LINES, count, gl.UNSIGNED_SHORT, 0);
-	// }
+	if (this.trail) {
+		gl.uniform1f(this.trailLocation, 1);
+		this.setTexture('frequencies', this.trailFrequencies);
+		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
+		gl.uniform1f(this.trailLocation, 0);
+	}
 
 	return this;
 };

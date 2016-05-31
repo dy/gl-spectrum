@@ -143,3 +143,7 @@
 ## Q: how is it possible - to avoid subviewing in CPU with falsy interpolation - and at the same time avoid log condition in shader?
 * we have to equalize lg(minF) + ratio * (lg(maxF) - lg(minF)) and minF + ratio * (maxF - minF). How to make lg(f) function which with some argument returns f?
 	* simple. y = step(0., isLog) * log(x) + x * step(isLog, x) / log(10) ...
+
+## Q: what is the best customization for fill?
+* Basically we need min level, the range, taking into account align, also magnitude is pretty useful visually.
+* Forcing fillRange to start with 0, which is required for image-fill, is not very cool and creates all the troubles. Sticking to the cool fillRange regardless of image as a fill is

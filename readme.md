@@ -32,6 +32,10 @@ var spectrum = new Spectrum({
 	//show logarithmic frequencies
 	logarithmic: true,
 
+	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
+	weighting: 'itu',
+
+	//rendering settings
 	smoothing: 0.5,
 	details: 1,
 
@@ -39,31 +43,26 @@ var spectrum = new Spectrum({
 	grid: true,
 	axes: false,
 
-	//The levels of magnitude/frequency.
-	//A colormap name, colormap, pixels array, imageData, imageElement or canvas
+	//The levels of magnitude/frequency - a colormap name, colormap, pixels array, imageData, imageElement or canvas
 	fill: null,
 
-	//Can be a color tuple, imageData, imageElement, canvas or url
-	//undefined background takes the 0-level of the fill
+	//A color tuple, imageData, imageElement, canvas or url. Default is 0-level of the fill
 	background: null,
 
 	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
 	align: 0,
 
-	//line, bar or fill
-	style: 'bar',
+	//A trail spectrum - max within the last N snapshots, rendered as a line
+	trail: 0,
 
-	//WIP shadow frequencies
-	shadow: [],
+	//snap magnitude to a number.
+	snap: false,
 
-	//snap magnitude to step. Number.
-	snap: null,
+	//the width of a bar.
+	group: 0,
 
-	//defines the width or style of bars. A number (for width), image, imageData or canvasElement.
-	mask: null,
-
-	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
-	weighting: 'itu'
+	//defines mask image for a bar. Image, imageData or canvasElement.
+	mask: null
 });
 
 //pass db frequencies in -100...0 range
