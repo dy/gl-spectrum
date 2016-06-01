@@ -66,21 +66,6 @@ function Spectrum (options) {
 		this.trailLocation = gl.getUniformLocation(this.program, 'trail');
 		this.balanceLocation = gl.getUniformLocation(this.program, 'balance');
 		this.peakLocation = gl.getUniformLocation(this.program, 'peak');
-
-		this.bgComponent = new Component({
-			frag: `
-			precision lowp float;
-			uniform sampler2D background;
-			uniform vec4 viewport;
-			void main() {
-				vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
-				gl_FragColor = texture2D(background, coord);
-			}`,
-			viewport: () => this.viewport,
-			context: this.context,
-			autostart: false,
-			antialias: false
-		});
 	}
 
 	this.freqBuffer = [];
@@ -97,7 +82,7 @@ inherits(Spectrum, Component);
 
 Spectrum.prototype.antialias = false;
 Spectrum.prototype.premultipliedAlpha = true;
-Spectrum.prototype.alpha = false;
+Spectrum.prototype.alpha = true;
 
 
 Spectrum.prototype.maxDecibels = -30;
@@ -495,13 +480,24 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 /** Set background */
 Spectrum.prototype.setBackground = function (bg) {
 	if (this.background !== null) {
-		this.bgComponent && this.bgComponent.setTexture('background', {
-			data: bg,
-			format: this.gl.RGBA,
-			magFilter: this.gl.LINEAR,
-			minFilter: this.gl.LINEAR,
-			wrap: this.gl.CLAMP_TO_EDGE
-		});
+		var bgStyle = null;
+		if (typeof bg === 'string') {
+			bgStyle = bg;
+		}
+		else if (Array.isArray(bg)) {
+			//map 0..1 range to 0..255
+			if (bg[0] && bg[0] <= 1 && bg[1] && bg[1] <= 1 && bg[2] && bg[2] <= 1) {
+				bg = bg.map((v) => v*255);
+			}
+
+			if (bg.length === 3) {
+				bgStyle = `rgb(${bg.join(', ')}`;
+			}
+			else {
+				bgStyle = `rgba(${bg.join(', ')}`;
+			}
+		}
+		this.canvas.style.background = bgStyle;
 	}
 
 	return this;
@@ -686,8 +682,6 @@ Spectrum.prototype.update = function () {
  */
 Spectrum.prototype.draw = function () {
 	var gl = this.gl;
-
-	this.bgComponent.render();
 
 	gl.useProgram(this.program);
 

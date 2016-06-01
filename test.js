@@ -16,7 +16,8 @@ var tap = require('tap-to-start');
 
 tap({
 	background: '#2F0F3E',
-	foreground: '#E86F56'
+	foreground: '#E86F56',
+	skip: true
 }, startEverything);
 
 
@@ -88,7 +89,9 @@ function startEverything () {
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	// var frequencies = ft(noise);
+	analyser.analyser.fftSize = 4096*2;
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	console.log(frequencies.length)
 	for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
 	// frequencies = frequencies
