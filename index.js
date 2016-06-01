@@ -2339,14 +2339,6 @@ function Spectrum (options) {
 		this.trailLocation = gl.getUniformLocation(this.program, 'trail');
 		this.balanceLocation = gl.getUniformLocation(this.program, 'balance');
 		this.peakLocation = gl.getUniformLocation(this.program, 'peak');
-
-		this.bgComponent = new Component({
-			frag: "\n\t\t\tprecision lowp float;\n\t\t\tuniform sampler2D background;\n\t\t\tuniform vec4 viewport;\n\t\t\tvoid main() {\n\t\t\t\tvec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\t\t\tgl_FragColor = texture2D(background, coord);\n\t\t\t}",
-			viewport: function () { return this$1.viewport; },
-			context: this.context,
-			autostart: false,
-			antialias: false
-		});
 	}
 
 	this.freqBuffer = [];
@@ -2363,7 +2355,7 @@ inherits(Spectrum, Component);
 
 Spectrum.prototype.antialias = false;
 Spectrum.prototype.premultipliedAlpha = true;
-Spectrum.prototype.alpha = false;
+Spectrum.prototype.alpha = true;
 
 
 Spectrum.prototype.maxDecibels = -30;
@@ -2620,13 +2612,24 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 /** Set background */
 Spectrum.prototype.setBackground = function (bg) {
 	if (this.background !== null) {
-		this.bgComponent && this.bgComponent.setTexture('background', {
-			data: bg,
-			format: this.gl.RGBA,
-			magFilter: this.gl.LINEAR,
-			minFilter: this.gl.LINEAR,
-			wrap: this.gl.CLAMP_TO_EDGE
-		});
+		var bgStyle = null;
+		if (typeof bg === 'string') {
+			bgStyle = bg;
+		}
+		else if (Array.isArray(bg)) {
+			//map 0..1 range to 0..255
+			if (bg[0] && bg[0] <= 1 && bg[1] && bg[1] <= 1 && bg[2] && bg[2] <= 1) {
+				bg = bg.map(function (v) { return v*255; });
+			}
+
+			if (bg.length === 3) {
+				bgStyle = "rgb(" + (bg.join(', '));
+			}
+			else {
+				bgStyle = "rgba(" + (bg.join(', '));
+			}
+		}
+		this.canvas.style.background = bgStyle;
 	}
 
 	return this;
@@ -2813,8 +2816,6 @@ Spectrum.prototype.update = function () {
  */
 Spectrum.prototype.draw = function () {
 	var gl = this.gl;
-
-	this.bgComponent.render();
 
 	gl.useProgram(this.program);
 
@@ -5960,7 +5961,8 @@ var tap = require('tap-to-start');
 
 tap({
 	background: '#2F0F3E',
-	foreground: '#E86F56'
+	foreground: '#E86F56',
+	skip: true
 }, startEverything);
 
 
@@ -6032,7 +6034,9 @@ function startEverything () {
 	// var frequencies = ft(sine);
 	// var frequencies = new Float32Array(1024).fill(0.5);
 	// var frequencies = ft(noise);
+	analyser.analyser.fftSize = 4096*2;
 	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
+	console.log(frequencies.length)
 	for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
 	// frequencies = frequencies
