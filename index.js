@@ -6476,7 +6476,7 @@ var app = startApp({
 var source = ctx.createMediaElementSource(app.audio);
 var analyser = ctx.createAnalyser();
 analyser.frequencyBinCount = 2048;
-analyser.smoothingTimeConstant = 0;
+analyser.smoothingTimeConstant = .1;
 source.connect(analyser);
 analyser.connect(ctx.destination);
 
@@ -6597,7 +6597,7 @@ function createColormapSelector (spectrum) {
 	var html = '';
 	for (var name in colorScales ) {
 		if (name === 'alpha') continue;
-		html += "<option value=\"" + name + "\"" + ((name === 'cdom') ? 'selected' : '') + ">" + name + "</option>"
+		html += "<option value=\"" + name + "\"" + ((name === 'inferno') ? 'selected' : '') + ">" + name + "</option>"
 	}
 	switcher.innerHTML = html;
 	switcher.addEventListener('input', function () {
