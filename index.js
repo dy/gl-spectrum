@@ -1,6 +1,4 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-
-},{}],2:[function(require,module,exports){
 'use strict'
 
 exports.toByteArray = toByteArray
@@ -111,7 +109,7 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],3:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
 (function (global){
 /*!
  * The buffer module from node.js, for the browser.
@@ -1597,14 +1595,14 @@ function blitBuffer (src, dst, offset, length) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":2,"ieee754":6,"isarray":4}],4:[function(require,module,exports){
+},{"base64-js":1,"ieee754":5,"isarray":3}],3:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],5:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -1908,7 +1906,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],6:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -1994,7 +1992,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],7:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -2089,186 +2087,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],8:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-'use strict';
-
-// If obj.hasOwnProperty has been overridden, then calling
-// obj.hasOwnProperty(prop) will break.
-// See: https://github.com/joyent/node/issues/1707
-function hasOwnProperty(obj, prop) {
-  return Object.prototype.hasOwnProperty.call(obj, prop);
-}
-
-module.exports = function(qs, sep, eq, options) {
-  sep = sep || '&';
-  eq = eq || '=';
-  var obj = {};
-
-  if (typeof qs !== 'string' || qs.length === 0) {
-    return obj;
-  }
-
-  var regexp = /\+/g;
-  qs = qs.split(sep);
-
-  var maxKeys = 1000;
-  if (options && typeof options.maxKeys === 'number') {
-    maxKeys = options.maxKeys;
-  }
-
-  var len = qs.length;
-  // maxKeys <= 0 means that we should not limit keys count
-  if (maxKeys > 0 && len > maxKeys) {
-    len = maxKeys;
-  }
-
-  for (var i = 0; i < len; ++i) {
-    var x = qs[i].replace(regexp, '%20'),
-        idx = x.indexOf(eq),
-        kstr, vstr, k, v;
-
-    if (idx >= 0) {
-      kstr = x.substr(0, idx);
-      vstr = x.substr(idx + 1);
-    } else {
-      kstr = x;
-      vstr = '';
-    }
-
-    k = decodeURIComponent(kstr);
-    v = decodeURIComponent(vstr);
-
-    if (!hasOwnProperty(obj, k)) {
-      obj[k] = v;
-    } else if (isArray(obj[k])) {
-      obj[k].push(v);
-    } else {
-      obj[k] = [obj[k], v];
-    }
-  }
-
-  return obj;
-};
-
-var isArray = Array.isArray || function (xs) {
-  return Object.prototype.toString.call(xs) === '[object Array]';
-};
-
-},{}],9:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-'use strict';
-
-var stringifyPrimitive = function(v) {
-  switch (typeof v) {
-    case 'string':
-      return v;
-
-    case 'boolean':
-      return v ? 'true' : 'false';
-
-    case 'number':
-      return isFinite(v) ? v : '';
-
-    default:
-      return '';
-  }
-};
-
-module.exports = function(obj, sep, eq, name) {
-  sep = sep || '&';
-  eq = eq || '=';
-  if (obj === null) {
-    obj = undefined;
-  }
-
-  if (typeof obj === 'object') {
-    return map(objectKeys(obj), function(k) {
-      var ks = encodeURIComponent(stringifyPrimitive(k)) + eq;
-      if (isArray(obj[k])) {
-        return map(obj[k], function(v) {
-          return ks + encodeURIComponent(stringifyPrimitive(v));
-        }).join(sep);
-      } else {
-        return ks + encodeURIComponent(stringifyPrimitive(obj[k]));
-      }
-    }).join(sep);
-
-  }
-
-  if (!name) return '';
-  return encodeURIComponent(stringifyPrimitive(name)) + eq +
-         encodeURIComponent(stringifyPrimitive(obj));
-};
-
-var isArray = Array.isArray || function (xs) {
-  return Object.prototype.toString.call(xs) === '[object Array]';
-};
-
-function map (xs, f) {
-  if (xs.map) return xs.map(f);
-  var res = [];
-  for (var i = 0; i < xs.length; i++) {
-    res.push(f(xs[i], i));
-  }
-  return res;
-}
-
-var objectKeys = Object.keys || function (obj) {
-  var res = [];
-  for (var key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) res.push(key);
-  }
-  return res;
-};
-
-},{}],10:[function(require,module,exports){
-'use strict';
-
-exports.decode = exports.parse = require('./decode');
-exports.encode = exports.stringify = require('./encode');
-
-},{"./decode":8,"./encode":9}],11:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 /**
  * @module  gl-spectrum
  */
@@ -2364,7 +2183,7 @@ Spectrum.prototype.minDecibels = -100;
 Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
 
-Spectrum.prototype.smoothing = 0.5;
+Spectrum.prototype.smoothing = 0.75;
 Spectrum.prototype.details = 1;
 
 Spectrum.prototype.snap = null;
@@ -2430,7 +2249,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	var smoothing = (bigger === this.frequencies ? 1 - this.smoothing : this.smoothing);
 
 	for (var i = 0; i < bigger.length; i++) {
-		bigger[i] = clamp(bigger[i], -200, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -200, 0) * (1 - smoothing);
+		bigger[i] = clamp(bigger[i], -100, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -100, 0) * (1 - smoothing);
 	}
 
 	//save actual frequencies
@@ -2442,7 +2261,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	//apply a-weighting
 	if (weighting[this.weighting]) {
 		var w = weighting[this.weighting];
-		magnitudes = magnitudes.map(function (mag, i, data) { return clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -100, 0); });
+		magnitudes = magnitudes.map(function (mag, i, data) { return clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -200, 0); });
 	}
 
 	//snap magnitudes
@@ -2623,10 +2442,10 @@ Spectrum.prototype.setBackground = function (bg) {
 			}
 
 			if (bg.length === 3) {
-				bgStyle = "rgb(" + (bg.join(', '));
+				bgStyle = "rgb(" + (bg.join(', ')) + ")";
 			}
 			else {
-				bgStyle = "rgba(" + (bg.join(', '));
+				bgStyle = "rgba(" + (bg.join(', ')) + ")";
 			}
 		}
 		this.canvas.style.background = bgStyle;
@@ -2836,28 +2655,28 @@ Spectrum.prototype.draw = function () {
 	return this;
 };
 
-},{"a-weighting":16,"colormap":23,"flatten":31,"gl-component":35,"inherits":37,"is-browser":39,"mumath/clamp":41,"mumath/lg":43,"plot-grid":49,"xtend/mutable":66}],12:[function(require,module,exports){
+},{"a-weighting":12,"colormap":24,"flatten":29,"gl-component":34,"inherits":36,"is-browser":38,"mumath/clamp":42,"mumath/lg":44,"plot-grid":51,"xtend/mutable":62}],8:[function(require,module,exports){
 module.exports = function a (f) {
 	var f2 = f*f;
 	return 1.2588966 * 148840000 * f2*f2 /
 	((f2 + 424.36) * Math.sqrt((f2 + 11599.29) * (f2 + 544496.41)) * (f2 + 148840000));
 };
 
-},{}],13:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 module.exports = function b (f) {
 	var f2 = f*f;
 	return 1.019764760044717 * 148840000 * f*f2 /
 	((f2 + 424.36) * Math.sqrt(f2 + 25122.25) * (f2 + 148840000));
 };
 
-},{}],14:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 module.exports = function c (f) {
 	var f2 = f*f;
 	return 1.0069316688518042 * 148840000 * f2 /
 	((f2 + 424.36) * (f2 + 148840000));
 };
 
-},{}],15:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 module.exports = function d (f) {
 	var f2 = f*f;
 	return (f / 6.8966888496476e-5) * Math.sqrt(
@@ -2868,7 +2687,7 @@ module.exports = function d (f) {
 	);
 };
 
-},{}],16:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 /**
  * @module  noise-weighting
  */
@@ -2881,7 +2700,7 @@ module.exports = {
 	itu: require('./itu'),
 	z: require('./z')
 };
-},{"./a":12,"./b":13,"./c":14,"./d":15,"./itu":17,"./z":18}],17:[function(require,module,exports){
+},{"./a":8,"./b":9,"./c":10,"./d":11,"./itu":13,"./z":14}],13:[function(require,module,exports){
 module.exports = function itu (f) {
 	var f2 = f*f;
 
@@ -2891,12 +2710,12 @@ module.exports = function itu (f) {
 	return 8.128305161640991 * 1.246332637532143e-4 * f / Math.sqrt(h1*h1 + h2*h2);
 };
 
-},{}],18:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 module.exports = function (f) {
 	return 1;
 };
 
-},{}],19:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 'use strict';
 
 var arraytools  = function () {
@@ -3085,7 +2904,13 @@ var arraytools  = function () {
 
 module.exports = arraytools();
 
-},{}],20:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
+var window = require('global/window');
+
+var Context = window.AudioContext || window.webkitAudioContext;
+if (Context) module.exports = new Context;
+
+},{"global/window":35}],17:[function(require,module,exports){
 var size = require('element-size')
 
 module.exports = fit
@@ -3135,7 +2960,7 @@ function fit(canvas, parent, scale) {
   }
 }
 
-},{"element-size":30}],21:[function(require,module,exports){
+},{"element-size":28}],18:[function(require,module,exports){
 (function (Buffer){
 var clone = (function() {
 'use strict';
@@ -3299,7 +3124,402 @@ if (typeof module === 'object' && module.exports) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":3}],22:[function(require,module,exports){
+},{"buffer":2}],19:[function(require,module,exports){
+module.exports = {
+	"aliceblue": [240, 248, 255],
+	"antiquewhite": [250, 235, 215],
+	"aqua": [0, 255, 255],
+	"aquamarine": [127, 255, 212],
+	"azure": [240, 255, 255],
+	"beige": [245, 245, 220],
+	"bisque": [255, 228, 196],
+	"black": [0, 0, 0],
+	"blanchedalmond": [255, 235, 205],
+	"blue": [0, 0, 255],
+	"blueviolet": [138, 43, 226],
+	"brown": [165, 42, 42],
+	"burlywood": [222, 184, 135],
+	"cadetblue": [95, 158, 160],
+	"chartreuse": [127, 255, 0],
+	"chocolate": [210, 105, 30],
+	"coral": [255, 127, 80],
+	"cornflowerblue": [100, 149, 237],
+	"cornsilk": [255, 248, 220],
+	"crimson": [220, 20, 60],
+	"cyan": [0, 255, 255],
+	"darkblue": [0, 0, 139],
+	"darkcyan": [0, 139, 139],
+	"darkgoldenrod": [184, 134, 11],
+	"darkgray": [169, 169, 169],
+	"darkgreen": [0, 100, 0],
+	"darkgrey": [169, 169, 169],
+	"darkkhaki": [189, 183, 107],
+	"darkmagenta": [139, 0, 139],
+	"darkolivegreen": [85, 107, 47],
+	"darkorange": [255, 140, 0],
+	"darkorchid": [153, 50, 204],
+	"darkred": [139, 0, 0],
+	"darksalmon": [233, 150, 122],
+	"darkseagreen": [143, 188, 143],
+	"darkslateblue": [72, 61, 139],
+	"darkslategray": [47, 79, 79],
+	"darkslategrey": [47, 79, 79],
+	"darkturquoise": [0, 206, 209],
+	"darkviolet": [148, 0, 211],
+	"deeppink": [255, 20, 147],
+	"deepskyblue": [0, 191, 255],
+	"dimgray": [105, 105, 105],
+	"dimgrey": [105, 105, 105],
+	"dodgerblue": [30, 144, 255],
+	"firebrick": [178, 34, 34],
+	"floralwhite": [255, 250, 240],
+	"forestgreen": [34, 139, 34],
+	"fuchsia": [255, 0, 255],
+	"gainsboro": [220, 220, 220],
+	"ghostwhite": [248, 248, 255],
+	"gold": [255, 215, 0],
+	"goldenrod": [218, 165, 32],
+	"gray": [128, 128, 128],
+	"green": [0, 128, 0],
+	"greenyellow": [173, 255, 47],
+	"grey": [128, 128, 128],
+	"honeydew": [240, 255, 240],
+	"hotpink": [255, 105, 180],
+	"indianred": [205, 92, 92],
+	"indigo": [75, 0, 130],
+	"ivory": [255, 255, 240],
+	"khaki": [240, 230, 140],
+	"lavender": [230, 230, 250],
+	"lavenderblush": [255, 240, 245],
+	"lawngreen": [124, 252, 0],
+	"lemonchiffon": [255, 250, 205],
+	"lightblue": [173, 216, 230],
+	"lightcoral": [240, 128, 128],
+	"lightcyan": [224, 255, 255],
+	"lightgoldenrodyellow": [250, 250, 210],
+	"lightgray": [211, 211, 211],
+	"lightgreen": [144, 238, 144],
+	"lightgrey": [211, 211, 211],
+	"lightpink": [255, 182, 193],
+	"lightsalmon": [255, 160, 122],
+	"lightseagreen": [32, 178, 170],
+	"lightskyblue": [135, 206, 250],
+	"lightslategray": [119, 136, 153],
+	"lightslategrey": [119, 136, 153],
+	"lightsteelblue": [176, 196, 222],
+	"lightyellow": [255, 255, 224],
+	"lime": [0, 255, 0],
+	"limegreen": [50, 205, 50],
+	"linen": [250, 240, 230],
+	"magenta": [255, 0, 255],
+	"maroon": [128, 0, 0],
+	"mediumaquamarine": [102, 205, 170],
+	"mediumblue": [0, 0, 205],
+	"mediumorchid": [186, 85, 211],
+	"mediumpurple": [147, 112, 219],
+	"mediumseagreen": [60, 179, 113],
+	"mediumslateblue": [123, 104, 238],
+	"mediumspringgreen": [0, 250, 154],
+	"mediumturquoise": [72, 209, 204],
+	"mediumvioletred": [199, 21, 133],
+	"midnightblue": [25, 25, 112],
+	"mintcream": [245, 255, 250],
+	"mistyrose": [255, 228, 225],
+	"moccasin": [255, 228, 181],
+	"navajowhite": [255, 222, 173],
+	"navy": [0, 0, 128],
+	"oldlace": [253, 245, 230],
+	"olive": [128, 128, 0],
+	"olivedrab": [107, 142, 35],
+	"orange": [255, 165, 0],
+	"orangered": [255, 69, 0],
+	"orchid": [218, 112, 214],
+	"palegoldenrod": [238, 232, 170],
+	"palegreen": [152, 251, 152],
+	"paleturquoise": [175, 238, 238],
+	"palevioletred": [219, 112, 147],
+	"papayawhip": [255, 239, 213],
+	"peachpuff": [255, 218, 185],
+	"peru": [205, 133, 63],
+	"pink": [255, 192, 203],
+	"plum": [221, 160, 221],
+	"powderblue": [176, 224, 230],
+	"purple": [128, 0, 128],
+	"rebeccapurple": [102, 51, 153],
+	"red": [255, 0, 0],
+	"rosybrown": [188, 143, 143],
+	"royalblue": [65, 105, 225],
+	"saddlebrown": [139, 69, 19],
+	"salmon": [250, 128, 114],
+	"sandybrown": [244, 164, 96],
+	"seagreen": [46, 139, 87],
+	"seashell": [255, 245, 238],
+	"sienna": [160, 82, 45],
+	"silver": [192, 192, 192],
+	"skyblue": [135, 206, 235],
+	"slateblue": [106, 90, 205],
+	"slategray": [112, 128, 144],
+	"slategrey": [112, 128, 144],
+	"snow": [255, 250, 250],
+	"springgreen": [0, 255, 127],
+	"steelblue": [70, 130, 180],
+	"tan": [210, 180, 140],
+	"teal": [0, 128, 128],
+	"thistle": [216, 191, 216],
+	"tomato": [255, 99, 71],
+	"turquoise": [64, 224, 208],
+	"violet": [238, 130, 238],
+	"wheat": [245, 222, 179],
+	"white": [255, 255, 255],
+	"whitesmoke": [245, 245, 245],
+	"yellow": [255, 255, 0],
+	"yellowgreen": [154, 205, 50]
+};
+},{}],20:[function(require,module,exports){
+/**
+ * @module color-parse
+ */
+
+module.exports = parse;
+
+
+var names = require('color-name');
+
+
+/**
+ * Base hues
+ * http://dev.w3.org/csswg/css-color/#typedef-named-hue
+ */
+//FIXME: use external hue detector
+var baseHues = {
+	red: 0,
+	orange: 60,
+	yellow: 120,
+	green: 180,
+	blue: 240,
+	purple: 300
+};
+
+
+/**
+ * Parse color from the string passed
+ *
+ * @return {Object} A space indicator `space`, an array `values` and `alpha`
+ */
+function parse (cstr) {
+	var m, parts = [0,0,0], alpha = 1, space = 'rgb';
+
+	//keyword
+	if (names[cstr]) {
+		parts = names[cstr].slice();
+	}
+
+	//reserved words
+	else if (cstr === 'transparent') alpha = 0;
+
+	//color space
+	else if (m = /^((?:rgb|hs[lvb]|hwb|cmyk?|xy[zy]|gray|lab|lchu?v?|[ly]uv|lms)a?)\s*\(([^\)]*)\)/.exec(cstr)) {
+		var name = m[1];
+		var base = name.replace(/a$/, '');
+		space = base;
+		var size = base === 'cmyk' ? 4 : base === 'gray' ? 1 : 3;
+		parts = m[2].trim()
+			.split(/\s*,\s*/)
+			.map(function (x, i) {
+				//<percentage>
+				if (/%$/.test(x)) {
+					//alpha
+					if (i === size)	return parseFloat(x) / 100;
+					//rgb
+					if (base === 'rgb') return parseFloat(x) * 255 / 100;
+					return parseFloat(x);
+				}
+				//hue
+				else if (base[i] === 'h') {
+					//<deg>
+					if (/deg$/.test(x)) {
+						return parseFloat(x);
+					}
+					//<base-hue>
+					else if (baseHues[x] !== undefined) {
+						return baseHues[x];
+					}
+				}
+				return parseFloat(x);
+			});
+
+		if (name === base) parts.push(1);
+		alpha = parts[size] === undefined ? 1 : parts[size];
+		parts = parts.slice(0, size);
+	}
+
+	//hex
+	else if (/^#[A-Fa-f0-9]+$/.test(cstr)) {
+		var base = cstr.replace(/^#/,'');
+		var size = base.length;
+		var isShort = size <= 4;
+
+		parts = base.split(isShort ? /(.)/ : /(..)/);
+		parts = parts.filter(Boolean)
+			.map(function (x) {
+				if (isShort) {
+					return parseInt(x + x, 16);
+				}
+				else {
+					return parseInt(x, 16);
+				}
+			});
+
+		if (parts.length === 4) {
+			alpha = parts[3] / 255;
+			parts = parts.slice(0,3);
+		}
+		if (!parts[0]) parts[0] = 0;
+		if (!parts[1]) parts[1] = 0;
+		if (!parts[2]) parts[2] = 0;
+	}
+
+	//named channels case
+	else if (cstr.length > 10 && /[0-9](?:\s|\/)/.test(cstr)) {
+		parts = cstr.match(/([0-9]+)/g).map(function (value) {
+			return parseFloat(value);
+		});
+
+		space = cstr.match(/([a-z])/ig).join('').toLowerCase();
+	}
+
+	else {
+		throw Error('Unable to parse ' + cstr);
+	}
+
+	return {
+		space: space,
+		values: parts,
+		alpha: alpha
+	};
+}
+},{"color-name":19}],21:[function(require,module,exports){
+/**
+ * @module color-space/hsl
+ */
+
+var rgb = require('./rgb');
+
+module.exports = {
+	name: 'hsl',
+	min: [0,0,0],
+	max: [360,100,100],
+	channel: ['hue', 'saturation', 'lightness'],
+	alias: ['HSL'],
+
+	rgb: function(hsl) {
+		var h = hsl[0] / 360,
+				s = hsl[1] / 100,
+				l = hsl[2] / 100,
+				t1, t2, t3, rgb, val;
+
+		if (s === 0) {
+			val = l * 255;
+			return [val, val, val];
+		}
+
+		if (l < 0.5) {
+			t2 = l * (1 + s);
+		}
+		else {
+			t2 = l + s - l * s;
+		}
+		t1 = 2 * l - t2;
+
+		rgb = [0, 0, 0];
+		for (var i = 0; i < 3; i++) {
+			t3 = h + 1 / 3 * - (i - 1);
+			if (t3 < 0) {
+				t3++;
+			}
+			else if (t3 > 1) {
+				t3--;
+			}
+
+			if (6 * t3 < 1) {
+				val = t1 + (t2 - t1) * 6 * t3;
+			}
+			else if (2 * t3 < 1) {
+				val = t2;
+			}
+			else if (3 * t3 < 2) {
+				val = t1 + (t2 - t1) * (2 / 3 - t3) * 6;
+			}
+			else {
+				val = t1;
+			}
+
+			rgb[i] = val * 255;
+		}
+
+		return rgb;
+	}
+};
+
+
+//extend rgb
+rgb.hsl = function(rgb) {
+	var r = rgb[0]/255,
+			g = rgb[1]/255,
+			b = rgb[2]/255,
+			min = Math.min(r, g, b),
+			max = Math.max(r, g, b),
+			delta = max - min,
+			h, s, l;
+
+	if (max === min) {
+		h = 0;
+	}
+	else if (r === max) {
+		h = (g - b) / delta;
+	}
+	else if (g === max) {
+		h = 2 + (b - r) / delta;
+	}
+	else if (b === max) {
+		h = 4 + (r - g)/ delta;
+	}
+
+	h = Math.min(h * 60, 360);
+
+	if (h < 0) {
+		h += 360;
+	}
+
+	l = (min + max) / 2;
+
+	if (max === min) {
+		s = 0;
+	}
+	else if (l <= 0.5) {
+		s = delta / (max + min);
+	}
+	else {
+		s = delta / (2 - max - min);
+	}
+
+	return [h, s * 100, l * 100];
+};
+},{"./rgb":22}],22:[function(require,module,exports){
+/**
+ * RGB space.
+ *
+ * @module  color-space/rgb
+ */
+
+module.exports = {
+	name: 'rgb',
+	min: [0,0,0],
+	max: [255,255,255],
+	channel: ['red', 'green', 'blue'],
+	alias: ['RGB']
+};
+},{}],23:[function(require,module,exports){
 module.exports={
 	"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],
 
@@ -3392,7 +3612,7 @@ module.exports={
 	"cubehelix": [{"index":0,"rgb":[0,0,0]},{"index":0.07,"rgb":[22,5,59]},{"index":0.13,"rgb":[60,4,105]},{"index":0.2,"rgb":[109,1,135]},{"index":0.27,"rgb":[161,0,147]},{"index":0.33,"rgb":[210,2,142]},{"index":0.4,"rgb":[251,11,123]},{"index":0.47,"rgb":[255,29,97]},{"index":0.53,"rgb":[255,54,69]},{"index":0.6,"rgb":[255,85,46]},{"index":0.67,"rgb":[255,120,34]},{"index":0.73,"rgb":[255,157,37]},{"index":0.8,"rgb":[241,191,57]},{"index":0.87,"rgb":[224,220,93]},{"index":0.93,"rgb":[218,241,142]},{"index":1,"rgb":[227,253,198]}]
 };
 
-},{}],23:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 /*
  * Ben Postlethwaite
  * January 2013
@@ -3529,154 +3749,24 @@ function rgbaStr (rgba) {
     return 'rgba(' + rgba.join(',') + ')';
 }
 
-},{"./colorScales":22,"arraytools":19,"clone":21}],24:[function(require,module,exports){
+},{"./colorScales":23,"arraytools":15,"clone":18}],25:[function(require,module,exports){
 module.exports = function gainToDecibels(value) {
   if (value == null) return 0
   return Math.round(Math.round(20 * (0.43429 * Math.log(value)) * 100) / 100 * 10) / 10
 }
-},{}],25:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 module.exports = {
   fromGain: require('./from-gain'),
   toGain: require('./to-gain')
 }
-},{"./from-gain":24,"./to-gain":26}],26:[function(require,module,exports){
+},{"./from-gain":25,"./to-gain":27}],27:[function(require,module,exports){
 module.exports = function decibelsToGain(value){
   if (value <= -40){
     return 0
   }
   return Math.round(Math.exp(value / 8.6858) * 10000) / 10000
 }
-},{}],27:[function(require,module,exports){
-
-/**
- * Expose `parse`.
- */
-
-module.exports = parse;
-
-/**
- * Tests for browser support.
- */
-
-var innerHTMLBug = false;
-var bugTestDiv;
-if (typeof document !== 'undefined') {
-  bugTestDiv = document.createElement('div');
-  // Setup
-  bugTestDiv.innerHTML = '  <link/><table></table><a href="/a">a</a><input type="checkbox"/>';
-  // Make sure that link elements get serialized correctly by innerHTML
-  // This requires a wrapper element in IE
-  innerHTMLBug = !bugTestDiv.getElementsByTagName('link').length;
-  bugTestDiv = undefined;
-}
-
-/**
- * Wrap map from jquery.
- */
-
-var map = {
-  legend: [1, '<fieldset>', '</fieldset>'],
-  tr: [2, '<table><tbody>', '</tbody></table>'],
-  col: [2, '<table><tbody></tbody><colgroup>', '</colgroup></table>'],
-  // for script/link/style tags to work in IE6-8, you have to wrap
-  // in a div with a non-whitespace character in front, ha!
-  _default: innerHTMLBug ? [1, 'X<div>', '</div>'] : [0, '', '']
-};
-
-map.td =
-map.th = [3, '<table><tbody><tr>', '</tr></tbody></table>'];
-
-map.option =
-map.optgroup = [1, '<select multiple="multiple">', '</select>'];
-
-map.thead =
-map.tbody =
-map.colgroup =
-map.caption =
-map.tfoot = [1, '<table>', '</table>'];
-
-map.polyline =
-map.ellipse =
-map.polygon =
-map.circle =
-map.text =
-map.line =
-map.path =
-map.rect =
-map.g = [1, '<svg xmlns="http://www.w3.org/2000/svg" version="1.1">','</svg>'];
-
-/**
- * Parse `html` and return a DOM Node instance, which could be a TextNode,
- * HTML DOM Node of some kind (<div> for example), or a DocumentFragment
- * instance, depending on the contents of the `html` string.
- *
- * @param {String} html - HTML string to "domify"
- * @param {Document} doc - The `document` instance to create the Node for
- * @return {DOMNode} the TextNode, DOM Node, or DocumentFragment instance
- * @api private
- */
-
-function parse(html, doc) {
-  if ('string' != typeof html) throw new TypeError('String expected');
-
-  // default to the global `document` object
-  if (!doc) doc = document;
-
-  // tag name
-  var m = /<([\w:]+)/.exec(html);
-  if (!m) return doc.createTextNode(html);
-
-  html = html.replace(/^\s+|\s+$/g, ''); // Remove leading/trailing whitespace
-
-  var tag = m[1];
-
-  // body support
-  if (tag == 'body') {
-    var el = doc.createElement('html');
-    el.innerHTML = html;
-    return el.removeChild(el.lastChild);
-  }
-
-  // wrap map
-  var wrap = map[tag] || map._default;
-  var depth = wrap[0];
-  var prefix = wrap[1];
-  var suffix = wrap[2];
-  var el = doc.createElement('div');
-  el.innerHTML = prefix + html + suffix;
-  while (depth--) el = el.lastChild;
-
-  // one element
-  if (el.firstChild == el.lastChild) {
-    return el.removeChild(el.firstChild);
-  }
-
-  // several elements
-  var fragment = doc.createDocumentFragment();
-  while (el.firstChild) {
-    fragment.appendChild(el.removeChild(el.firstChild));
-  }
-
-  return fragment;
-}
-
 },{}],28:[function(require,module,exports){
-function circOut(t) {
-  return Math.sqrt(1 - ( --t * t ))
-}
-
-module.exports = circOut
-},{}],29:[function(require,module,exports){
-function expoInOut(t) {
-  return (t === 0.0 || t === 1.0)
-    ? t
-    : t < 0.5
-      ? +0.5 * Math.pow(2.0, (20.0 * t) - 10.0)
-      : -0.5 * Math.pow(2.0, 10.0 - (t * 20.0)) + 1.0
-}
-
-module.exports = expoInOut
-},{}],30:[function(require,module,exports){
 module.exports = getSize
 
 function getSize(element) {
@@ -3712,7 +3802,7 @@ function parse(prop) {
   return parseFloat(prop) || 0
 }
 
-},{}],31:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 module.exports = function flatten(list, depth) {
   depth = (typeof depth == 'number') ? depth : Infinity;
 
@@ -3737,7 +3827,55 @@ module.exports = function flatten(list, depth) {
   }
 };
 
-},{}],32:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
+var isFunction = require('is-function')
+
+module.exports = forEach
+
+var toString = Object.prototype.toString
+var hasOwnProperty = Object.prototype.hasOwnProperty
+
+function forEach(list, iterator, context) {
+    if (!isFunction(iterator)) {
+        throw new TypeError('iterator must be a function')
+    }
+
+    if (arguments.length < 3) {
+        context = this
+    }
+    
+    if (toString.call(list) === '[object Array]')
+        forEachArray(list, iterator, context)
+    else if (typeof list === 'string')
+        forEachString(list, iterator, context)
+    else
+        forEachObject(list, iterator, context)
+}
+
+function forEachArray(array, iterator, context) {
+    for (var i = 0, len = array.length; i < len; i++) {
+        if (hasOwnProperty.call(array, i)) {
+            iterator.call(context, array[i], i, array)
+        }
+    }
+}
+
+function forEachString(string, iterator, context) {
+    for (var i = 0, len = string.length; i < len; i++) {
+        // no such thing as a sparse string.
+        iterator.call(context, string.charAt(i), i, string)
+    }
+}
+
+function forEachObject(object, iterator, context) {
+    for (var k in object) {
+        if (hasOwnProperty.call(object, k)) {
+            iterator.call(context, object[k], k, object)
+        }
+    }
+}
+
+},{"is-function":39}],31:[function(require,module,exports){
 /**
  * Real values fourier transform.
  *
@@ -3961,7 +4099,7 @@ function reverseBinPermute (N, dest, source) {
 
 	dest[nm1] = source[nm1];
 };
-},{}],33:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 module.exports = getCanvasContext
 function getCanvasContext (type, opts) {
   if (typeof type !== 'string') {
@@ -3999,14 +4137,14 @@ function getCanvasContext (type, opts) {
   return (gl || null) // ensure null on fail
 }
 
-},{}],34:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 /** generate unique id for selector */
 var counter = Date.now() % 1e9;
 
 module.exports = function getUid(){
 	return (Math.random() * 1e9 >>> 0) + (counter++);
 };
-},{}],35:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 /**
  * @module  gl-spectrum
  */
@@ -4554,47 +4692,18 @@ Component.prototype.createProgram = function (vSrc, fSrc) {
 }
 
 
-},{"canvas-fit":20,"events":5,"get-canvas-context":33,"inherits":37,"is-browser":39,"mutype/is-object":47,"raf-loop":50,"xtend/mutable":66}],36:[function(require,module,exports){
-module.exports = asString
-module.exports.add = append
-
-function asString(fonts) {
-  var href = getHref(fonts)
-  return '<link href="' + href + '" rel="stylesheet" type="text/css">'
+},{"canvas-fit":17,"events":4,"get-canvas-context":32,"inherits":36,"is-browser":38,"mutype/is-object":48,"raf-loop":52,"xtend/mutable":62}],35:[function(require,module,exports){
+(function (global){
+if (typeof window !== "undefined") {
+    module.exports = window;
+} else if (typeof global !== "undefined") {
+    module.exports = global;
+} else {
+    module.exports = {};
 }
 
-function asElement(fonts) {
-  var href = getHref(fonts)
-  var link = document.createElement('link')
-  link.setAttribute('href', href)
-  link.setAttribute('rel', 'stylesheet')
-  link.setAttribute('type', 'text/css')
-  return link
-}
-
-function getHref(fonts) {
-  var family = Object.keys(fonts).map(function(name) {
-    var details = fonts[name]
-    name = name.replace(/\s+/, '+')
-    return typeof details === 'boolean'
-      ? name
-      : name + ':' + makeArray(details).join(',')
-  }).join('|')
-
-  return 'http://fonts.googleapis.com/css?family=' + family
-}
-
-function append(fonts) {
-  var link = asElement(fonts)
-  document.head.appendChild(link)
-  return link
-}
-
-function makeArray(arr) {
-  return Array.isArray(arr) ? arr : [arr]
-}
-
-},{}],37:[function(require,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],36:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -4619,7 +4728,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],38:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -4643,160 +4752,79 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],39:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 module.exports = true;
+},{}],39:[function(require,module,exports){
+module.exports = isFunction
+
+var toString = Object.prototype.toString
+
+function isFunction (fn) {
+  var string = toString.call(fn)
+  return string === '[object Function]' ||
+    (typeof fn === 'function' && string !== '[object RegExp]') ||
+    (typeof window !== 'undefined' &&
+     // IE8 and below
+     (fn === window.setTimeout ||
+      fn === window.alert ||
+      fn === window.confirm ||
+      fn === window.prompt))
+};
+
 },{}],40:[function(require,module,exports){
+module.exports = isMobile;
 
-/**
- * Expose `render()`.`
- */
-
-exports = module.exports = render;
-
-/**
- * Expose `compile()`.
- */
-
-exports.compile = compile;
-
-/**
- * Render the given mustache `str` with `obj`.
- *
- * @param {String} str
- * @param {Object} obj
- * @return {String}
- * @api public
- */
-
-function render(str, obj) {
-  obj = obj || {};
-  var fn = compile(str);
-  return fn(obj);
-}
-
-/**
- * Compile the given `str` to a `Function`.
- *
- * @param {String} str
- * @return {Function}
- * @api public
- */
-
-function compile(str) {
-  var js = [];
-  var toks = parse(str);
-  var tok;
-
-  for (var i = 0; i < toks.length; ++i) {
-    tok = toks[i];
-    if (i % 2 == 0) {
-      js.push('"' + tok.replace(/"/g, '\\"') + '"');
-    } else {
-      switch (tok[0]) {
-        case '/':
-          tok = tok.slice(1);
-          js.push(') + ');
-          break;
-        case '^':
-          tok = tok.slice(1);
-          assertProperty(tok);
-          js.push(' + section(obj, "' + tok + '", true, ');
-          break;
-        case '#':
-          tok = tok.slice(1);
-          assertProperty(tok);
-          js.push(' + section(obj, "' + tok + '", false, ');
-          break;
-        case '!':
-          tok = tok.slice(1);
-          assertProperty(tok);
-          js.push(' + obj.' + tok + ' + ');
-          break;
-        default:
-          assertProperty(tok);
-          js.push(' + escape(obj.' + tok + ') + ');
-      }
-    }
+function isMobile (ua) {
+  if (!ua && typeof navigator != 'undefined') ua = navigator.userAgent;
+  if (ua && ua.headers && typeof ua.headers['user-agent'] == 'string') {
+    ua = ua.headers['user-agent'];
   }
+  if (typeof ua != 'string') return false;
 
-  js = '\n'
-    + indent(escape.toString()) + ';\n\n'
-    + indent(section.toString()) + ';\n\n'
-    + '  return ' + js.join('').replace(/\n/g, '\\n');
-
-  return new Function('obj', js);
+  return /(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows (ce|phone)|xda|xiino/i.test(ua) || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(ua.substr(0,4));
 }
 
-/**
- * Assert that `prop` is a valid property.
- *
- * @param {String} prop
- * @api private
- */
-
-function assertProperty(prop) {
-  if (!prop.match(/^[\w.]+$/)) throw new Error('invalid property "' + prop + '"');
-}
-
-/**
- * Parse `str`.
- *
- * @param {String} str
- * @return {Array}
- * @api private
- */
-
-function parse(str) {
-  return str.split(/\{\{|\}\}/);
-}
-
-/**
- * Indent `str`.
- *
- * @param {String} str
- * @return {String}
- * @api private
- */
-
-function indent(str) {
-  return str.replace(/^/gm, '  ');
-}
-
-/**
- * Section handler.
- *
- * @param {Object} context obj
- * @param {String} prop
- * @param {String} str
- * @param {Boolean} negate
- * @api private
- */
-
-function section(obj, prop, negate, str) {
-  var val = obj[prop];
-  if ('function' == typeof val) return val.call(obj, str);
-  if (negate) val = !val;
-  if (val) return str;
-  return '';
-}
-
-/**
- * Escape the given `html`.
- *
- * @param {String} html
- * @return {String}
- * @api private
- */
-
-function escape(html) {
-  return String(html)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
 
 },{}],41:[function(require,module,exports){
+'use strict';
+module.exports = leftPad;
+
+var cache = [
+  '',
+  ' ',
+  '  ',
+  '   ',
+  '    ',
+  '     ',
+  '      ',
+  '       ',
+  '        ',
+  '         '
+];
+
+function leftPad (str, len, ch) {
+  // convert `str` to `string`
+  str = str + '';
+
+  // doesn't need to pad
+  len = len - str.length;
+  if (len <= 0) return str;
+
+  // convert `ch` to `string`
+  if (!ch && ch !== 0) ch = ' ';
+  ch = ch + '';
+  if(ch === ' ' && len < 10) return cache[len] + str;
+  var pad = '';
+  while (true) {
+    if (len & 1) pad += ch;
+    len >>= 1;
+    if (len) ch += ch;
+    else break;
+  }
+  return pad + str;
+}
+
+},{}],42:[function(require,module,exports){
 /**
  * Clamp value.
  * Detects proper clamp min/max.
@@ -4811,7 +4839,7 @@ function escape(html) {
 module.exports = require('./wrap')(function(a, min, max){
 	return max > min ? Math.max(Math.min(a,max),min) : Math.max(Math.min(a,min),max);
 });
-},{"./wrap":46}],42:[function(require,module,exports){
+},{"./wrap":47}],43:[function(require,module,exports){
 /**
  * @module  mumath/closest
  */
@@ -4828,7 +4856,7 @@ module.exports = function closest (num, arr) {
 	}
 	return curr;
 }
-},{}],43:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 /**
  * Base 10 logarithm
  *
@@ -4837,7 +4865,7 @@ module.exports = function closest (num, arr) {
 module.exports = require('./wrap')(function (a) {
 	return Math.log(a) / Math.log(10);
 });
-},{"./wrap":46}],44:[function(require,module,exports){
+},{"./wrap":47}],45:[function(require,module,exports){
 /**
  * @module mumath/order
  */
@@ -4846,7 +4874,7 @@ module.exports = require('./wrap')(function (n) {
 	var order = Math.floor(Math.log(n) / Math.LN10 + 0.000000001);
 	return Math.pow(10,order);
 });
-},{"./wrap":46}],45:[function(require,module,exports){
+},{"./wrap":47}],46:[function(require,module,exports){
 /**
  * Whether element is between left & right including
  *
@@ -4865,7 +4893,7 @@ module.exports = require('./wrap')(function(a, left, right){
 	if (a <= right && a >= left) return true;
 	return false;
 });
-},{"./wrap":46}],46:[function(require,module,exports){
+},{"./wrap":47}],47:[function(require,module,exports){
 /**
  * Get fn wrapped with array/object attrs recognition
  *
@@ -4907,7 +4935,7 @@ module.exports = function(fn){
 		}
 	};
 };
-},{}],47:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 /**
  * @module mutype/is-object
  */
@@ -4920,7 +4948,39 @@ module.exports = function(o){
 	return !!o && typeof o === 'object' && o.constructor === Object;
 };
 
-},{}],48:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
+var trim = require('trim')
+  , forEach = require('for-each')
+  , isArray = function(arg) {
+      return Object.prototype.toString.call(arg) === '[object Array]';
+    }
+
+module.exports = function (headers) {
+  if (!headers)
+    return {}
+
+  var result = {}
+
+  forEach(
+      trim(headers).split('\n')
+    , function (row) {
+        var index = row.indexOf(':')
+          , key = trim(row.slice(0, index)).toLowerCase()
+          , value = trim(row.slice(index + 1))
+
+        if (typeof(result[key]) === 'undefined') {
+          result[key] = value
+        } else if (isArray(result[key])) {
+          result[key].push(value)
+        } else {
+          result[key] = [ result[key], value ]
+        }
+      }
+  )
+
+  return result
+}
+},{"for-each":30,"trim":60}],50:[function(require,module,exports){
 (function (process){
 // Generated by CoffeeScript 1.7.1
 (function() {
@@ -4956,7 +5016,7 @@ module.exports = function(o){
 }).call(this);
 
 }).call(this,require('_process'))
-},{"_process":7}],49:[function(require,module,exports){
+},{"_process":6}],51:[function(require,module,exports){
 /**
  * @module  plot-grid
  */
@@ -5274,7 +5334,7 @@ Grid.prototype.update = function (options) {
 
 	return this;
 };
-},{"events":5,"get-uid":34,"inherits":37,"insert-css":38,"is-browser":39,"mumath/closest":42,"mumath/lg":43,"mumath/order":44,"mumath/within":45,"xtend":65}],50:[function(require,module,exports){
+},{"events":4,"get-uid":33,"inherits":36,"insert-css":37,"is-browser":38,"mumath/closest":43,"mumath/lg":44,"mumath/order":45,"mumath/within":46,"xtend":61}],52:[function(require,module,exports){
 var inherits = require('inherits')
 var EventEmitter = require('events').EventEmitter
 var now = require('right-now')
@@ -5319,7 +5379,7 @@ Engine.prototype.tick = function() {
     this.emit('tick', dt)
     this.last = time
 }
-},{"events":5,"inherits":37,"raf":51,"right-now":52}],51:[function(require,module,exports){
+},{"events":4,"inherits":36,"raf":53,"right-now":54}],53:[function(require,module,exports){
 (function (global){
 var now = require('performance-now')
   , root = typeof window === 'undefined' ? global : window
@@ -5395,7 +5455,7 @@ module.exports.polyfill = function() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"performance-now":48}],52:[function(require,module,exports){
+},{"performance-now":50}],54:[function(require,module,exports){
 (function (global){
 module.exports =
   global.performance &&
@@ -5406,7 +5466,7 @@ module.exports =
   }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],53:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 'use strict'
 
 function blackmanHarris (i,N) {
@@ -5421,463 +5481,667 @@ function blackmanHarris (i,N) {
 
 module.exports = blackmanHarris
 
-},{}],54:[function(require,module,exports){
-var resolve = require('soundcloud-resolve')
-var fonts = require('google-fonts')
-var minstache = require('minstache')
-var insert = require('insert-css')
-var fs = require('fs')
-
-var icons = {
-    black: 'https://developers.soundcloud.com/assets/logo_black.png'
-  , white: 'https://developers.soundcloud.com/assets/logo_white.png'
-}
-
-module.exports = badge
-function noop(err){ if (err) throw err }
-
-var inserted = false
-var gwfadded = false
-var template = null
-
-function badge(options, callback) {
-  if (!inserted) insert(".npm-scb-wrap {\n  font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;\n  font-weight: 200;\n  position: absolute;\n  top: 0;\n  left: 0;\n  z-index: 999;\n}\n\n.npm-scb-wrap a {\n  text-decoration: none;\n  color: #000;\n}\n.npm-scb-white\n.npm-scb-wrap a {\n  color: #fff;\n}\n\n.npm-scb-inner {\n  position: absolute;\n  top: -120px; left: 0;\n  padding: 8px;\n  width: 100%;\n  height: 150px;\n  z-index: 2;\n  -webkit-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n     -moz-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n      -ms-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n       -o-transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n          transition: width 0.5s cubic-bezier(1, 0, 0, 1), top 0.5s;\n}\n.npm-scb-wrap:hover\n.npm-scb-inner {\n  top: 0;\n}\n\n.npm-scb-artwork {\n  position: absolute;\n  top: 16px; left: 16px;\n  width: 104px; height: 104px;\n  box-shadow: 0 0 8px -3px #000;\n  outline: 1px solid rgba(0,0,0,0.1);\n  z-index: 2;\n}\n.npm-scb-white\n.npm-scb-artwork {\n  outline: 1px solid rgba(255,255,255,0.1);\n  box-shadow: 0 0 10px -2px rgba(255,255,255,0.9);\n}\n\n.npm-scb-info {\n  position: absolute;\n  top: 16px;\n  left: 120px;\n  width: 300px;\n  z-index: 1;\n}\n\n.npm-scb-info > a {\n  display: block;\n}\n\n.npm-scb-now-playing {\n  font-size: 12px;\n  line-height: 12px;\n  position: absolute;\n  width: 500px;\n  z-index: 1;\n  padding: 15px 0;\n  top: 0; left: 138px;\n  opacity: 1;\n  -webkit-transition: opacity 0.25s;\n     -moz-transition: opacity 0.25s;\n      -ms-transition: opacity 0.25s;\n       -o-transition: opacity 0.25s;\n          transition: opacity 0.25s;\n}\n\n.npm-scb-wrap:hover\n.npm-scb-now-playing {\n  opacity: 0;\n}\n\n.npm-scb-white\n.npm-scb-now-playing {\n  color: #fff;\n}\n.npm-scb-now-playing > a {\n  font-weight: bold;\n}\n\n.npm-scb-info > a > p {\n  margin: 0;\n  padding-bottom: 0.25em;\n  line-height: 1.35em;\n  margin-left: 1em;\n  font-size: 1em;\n}\n\n.npm-scb-title {\n  font-weight: bold;\n}\n\n.npm-scb-icon {\n  position: absolute;\n  top: 120px;\n  padding-top: 0.75em;\n  left: 16px;\n}\n"), inserted = true
-  if (!template) template = minstache.compile("<div class=\"npm-scb-wrap\">\n  <div class=\"npm-scb-inner\">\n    <a target=\"_blank\" href=\"{{!urls.song}}\">\n      <img class=\"npm-scb-icon\" src=\"{{!icon}}\">\n      <img class=\"npm-scb-artwork\" src=\"{{!artwork}}\">\n    </a>\n    <div class=\"npm-scb-info\">\n      <a target=\"_blank\" href=\"{{!urls.song}}\">\n        <p class=\"npm-scb-title\">{{!title}}</p>\n      </a>\n      <a target=\"_blank\" href=\"{{!urls.artist}}\">\n        <p class=\"npm-scb-artist\">{{!artist}}</p>\n      </a>\n    </div>\n  </div>\n  <div class=\"npm-scb-now-playing\">\n    Now Playing:\n    <a href=\"{{!urls.song}}\">{{!title}}</a>\n    by\n    <a href=\"{{!urls.artist}}\">{{!artist}}</a>\n  </div>\n</div>")
-
-  if (!gwfadded && options.getFonts) {
-    fonts.add({ 'Open Sans': [300, 600] })
-    gwfadded = true
-  }
-
-  options = options || {}
-  callback = callback || noop
-
-  var div   = options.el || document.createElement('div')
-  var icon  = !('dark' in options) || options.dark ? 'black' : 'white'
-  var id    = options.client_id
-  var song  = options.song
-
-  resolve(id, song, function(err, json) {
-    if (err) return callback(err)
-    if (json.kind !== 'track') throw new Error(
-      'soundcloud-badge only supports individual tracks at the moment'
-    )
-
-    div.classList[
-      icon === 'black' ? 'remove' : 'add'
-    ]('npm-scb-white')
-
-    div.innerHTML = template({
-        artwork: json.artwork_url || json.user.avatar_url
-      , artist: json.user.username
-      , title: json.title
-      , icon: icons[icon]
-      , urls: {
-          song: json.permalink_url
-        , artist: json.user.permalink_url
-      }
-    })
-
-    document.body.appendChild(div)
-
-    callback(null, json.stream_url + '?client_id=' + id, json, div)
-  })
-
-  return div
-}
-
-},{"fs":1,"google-fonts":36,"insert-css":55,"minstache":40,"soundcloud-resolve":56}],55:[function(require,module,exports){
-var inserted = [];
-
-module.exports = function (css) {
-    if (inserted.indexOf(css) >= 0) return;
-    inserted.push(css);
-    
-    var elem = document.createElement('style');
-    var text = document.createTextNode(css);
-    elem.appendChild(text);
-    
-    if (document.head.childNodes.length) {
-        document.head.insertBefore(elem, document.head.childNodes[0]);
-    }
-    else {
-        document.head.appendChild(elem);
-    }
-};
-
 },{}],56:[function(require,module,exports){
-var qs  = require('querystring')
-var xhr = require('xhr')
+/**
+ * @module audio-demo
+ */
+var Emitter = require('events').EventEmitter;
+var inherits = require('inherits');
+var extend = require('xtend/mutable');
+var sf = 0;
+var className = ((require('insert-css')("._5f939f9f {\r\n\tmin-height: 100vh;\r\n\tmargin: 0;\r\n\tfont-family: sans-serif;\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._5f939f9f * {\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._5f939f9f a {\r\n\tcolor: inherit;\r\n}\r\n\r\n._5f939f9f [hidden] {\r\n\tdisplay: none!important;\r\n}\r\n\r\n._5f939f9f:after {\r\n\tcontent: '';\r\n}\r\n._5f939f9f.dragover:after {\r\n\tcontent: '⎗';\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tmargin: auto;\r\n\twidth: 20vh;\r\n\theight: 20vh;\r\n\tz-index: 2;\r\n\tfont-size: 20vh;\r\n\ttext-align: center;\r\n\tline-height: 20vh;\r\n\tdisplay: block;\r\n}\r\n\r\n._5f939f9f.dragover:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tbottom: 0;\r\n\tmargin: 0;\r\n\tborder: .2rem dashed;\r\n\tz-index: 1;\r\n\tdisplay: block;\r\n}\r\n\r\n._5f939f9f.dragover .source {\r\n}\r\n\r\n._5f939f9f .source {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tposition: absolute;\r\n\ttop: .5rem;\r\n\tleft: .75rem;\r\n\tdisplay: block;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\toutline: none;\r\n\tfill: currentColor;\r\n\tz-index: 999;\r\n}\r\n._5f939f9f .source-input {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tborder: 0;\r\n\tdisplay: inline;\r\n\tvertical-align: baseline;\r\n\tline-height: 1rem;\r\n\theight: 1rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\tfont-weight: bolder;\r\n\toutline: none;\r\n\tbackground: none;\r\n\t-webkit-appearance: none;\r\n\tappearance: none;\r\n\tborder-radius: 0;\r\n\tbox-shadow: 0 2px;\r\n\tcolor: inherit;\r\n}\r\n._5f939f9f .source-input:focus{\r\n\toutline: none;\r\n}\r\n._5f939f9f .source-input-file {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\topacity: 0;\r\n\tborder: none;\r\n\tcursor: pointer;\r\n}\r\n._5f939f9f .source-input-url {\r\n\tfont-family: sans-serif;\r\n\tfont-weight: bold;\r\n\tmin-width: 40vw;\r\n}\r\n._5f939f9f .source-input-url:focus {\r\n}\r\n._5f939f9f input[type=file],\r\n._5f939f9f input[type=file]::-webkit-file-upload-button {\r\n\tcursor: pointer;\r\n}\r\n._5f939f9f i {\r\n\tfill: currentColor;\r\n}\r\n._5f939f9f .source i {\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tdisplay: inline-block;\r\n\tposition: relative;\r\n}\r\n._5f939f9f .source i svg {\r\n\tmargin-bottom: -.52rem;\r\n}\r\n._5f939f9f i svg {\r\n\tmax-width: 100%;\r\n\tmax-height: 100%;\r\n}\r\n._5f939f9f .source-link {\r\n\tposition: relative;\r\n\tfont-weight: bold;\r\n\ttext-decoration: none;\r\n\tbox-shadow: 0px 2px;\r\n\twhite-space: nowrap;\r\n\tcursor: pointer;\r\n}\r\n\r\n._5f939f9f .text-length-limiter {\r\n\tdisplay: inline-block;\r\n\tmax-width: 50%;\r\n\tvertical-align: top;\r\n\twhite-space: nowrap;\r\n\ttext-overflow: ellipsis;\r\n\toverflow: hidden;\r\n}\r\n._5f939f9f .source-title {\r\n\tdisplay: inline;\r\n}\r\n\r\n._5f939f9f .fps {\r\n\tposition: fixed;\r\n\ttop: .5rem;\r\n\tright: .75rem;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tz-index: 999;\r\n}\r\n\r\n\r\n._5f939f9f .fps-canvas {\r\n\theight: 1rem;\r\n\twidth: 2rem;\r\n\tdisplay: inline-block;\r\n\tvertical-align: baseline;\r\n\tmargin-right: .15rem;\r\n\tmargin-bottom: -.15rem;\r\n}\r\n\r\n._5f939f9f .fps-text {\r\n}\r\n\r\n._5f939f9f .fps-value {\r\n}\r\n\r\n._5f939f9f .audio-playback {\r\n\r\n}\r\n\r\n._5f939f9f .progress {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\theight: .2rem;\r\n\tbackground: currentColor;\r\n\ttransition: .1s linear width;\r\n}\r\n\r\n@media (max-width: 640px) {\r\n\t._5f939f9f .text-length-limiter {\r\n\t\tmax-width: 30%;\r\n\t}\r\n\t._5f939f9f .source {\r\n\t\tright: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n\t._5f939f9f .fps {\r\n\t\ttop: auto;\r\n\t\tbottom: .5rem;\r\n\t\tright: .75rem;\r\n\t\tleft: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n}") || true) && "_5f939f9f");
+var ctx = require('audio-context');
 
-module.exports = resolve
+var raf = require('raf');
+var now = require('right-now');
+var colorParse = require('color-parse');
+var hsl = require('color-space/hsl');
+var pad = require('left-pad');
+var isMobile = require('is-mobile')();
+var xhr = require('xhr');
 
-function resolve(id, goal, callback) {
-  var uri = 'https://api.soundcloud.com/resolve.json?' + qs.stringify({
-      url: goal
-    , client_id: id
-  })
+module.exports = StartApp;
 
-  xhr({
-      uri: uri
-    , method: 'GET'
-  }, function(err, res, body) {
-    if (err) return callback(err)
-    try {
-      body = JSON.parse(body)
-    } catch(e) {
-      return callback(e)
-    }
-    if (body.errors) return callback(new Error(
-      body.errors[0].error_message
-    ))
 
-    var stream_url = body.kind === 'track'
-      && body.stream_url + '?client_id=' + id
 
-    return callback(null, body, stream_url)
-  })
+/**
+ * @constructor
+ */
+function StartApp (opts, cb) {
+	var this$1 = this;
+
+	if (!(this instanceof StartApp)) return new StartApp(opts, cb);
+
+	var self = this;
+
+	extend(this, opts);
+
+	//ensure container
+	if (!this.container) this.container = document.body || document.documentElement;
+	this.container.classList.add(className);
+
+	//create container
+	this.sourceEl = document.createElement('div');
+	this.sourceEl.classList.add('source');
+	this.container.appendChild(this.sourceEl);
+
+	//create dynamic style
+	this.styleEl = document.createElement('style');
+	(document.head || document.documentElement).appendChild(this.styleEl);
+
+	this.setColor(this.color);
+
+	//add mobile metas
+	if (isMobile && this.mobile) {
+		var metaEl = document.createElement('meta');
+		metaEl.setAttribute('name', 'viewport');
+		metaEl.setAttribute('content', 'width=device-width, initial-scale=1, shrink-to-fit=no, user-scalable=no');
+		(document.head || document.documentElement).appendChild(metaEl);
+
+		metaEl = document.createElement('meta');
+		metaEl.setAttribute('name', 'apple-mobile-web-app-capable');
+		metaEl.setAttribute('content', 'yes');
+		(document.head || document.documentElement).appendChild(metaEl);
+
+		setTimeout(function () {
+			window.scrollTo(0, 0);
+		}, 0);
+	}
+
+	//create layout
+	this.sourceEl.innerHTML = "\n\t\t<i class=\"source-icon\">" + (this.icons.loading) + "</i>\n\t\t<span class=\"source-text\"></span>\n\t\t<a href=\"#audio\" class=\"audio-playback\" hidden><i class=\"audio-icon\">" + (this.icons.play) + "</i></a><a href=\"#stop\" class=\"audio-stop\" title=\"Reset\" hidden><i class=\"audio-icon\">" + (this.icons.eject) + "</i></a>\n\t";
+	this.sourceIcon = this.sourceEl.querySelector('.source-icon');
+	this.sourceText = this.sourceEl.querySelector('.source-text');
+	this.sourceIcon.innerHTML = this.file ? this.icons.open : this.url ? this.icons.url : this.mic ? this.icons.mic : this.icons.open;
+
+	this.sourceText.innerHTML = "\n\t\t<span class=\"source-links\">\n\t\t\t<a href=\"#open-file\" " + (this.file ? '' : 'hidden') + " class=\"source-link source-link-file\">Open file</a>" + (this.file && this.url && this.mic ? ',' : this.file && (this.url || this.mic) ? ' or' : '') + "\n\t\t\t<a href=\"#enter-url\" " + (this.url ? '' : 'hidden') + " class=\"source-link source-link-url\">enter URL</a>\n\t\t\t" + (this.url && this.mic ? ' or' : '') + "\n\t\t\t<a href=\"#enable-mic\" " + (this.mic ? '' : 'hidden') + " class=\"source-link source-link-mic\">\n\t\t\t\tenable microphone\n\t\t\t</a>\n\t\t</span>\n\t\t<input class=\"source-input source-input-file\" hidden type=\"file\"/>\n\t\t<input placeholder=\"http://url.to/audio\" hidden class=\"source-input source-input-url\" type=\"url\" value=\"" + (this.source || '') + "\"/>\n\t\t<strong class=\"source-title\"></strong>\n\t";
+	this.sourceTitle = this.sourceEl.querySelector('.source-title');
+	this.sourceLinks = this.sourceEl.querySelector('.source-links');
+	this.sourceInputFile = this.sourceEl.querySelector('.source-input-file');
+	this.sourceEl.querySelector('.source-link-file').addEventListener('click', function (e) {
+		e.preventDefault();
+		this$1.sourceInputFile.click();
+	});
+	this.sourceInputFile.addEventListener('change', function (e) {
+		if (!this$1.sourceInputFile.files.length) return this$1;
+		this$1.setSource(this$1.sourceInputFile.files);
+	});
+	this.sourceInputURL = this.sourceEl.querySelector('.source-input-url');
+	this.sourceInputURL.addEventListener('blur', function (e) {
+		this$1.showInput();
+	});
+	this.sourceInputURL.addEventListener('change', function (e) {
+		e.preventDefault();
+		this$1.hideInput();
+		this$1.sourceIcon.innerHTML = this$1.icons.loading;
+		this$1.sourceTitle.innerHTML = "loading";
+		this$1.setSource(this$1.sourceInputURL.value, function (err) {
+			//in case of error allow second chance
+			if (err) {
+				this$1.hideInput();
+				this$1.sourceTitle.innerHTML = "";
+				this$1.sourceInputURL.removeAttribute('hidden');
+				this$1.sourceIcon.innerHTML = this$1.icons.url;
+			}
+		});
+	});
+	this.sourceEl.querySelector('.source-link-url').addEventListener('click', function (e) {
+		e.preventDefault();
+		this$1.hideInput();
+		this$1.sourceInputURL.removeAttribute('hidden');
+		this$1.sourceInputURL.focus();
+		this$1.sourceIcon.innerHTML = this$1.icons.url;
+	});
+	this.sourceInputMic = this.sourceEl.querySelector('.source-link-mic');
+	this.sourceInputMic.addEventListener('click', function (e) {
+		e.preventDefault();
+
+		if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+			navigator.mediaDevices.getUserMedia({audio: true, video: false})
+			.then(enableMic).catch(errMic);
+		}
+		else {
+			try {
+				navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia);
+				navigator.getUserMedia({audio: true, video: false}, enableMic, errMic);
+			} catch (e) {
+				errMic(e);
+			}
+		}
+
+		function enableMic(stream) {
+			self.hideInput();
+			self.sourceTitle.innerHTML = "Microphone";
+			self.sourceIcon.innerHTML = self.icons.mic;
+
+			self.audio.src = URL.createObjectURL(stream);
+			self.play();
+			self.audioStop.querySelector('i').innerHTML = self.icons.stop;
+			self.audioStop.removeAttribute('hidden');
+		}
+		function errMic (err) {
+			self.hideInput();
+			self.sourceTitle.innerHTML = err;//`microphone is not allowed`;
+			self.sourceIcon.innerHTML = self.icons.error;
+			setTimeout(function () {
+				if (!self.source) self.showInput();
+				cb && cb(new Error('Microphone is not allowed'));
+			}, 1000);
+		}
+	});
+
+	//init audio
+	var audio = this.audio = new Audio();
+	this.audio.loop = this.loop;
+	this.audio.crossOrigin = 'Anonymous';
+	this.audioEl = this.sourceEl.querySelector('.audio-playback');
+	this.audioStop = this.sourceEl.querySelector('.audio-stop');
+	this.audioIcon = this.sourceEl.querySelector('.audio-icon');
+	this.audio.addEventListener('canplay', function () {
+		this$1.source && this$1.autoplay && this$1.play();
+	});
+	this.audioEl.addEventListener('click', function (e) {
+		e.preventDefault();
+		if (this$1.audio.paused) {
+			this$1.play();
+		}
+		else {
+			this$1.pause();
+		}
+	});
+	this.audioStop.addEventListener('click', function (e) {
+		this$1.reset();
+	});
+
+	//init progress bar
+	var progress = this.progressEl = document.createElement('div');
+	this.progressEl.classList.add('progress');
+	if (!this.progress) this.progressEl.setAttribute('hidden', true);
+	this.progressEl.setAttribute('title', '00:00');
+	this.container.appendChild(progress);
+	setInterval(function () {
+		if (this$1.audio) {
+			progress.style.width = ((audio.currentTime / audio.duration * 100) || 0) + '%';
+			progress.setAttribute('title', ((this$1.getTime(this$1.audio.currentTime)) + " / " + (this$1.getTime(this$1.audio.duration)) + " played"));
+		}
+	}, 500)
+
+
+	//init fps
+	this.fpsEl = document.createElement('div');
+	this.fpsEl.classList.add('fps');
+	this.fpsEl.setAttribute('hidden', true);
+	this.fpsEl.innerHTML = "\n\t\t<canvas class=\"fps-canvas\"></canvas>\n\t\t<span class=\"fps-text\">\n\t\t\tfps <span class=\"fps-value\">60.0</span>\n\t\t</span>\n\t";
+	this.fpsCanvas = this.fpsEl.querySelector('.fps-canvas');
+	var fpsValue = this.fpsValue = this.fpsEl.querySelector('.fps-value');
+	this.container.appendChild(this.fpsEl);
+
+	var w = this.fpsCanvas.width = parseInt(getComputedStyle(this.fpsCanvas).width) || 1;
+	var h = this.fpsCanvas.height = parseInt(getComputedStyle(this.fpsCanvas).height) || 1;
+
+	var ctx = this.fpsCanvas.getContext('2d');
+	var count = 0;
+	var last = 0;
+	var len = this.fpsCanvas.width;
+	var values = Array(len).fill(0);
+	var updatePeriod = 1000;
+	var maxFPS = 100;
+	var that = this;
+
+	//enable update routine
+	raf(function measure () {
+		count++;
+		var t = now();
+		if (t - last > updatePeriod) {
+			var color = that.color;
+			var transparentColor = that.transparentColor;
+			last = t;
+			values.push((count) / (maxFPS * updatePeriod * 0.001));
+			values = values.slice(-len);
+			count = 0;
+
+			ctx.clearRect(0, 0, w, h);
+			ctx.fillStyle = color;
+			for (var i = 0; i < len; i++) {
+				ctx.fillRect(i, h - h * values[i], 1, h * values[i]);
+			}
+
+			fpsValue.innerHTML = (values[values.length - 1]*maxFPS).toFixed(1);
+		}
+
+		raf(measure);
+	});
+
+
+	this.update();
+
+	setTimeout(function () {
+		if (this$1.source) {
+			this$1.setSource(this$1.source, function (err) {
+				if (err) this$1.showInput();
+				cb && cb(null, this$1.source);
+			});
+		}
+		else {
+			cb && cb(null, this$1.source);
+		}
+	});
 }
 
-},{"querystring":10,"xhr":62}],57:[function(require,module,exports){
-// stats.js - http://github.com/mrdoob/stats.js
-var Stats=function(){function h(a){c.appendChild(a.dom);return a}function k(a){for(var d=0;d<c.children.length;d++)c.children[d].style.display=d===a?"block":"none";l=a}var l=0,c=document.createElement("div");c.style.cssText="position:fixed;top:0;left:0;cursor:pointer;opacity:0.9;z-index:10000";c.addEventListener("click",function(a){a.preventDefault();k(++l%c.children.length)},!1);var g=(performance||Date).now(),e=g,a=0,r=h(new Stats.Panel("FPS","#0ff","#002")),f=h(new Stats.Panel("MS","#0f0","#020"));
-if(self.performance&&self.performance.memory)var t=h(new Stats.Panel("MB","#f08","#201"));k(0);return{REVISION:16,dom:c,addPanel:h,showPanel:k,begin:function(){g=(performance||Date).now()},end:function(){a++;var c=(performance||Date).now();f.update(c-g,200);if(c>e+1E3&&(r.update(1E3*a/(c-e),100),e=c,a=0,t)){var d=performance.memory;t.update(d.usedJSHeapSize/1048576,d.jsHeapSizeLimit/1048576)}return c},update:function(){g=this.end()},domElement:c,setMode:k}};
-Stats.Panel=function(h,k,l){var c=Infinity,g=0,e=Math.round,a=e(window.devicePixelRatio||1),r=80*a,f=48*a,t=3*a,u=2*a,d=3*a,m=15*a,n=74*a,p=30*a,q=document.createElement("canvas");q.width=r;q.height=f;q.style.cssText="width:80px;height:48px";var b=q.getContext("2d");b.font="bold "+9*a+"px Helvetica,Arial,sans-serif";b.textBaseline="top";b.fillStyle=l;b.fillRect(0,0,r,f);b.fillStyle=k;b.fillText(h,t,u);b.fillRect(d,m,n,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d,m,n,p);return{dom:q,update:function(f,
-v){c=Math.min(c,f);g=Math.max(g,f);b.fillStyle=l;b.globalAlpha=1;b.fillRect(0,0,r,m);b.fillStyle=k;b.fillText(e(f)+" "+h+" ("+e(c)+"-"+e(g)+")",t,u);b.drawImage(q,d+a,m,n-a,p,d,m,n-a,p);b.fillRect(d+n-a,m,a,p);b.fillStyle=l;b.globalAlpha=.9;b.fillRect(d+n-a,m,a,e((1-f/v)*p))}}};"object"===typeof module&&(module.exports=Stats);
+inherits(StartApp, Emitter);
 
-},{}],58:[function(require,module,exports){
-var has = require('has');
+//Allow dropping files to browser
+StartApp.prototype.dragAndDrop = true;
 
-module.exports = function (name, attr) {
-    var elem = document.createElementNS('http://www.w3.org/2000/svg', name);
-    if (!attr) return elem;
-    for (var key in attr) {
-        if (!has(attr, key)) continue;
-        var nkey = key.replace(/([a-z])([A-Z])/g, function (_, a, b) {
-            return a + '-' + b.toLowerCase();
-        });
-        elem.setAttribute(nkey, attr[key]);
-    }
-    return elem;
-}
+//Enable file select
+StartApp.prototype.file = true;
 
-},{"has":59}],59:[function(require,module,exports){
-var hasOwn = Object.prototype.hasOwnProperty;
+//Enable url select
+StartApp.prototype.url = true;
 
+//Enable mic input
+StartApp.prototype.mic = !!(navigator.mediaDevices || navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia);
 
-module.exports = function has(obj, property) {
-  return hasOwn.call(obj, property);
+//Default (my) soundcloud API token
+StartApp.prototype.token = {
+	soundcloud: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
+	youtube: 'AIzaSyBPxsJRzvSSz_LOpejJhOGPyEzlRxU062M'
 };
 
-},{}],60:[function(require,module,exports){
-module.exports = tapToStart
+//display micro fps counter
+StartApp.prototype.fps = true;
 
-var domify = require('domify')
-var circ = require('eases/circ-out')
-var expo = require('eases/expo-in-out')
-var SVG = require('svg-create-element')
-var raf = require('raf')
+//autostart play
+StartApp.prototype.autoplay = true;
+StartApp.prototype.loop = true;
 
-function tapToStart (options, done) {
-  options = options || {}
+//enable progress indicator
+StartApp.prototype.progress = true;
 
-  var bgColor = options.background || 'transparent'
-  var fgColor = options.foreground || '#000'
-  var acColor = options.accent || options.background || '#fff'
-  if (options.skip) return raf(done)
+//icon paths
+StartApp.prototype.icons = {
+	record: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M757.76 818.347h-696.32c-29.013 0-52.907-23.893-52.907-52.907v-532.48c0-29.013 23.893-52.907 52.907-52.907h696.32c29.013 0 52.907 23.893 52.907 52.907v532.48c0 29.013-23.893 52.907-52.907 52.907zM75.093 751.787h669.013v-505.173h-669.013v505.173z\"></path>\n<path d=\"M574.293 636.588c-69.973 0-128-56.32-128-126.293s56.32-126.293 128-126.293c69.973 0 128 56.32 128 126.293s-58.027 126.293-128 126.293zM574.293 450.561c-32.427 0-59.733 27.307-59.733 59.733s27.307 59.733 59.733 59.733 59.733-27.307 59.733-59.733-27.307-59.733-59.733-59.733z\"></path>\n<path d=\"M241.493 636.588c-69.973 0-128-56.32-128-126.293s56.32-126.293 128-126.293c69.973 0 128 56.32 128 126.293s-58.027 126.293-128 126.293zM241.493 450.561c-32.427 0-59.733 27.307-59.733 59.733s27.307 59.733 59.733 59.733c32.427 0 59.733-27.307 59.733-59.733s-27.307-59.733-59.733-59.733z\"></path>\n<path d=\"M572.607 450.113h-332.8c-18.773 0-34.133-14.88-34.133-33.067s15.36-33.067 34.133-33.067h332.8c18.773 0 34.133 14.88 34.133 33.067s-17.067 33.067-34.133 33.067z\"></path>\n</svg>\n",
+	error: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M807.303 756.637l-351.17-607.966c-9.601-16.582-27.188-26.702-46.308-26.702-0.074 0-0.143 0-0.208 0s-0.143 0-0.208 0c-19.112 0-36.699 10.12-46.308 26.702l-351.186 607.966c-9.564 16.643-9.564 37.104 0 53.706 9.511 16.61 27.209 26.775 46.525 26.775h702.348c19.308 0 37.014-10.165 46.525-26.775 9.564-16.598 9.564-37.087-0.008-53.706zM89.419 765.556l320.193-554.297 320.193 554.297h-640.382z\"></path>\n<path d=\"M540.178 663.195l-72.859-74.216 70.995-71.763-57.871-57.242-70.161 70.926-70.746-72.058-58.075 57.025 71.584 72.904-73.991 74.804 57.863 57.242 73.157-73.946 72.033 73.353z\"></path>\n</svg>\n",
+	soundcloud: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"1206\" height=\"1024\" viewBox=\"0 0 1206 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M54.937 674.845c0 13.601 4.925 23.883 14.799 30.861 9.861 6.973 20.4 9.443 31.63 7.391 10.545-2.033 17.938-5.785 22.187-11.229 4.246-5.445 6.37-14.459 6.37-27.037v-147.916c0-10.545-3.66-19.475-10.963-26.771-7.315-7.315-16.244-10.963-26.771-10.963-10.203 0-18.954 3.66-26.276 10.963s-10.963 16.244-10.963 26.771v147.916zM172.25 738.092c0 9.861 3.479 17.261 10.461 22.187s15.903 7.391 26.771 7.391c11.229 0 20.311-2.463 27.292-7.391 6.973-4.924 10.461-12.331 10.461-22.187v-344.801c0-10.203-3.662-18.956-10.963-26.276-7.315-7.315-16.245-10.963-26.771-10.963-10.203 0-18.956 3.662-26.276 10.963-7.315 7.315-10.963 16.062-10.963 26.276v344.801zM289.060 754.417c0 9.861 3.569 17.261 10.708 22.187 7.139 4.924 16.321 7.391 27.541 7.391 10.887 0 19.813-2.463 26.771-7.391 6.973-4.925 10.462-12.331 10.462-22.187v-314.708c0-10.545-3.662-19.551-10.963-27.037-7.315-7.477-16.062-11.228-26.276-11.228-10.545 0-19.551 3.743-27.037 11.228s-11.229 16.493-11.229 27.037v314.708zM406.369 755.939c0 18.708 12.584 28.062 37.752 28.062s37.751-9.354 37.751-28.062v-510.062c0-28.557-8.676-44.708-26.011-48.461-11.229-2.717-22.277 0.513-33.155 9.692s-16.321 22.097-16.321 38.769v510.062zM525.728 770.737v-554.954c0-17.689 5.263-28.216 15.815-31.63 22.781-5.445 45.391-8.155 67.845-8.155 52.028 0 100.491 12.245 145.37 36.727 44.891 24.491 81.187 57.893 108.893 100.226 27.721 42.34 43.785 89.014 48.203 140.012 20.739-8.835 42.845-13.262 66.306-13.262 47.602 0 88.331 16.831 122.155 50.493 33.839 33.664 50.749 74.125 50.749 121.392 0 47.602-16.923 88.245-50.749 121.907s-74.385 50.493-121.658 50.493l-443.755-0.513c-3.059-1.016-5.356-2.893-6.893-5.605s-2.299-5.11-2.299-7.142z\"></path>\n</svg>\n",
+	open: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M799.019 413.071c-13.274-16.986-33.621-26.933-55.195-26.933v-140.089c0-38.664-31.379-70.045-70.045-70.045h-140.089c-38.664 0-70.045 31.379-70.045 70.045h-350.222c-38.664 0-70.045 31.379-70.045 70.045v420.267c0 38.664 31.379 70.045 70.045 70.045h560.355c32.466 0 59.503-22.205 67.453-52.149 0.105-0.315 0.456-0.595 0.525-0.875l70.045-280.178c5.218-20.944 0.49-43.147-12.783-60.133zM113.424 316.095h420.267v-70.045h140.089v140.089h-490.311c-32.15 0-60.168 21.889-67.943 53.059l-2.101 8.336v-131.438zM673.781 736.361h-560.355l70.045-280.178h560.355l-70.045 280.178z\"></path>\n</svg>\n",
+	loading: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M640.327 412.161c-45.569 0-82.591 37.025-82.591 85.44s37.025 85.44 82.591 85.44c45.569 0 82.591-37.025 82.591-85.44s-37.025-85.44-82.591-85.44zM409.639 412.161c-45.569 0-82.591 37.025-82.591 85.44s37.025 85.44 82.591 85.44c45.569 0 82.591-37.025 82.591-85.44s-37.025-85.44-82.591-85.44zM178.951 412.161c-45.569 0-82.591 37.025-82.591 85.44s37.025 85.44 82.591 85.44c45.569 0 82.591-37.025 82.591-85.44s-37.025-85.44-82.591-85.44z\"></path>\n</svg>\n",
+	url: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M407.776 122.436c-199.872 0-362.496 162.624-362.496 362.496s162.624 362.496 362.496 362.496 362.496-162.624 362.496-362.496-162.624-362.496-362.496-362.496zM407.776 791.652c-39.826 0-83.1-74.988-101.902-187.459 32.351-4.849 66.514-7.709 101.902-7.709s69.551 2.9 101.902 7.709c-18.801 112.471-62.075 187.459-101.902 187.459zM407.776 540.708c-37.837 0-74.271 2.989-108.846 8.152-1.764-20.485-2.674-41.864-2.674-63.896s0.91-43.411 2.674-63.896c34.574 5.164 71.009 8.152 108.846 8.152s74.271-2.989 108.846-8.152c1.764 20.485 2.674 41.864 2.674 63.896s-0.91 43.411-2.674 63.896c-34.574-5.164-71.009-8.152-108.846-8.152zM101.056 484.932c0-42.775 8.797-83.471 24.738-120.445 32.174 19.486 72.596 34.896 117.948 45.9-2.175 23.885-3.262 48.848-3.262 74.586s1.087 50.612 3.262 74.586c-45.409 11.052-85.775 26.374-117.948 45.9-15.91-37.023-24.738-77.751-24.738-120.526zM407.776 178.212c39.826 0 83.1 74.988 101.902 187.459-32.351 4.809-66.474 7.709-101.902 7.709s-69.551-2.9-101.902-7.709c18.801-112.471 62.075-187.459 101.902-187.459zM571.842 410.346c45.409-11.052 85.726-26.374 117.948-45.9 15.853 36.886 24.738 77.614 24.738 120.389s-8.797 83.471-24.738 120.437c-32.222-19.478-72.596-34.977-117.948-45.9 2.175-23.876 3.262-48.848 3.262-74.586s-1.087-50.476-3.262-74.408zM663.102 315.276c-26.188 16.361-59.852 29.813-98.51 39.609-10.69-63.936-29.137-118.222-53.198-158.314 62.349 22.515 115.499 64.387 151.709 118.673zM304.191 196.603c-24.062 40.060-42.509 94.346-53.198 158.314-38.69-9.828-72.322-23.248-98.51-39.609 36.209-54.286 89.359-96.158 151.709-118.673zM152.482 654.661c26.188-16.401 59.852-29.821 98.51-39.649 10.69 63.936 29.137 118.222 53.198 158.322-62.349-22.563-115.499-64.436-151.709-118.673zM511.361 773.334c24.062-40.1 42.509-94.386 53.198-158.322 38.69 9.828 72.322 23.248 98.51 39.649-36.209 54.237-89.359 96.11-151.709 118.673z\"></path>\n</svg>\n",
+	mic: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M409.618 681.692c114.138 0 206.667-92.529 206.667-206.667v-165.333c0-114.138-92.529-206.667-206.667-206.667s-206.667 92.529-206.667 206.667v165.333c0 114.138 92.529 206.667 206.667 206.667z\"></path>\n<path d=\"M368.285 844.589v85.104h82.667v-85.104c185.707-20.667 330.667-178.44 330.667-369.563v-82.667h-82.667v82.667c0 159.547-129.83 289.333-289.333 289.333s-289.333-129.787-289.333-289.333v-82.667h-82.667v82.667c0 191.124 144.96 348.94 330.667 369.563z\"></path>\n</svg>\n",
+	play: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M236.256 289.447c0-26.093 21.148-47.248 47.241-47.248 8.109 0 13.243 2.118 22.273 5.714l331.371 192.797c15.414 9.136 22.545 23.813 25.295 40.725v4.748c-2.758 16.904-9.891 31.585-25.295 40.725l-331.363 192.789c-9.045 3.604-14.179 5.706-22.273 5.706-26.093 0-47.241-21.155-47.241-47.248v-388.723z\"></path>\n</svg>\n",
+	pause: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M186.54 304.268c0-25.055 20.319-45.372 45.387-45.372h95.385c25.055 0 45.387 20.319 45.387 45.372v360.448c0 25.060-20.319 45.38-45.387 45.38h-95.385c-25.055 0-45.387-20.319-45.387-45.38v-360.448z\"></path>\n<path d=\"M446.44 304.268c0-25.055 20.319-45.372 45.359-45.372h95.387c25.055 0 45.364 20.319 45.364 45.372v360.448c0 25.060-20.312 45.38-45.364 45.38h-95.387c-25.050 0-45.364-20.319-45.364-45.38v-360.448z\"></path>\n</svg>\n",
+	stop: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M183.954 319.128c0-28.864 23.393-52.253 52.261-52.253h346.679c28.864 0 52.261 23.393 52.261 52.253v346.687c0 28.864-23.393 52.261-52.261 52.261h-346.679c-28.864 0-52.261-23.394-52.261-52.261v-346.687z\"></path>\n</svg>\n",
+	eject: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M631.487 257.578l-311.033 199.782c-8.736 5.828-12.814 14.564-12.814 23.879s4.078 18.053 12.814 23.879l311.612 200.361c18.642 12.235 43.68-1.166 43.68-23.879v-400.142c-0.579-22.718-25.050-36.114-44.27-23.879z\"></path>\n<path d=\"M249.975 252.331h-40.772c-31.457 0-57.083 25.629-57.083 57.083v343.648c0 31.457 25.629 57.083 57.083 57.083h40.772c31.457 0 57.083-25.629 57.083-57.083v-343.648c0-31.457-25.629-57.083-57.083-57.083z\"></path>\n</svg>\n"
+};
 
-  var container = SVG('svg')
-  var pulser = container.appendChild(SVG('circle'))
-  var circle = container.appendChild(SVG('circle'))
-  var start = Date.now()
-  var touchTime = null
+//do mobile routines
+StartApp.prototype.mobile = true;
 
-  container.style.position = 'absolute'
-  container.style.width = '100%'
-  container.style.height = '100%'
-  container.style.left = 0
-  container.style.top = 0
-  container.style.background = bgColor
-  container.style.cursor = 'pointer'
 
-  circle.setAttribute('r', 50)
-  circle.setAttribute('fill', fgColor)
-  pulser.setAttribute('fill', fgColor)
+/**
+ * Init settings
+ */
+StartApp.prototype.update = function (opts) {
+	var this$1 = this;
 
-  // Thanks for the icon Nick Bluth!
-  // https://thenounproject.com/npbluth/collection/cursors/?oq=cursor&cidx=1&i=415116
-  var icon = domify('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" x="0px" y="0px" viewBox="0 0 100 100" style="enable-background:new 0 0 100 100;" xml:space="preserve"><g><path d="M72.3,43.2c-1.1-0.1-2.1,0.1-3,0.5c-0.9-2.5-3.1-4.4-5.9-4.5c-1.3-0.1-2.5,0.2-3.6,0.8c-1.1-1.9-3.1-3.2-5.3-3.4   c-0.9-0.1-1.8,0.1-2.6,0.4v-6.5c0-3.7-2.8-6.7-6.3-6.9c-1.8-0.1-3.6,0.5-4.9,1.8c-1.3,1.2-2.1,3-2.1,4.8v24.6l-1.9-1.7   c-3.1-2.5-5.9-3-8.4-1.6c-1.5,0.9-2.6,2.4-3,4.2c-0.4,1.8-0.1,3.8,1,5.4l15.6,23.5v6.2c0,1.2,1,2.2,2.2,2.2h26.7   c1.2,0,2.2-1,2.2-2.2v-8.3l4.5-8.3c0.8-1.4,1.1-2.9,1.1-4.5V50C78.6,46.4,75.8,43.4,72.3,43.2z M74.6,61.1l-0.4,8.7   c0,0.9-0.2,1.7-0.6,2.4L68.8,81c-0.2,0.3-0.3,0.7-0.3,1v6.7H46.2V84c0-0.4-0.1-0.8-0.4-1.2l-16-24c-0.4-0.6-0.5-1.3-0.4-2   c0.1-0.3,0.3-1,1-1.4c0.4-0.2,1.2-0.7,3.5,1.1l3.7,3.2c0.6,0.6,1,1.4,1,2.2v1.4c0,1.2,1,2.2,2.2,2.2s2.2-1,2.2-2.2v-3.7V57V30.3   c0-0.6,0.3-1.2,0.7-1.7c0.5-0.4,1.1-0.7,1.7-0.6c1.2,0.1,2.2,1.2,2.2,2.5v7.8v4.9v10.1c0,1.2,1,2.2,2.2,2.2c1.2,0,2.2-1,2.2-2.2   v-10c0-0.6,0.3-1.2,0.7-1.7c0.4-0.4,1.1-0.7,1.7-0.6c1.2,0.1,2.2,1.2,2.2,2.5v0.6v1.7v7.6c0,1.2,1,2.2,2.2,2.2c1.2,0,2.2-1,2.2-2.2   v-7.6c0-0.6,0.3-1.2,0.7-1.7c0.5-0.4,1.1-0.6,1.7-0.6c1.2,0.1,2.2,1.2,2.2,2.5v1v2.7v6.5c0,1.2,1,2.2,2.2,2.2c1.2,0,2.2-1,2.2-2.2   v-6.5c0-0.6,0.3-1.2,0.7-1.7c0.5-0.4,1.1-0.6,1.7-0.6c1.2,0.1,2.2,1.2,2.2,2.5V61.1z"></path><path d="M45,18.5c1.1,0,2-0.9,2-1.9V7.8c0-1.1-0.9-2-2-2s-2,0.9-2,2v8.7C43,17.6,43.9,18.5,45,18.5z"></path><path d="M53.9,21.2c0.5,0,1-0.2,1.4-0.6l6.2-6.2c0.8-0.8,0.8-2,0-2.8c-0.8-0.8-2-0.8-2.8,0l-6.2,6.2c-0.8,0.8-0.8,2,0,2.8   C52.9,21,53.4,21.2,53.9,21.2z"></path><path d="M34.7,20.6c0.4,0.4,0.9,0.6,1.4,0.6s1-0.2,1.4-0.6c0.8-0.8,0.8-2,0-2.8l-6.2-6.2c-0.8-0.8-2-0.8-2.8,0   c-0.8,0.8-0.8,2,0,2.8L34.7,20.6z"></path><path d="M34.3,27.1c0-1.1-0.9-2-2-2h-8.8c-1.1,0-2,0.9-2,2c0,1.1,0.9,2,2,2h8.8C33.4,29.1,34.3,28.2,34.3,27.1z"></path><path d="M55.5,27.1c0,1.1,0.9,2,2,2h8.8c1.1,0,2-0.9,2-2c0-1.1-0.9-2-2-2h-8.8C56.4,25.1,55.5,26,55.5,27.1z"></path></g></svg>')
-    .querySelector('g')
+	extend(this, opts);
 
-  var iconPaths = icon.querySelectorAll('path')
-  for (var i = 0; i < iconPaths.length; i++) {
-    iconPaths[i].setAttribute('fill', acColor)
-  }
-  container.appendChild(icon)
-  icon.setAttribute('opacity', 0.9)
+	if (this.color) {
+		this.setColor(this.color);
+	}
 
-  render()
-  resize()
+	if (this.dragAndDrop && !this.isDnD) {
+		this.isDnD = true;
+		var title, icon, target;
 
-  document.body.appendChild(container)
+		this.container.addEventListener('dragstart', function (e) {
+			//ignore dragging the container
+			//FIXME: maybe we need a bit more specifics here, by components
+			e.preventDefault();
+			return false;
+		}, false);
+		this.container.addEventListener('dragenter', function (e) {
+			if (target) return;
+			target = e.target;
+			// if (e.target != this.container) return;
 
-  window.addEventListener('resize', resize, false)
-  window.addEventListener('touchstart', tap, false)
-  window.addEventListener('mousedown', tap, false)
+			this$1.container.classList.add('dragover');
+			e.dataTransfer.dropEffect = 'copy';
 
-  function tap (e) {
-    window.removeEventListener('touchstart', tap, false)
-    window.removeEventListener('mousedown', tap, false)
-    touchTime = Date.now()
-    done()
-    e && e.preventDefault()
-    return false
-  }
+			//save initial values
+			title = this$1.sourceTitle.innerHTML;
+			icon = this$1.sourceIcon.innerHTML;
 
-  function render () {
-    var currTime = Date.now()
-    if (touchTime && currTime - touchTime > 800) return cleanup()
-    raf(render)
+			var dt = e.dataTransfer;
+			var list = dt.files, src;
 
-    var tp = circ(((currTime - start - 350) / 1500) % 1) || 0
-    var tt = expo(Math.max(0, (currTime - touchTime) / 800)) || 0
-    var ts = expo(Math.min(1, (currTime - start) / 500)) || 0
+			this$1.hideInput();
+			this$1.sourceTitle.innerHTML = "drop audio file";
+			this$1.sourceIcon.innerHTML = this$1.icons.record;
+		});
 
-    if (touchTime !== null) {
-      var tt1 = Math.min(1, tt * 2)
-      var tt2 = Math.max(0, tt * 2 - 1)
+		this.container.addEventListener('dragleave', function (e) {
+			if (e.target != this$1.container) return;
 
-      circle.setAttribute('r', 50 * (1 - tt))
-      icon.setAttribute('opacity', 1 - tt1)
-      container.style.opacity = 1 - tt2
-    } else {
-      tt = 0
-      circle.setAttribute('r', 50 * ts)
-      icon.setAttribute('opacity', ts)
-    }
+			target = null;
+			this$1.container.classList.remove('dragover');
+			if (this$1.source) {
+				this$1.sourceTitle.innerHTML = title;
+				this$1.sourceIcon.innerHTML = icon;
+			}
+			else {
+				this$1.showInput();
+			}
+		}, false);
 
-    pulser.setAttribute('opacity', ts * (1 - tp) * 0.5 * (1 - tt))
-    pulser.setAttribute('r', 50 + tp * 70)
-  }
+		this.container.addEventListener('drop', function (e) {
+			e.preventDefault();
+			this$1.container.classList.remove('dragover');
+			target = null;
 
-  function cleanup () {
-    window.removeEventListener('resize', resize, false)
-    document.body.removeChild(container)
-  }
+			var dt = e.dataTransfer;
+			this$1.setSource(dt.files, function (err, data) {
+				if (err) {
+					this$1.sourceTitle.innerHTML = title;
+					this$1.sourceIcon.innerHTML = icon;
+				}
+			});
+		}, false);
 
-  function resize () {
-    circle.setAttribute('cx', window.innerWidth / 2)
-    circle.setAttribute('cy', window.innerHeight / 2)
-    pulser.setAttribute('cx', window.innerWidth / 2)
-    pulser.setAttribute('cy', window.innerHeight / 2)
+		this.container.addEventListener('dragover', function (e) {
+			e.preventDefault();
+		}, false);
+	}
 
-    var ix = window.innerWidth / 2 - 37
-    var iy = window.innerHeight / 2 - 36
-    icon.setAttribute('transform', 'translate(' + ix + ',' + iy + ') scale(0.7)')
-  }
+	if (this.fps) {
+		this.fpsEl.removeAttribute('hidden');
+	}
+	else {
+		this.fpsEl.setAttribute('hidden', true);
+	}
+
+	if (this.time) {
+
+	}
+
+	return this;
+};
+
+
+//inner method for setting color
+StartApp.prototype.setColor = function (color) {
+	this.color = color = color || this.color;
+
+	var parsed = colorParse(color);
+
+	if (parsed.space === 'hsl') {
+		var values = hsl.rgb(parsed.values);
+	}
+	else {
+		var values = parsed.values;
+	}
+	this.colorValues = values;
+	this.color = "rgba(" + (values.join(', ')) + ", " + (parsed.alpha) + ")";
+	this.inverseColor = "rgba(" + (values.map(function (v) { return 255 - v; }).join(', ')) + ", " + (parsed.alpha) + ")";
+	this.transparentColor = "rgba(" + (values.join(', ')) + ", 0.1)";
+	this.semiTransparentColor = "rgba(" + (values.join(', ')) + ", 0.25)";
+
+	this.styleEl.innerHTML = "\n\t\t." + className + " {\n\t\t\tcolor: " + (this.color) + ";\n\t\t}\n\t\t." + className + " .source-input,\n\t\t." + className + " .source-link\n\t\t{\n\t\t\tbox-shadow: 0 2px " + (this.semiTransparentColor) + ";\n\t\t}\n\t\t." + className + " .source-input:focus,\n\t\t." + className + " .source-link:hover\n\t\t{\n\t\t\tbox-shadow: 0 2px " + (this.color) + ";\n\t\t}\n\n\t\t::selection{\n\t\t\tbackground: " + (this.semiTransparentColor) + ";\n\t\t\tcolor: " + (this.inverseColor) + ";\n\t\t}\n\t\t::-moz-selection{\n\t\t\tbackground: " + (this.semiTransparentColor) + ";\n\t\t\tcolor: " + (this.inverseColor) + ";\n\t\t}\n\n\t\t." + className + " .fps-canvas { background:" + (this.transparentColor) + "; }\n\n\t\t::-moz-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\tinput:-moz-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\t:-ms-input-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\t::-webkit-input-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t";
+
+	return this;
+};
+
+
+/**
+ * Set source to play
+ */
+StartApp.prototype.setSource = function (src, cb) {
+	var this$1 = this;
+
+	var self = this;
+
+	//Undefined source - no action
+	if (!src) {
+		return this;
+	}
+
+	this.hideInput();
+
+	//find first audio file from the list
+	if (src instanceof FileList) {
+		var list = src;
+		src = null;
+
+		for (var i = 0; i < list.length; i++) {
+			if (/audio/.test(list[i].type)) {
+				src = list[i];
+				break;
+			}
+		}
+
+		if (!src) {
+			this.sourceTitle.innerHTML = "not an audio";
+			this.sourceIcon.innerHTML = this.icons.error;
+			setTimeout(function () {
+				if (!this$1.source) this$1.showInput();
+				cb && cb(new Error('Not an audio'));
+			}, 1000);
+			return this;
+		}
+	}
+
+	//File instance case
+	if (src instanceof File) {
+		var url = URL.createObjectURL(src);
+		this.sourceIcon.innerHTML = this.icons.record;
+		this.sourceTitle.innerHTML = src.name;
+
+		this.source = url;
+
+		this.audio.src = url;
+		this.audioEl.removeAttribute('hidden');
+		this.audioStop.removeAttribute('hidden');
+
+		this.emit('source', url);
+		cb && cb(null, url);
+
+		return this;
+	}
+
+
+	if (/soundcloud/.test(src)) {
+		this.sourceIcon.innerHTML = this.icons.loading;
+		this.sourceTitle.innerHTML = 'connecting to soundcloud';
+		var token = this.token.soundcloud || this.token;
+
+		//sad ios workaround
+		if (isMobile) {
+			xhr({
+				uri: ("https://api.soundcloud.com/resolve.json?client_id=" + (this.token.soundcloud || this.token) + "&url=" + src + "&format=json"),
+				method: 'GET'
+			}, function () {
+				xhr({
+					uri: ("https://api.soundcloud.com/resolve.json?client_id=" + (this$1.token.soundcloud || this$1.token) + "&url=" + src + "&_status_code_map[302]=200&format=json"),
+					method: 'GET'
+				}, function (err, response) {
+					if (err) return badURL(err);
+
+					var obj = JSON.parse(response.body);
+					xhr({
+						uri: obj.location,
+						method: 'GET'
+					}, function (err, response) {
+						if (err) return badURL(err);
+
+						var json = JSON.parse(response.body);
+
+						setSoundcloud(json);
+					});
+				});
+			});
+		}
+
+		else {
+			xhr({
+				uri: ("https://api.soundcloud.com/resolve.json?client_id=" + (this.token.soundcloud || this.token) + "&url=" + src),
+				method: 'GET'
+			}, function (err, response) {
+				if (err) {
+					return badURL(err);
+				}
+
+				var json = JSON.parse(response.body);
+
+				setSoundcloud(json);
+			});
+		}
+
+		function setSoundcloud (json) {
+			var streamUrl = json.stream_url + '?client_id=' + token;
+
+			self.sourceIcon.innerHTML = self.icons.soundcloud;
+
+			//FIXME: play list of tracks properly
+			if (json.tracks) {
+				var id = Math.floor(Math.random() * json.tracks.length);
+				return self.setSource(json.tracks[id].permalink_url, cb);
+			}
+
+			var maxTitle = window.innerWidth * .05;
+			self.sourceTitle.innerHTML = "\n\t\t\t\t<a class=\"source-link\" href=\"" + (json.permalink_url) + "\" target=\"_blank\" title=\"" + (json.title) + "\"><span class=\"text-length-limiter\">" + (json.title) + "</span></a>\n\t\t\t";
+			if (json.user) {
+				self.sourceTitle.innerHTML += "by\n\t\t\t\t<a class=\"source-link\" href=\"" + (json.user.permalink_url) + "\" target=\"_blank\" title=\"" + (json.user.username) + "\"><span class=\"text-length-limiter\">" + (json.user.username) + "</span></a>\n\t\t\t\t";
+			}
+
+			self.source = streamUrl;
+
+			self.audio.src = streamUrl;
+			self.audioEl.removeAttribute('hidden');
+			self.audioStop.removeAttribute('hidden');
+
+			self.emit('source', streamUrl);
+
+			cb && cb(null, streamUrl);
+		}
+	}
+
+	// else if (/youtu/.test(url.hostname)) {
+	// 	this.sourceIcon.innerHTML = this.icons.loading;
+	// 	this.sourceTitle.innerHTML = 'connecting to youtube';
+	// 	var token = this.token.youtube || this.token;
+
+
+	// 	self.source = url.href;
+	// 	self.audio.src = url.href;
+	//
+	// 	self.audioEl.removeAttribute('hidden');
+	// 	self.audioStop.removeAttribute('hidden');
+	// }
+
+	//default url
+	else {
+		// xhr({
+		// 	url: url.href,
+		// 	method: 'GET',
+		// 	useXDR: true,
+		// 	headers: {
+		// 		'Access-Control-Allow-Credentials': true,
+		// 		'Access-Control-Allow-Origin': 'http://sampleswap.org/',
+		// 		// Access-Control-Request-Method: PUT
+		// 		// Access-Control-Request-Headers: X-Custom-Header
+		// 	}
+		// }, (err, resp) => {
+		//
+		// });
+
+		self.source = src;
+
+		self.sourceTitle.innerHTML = "\n\t\t\t<a class=\"source-link\" href=\"" + src + "\" target=\"_blank\" title=\"Open " + src + "\"><span class=\"text-length-limiter\">" + src + "</span></a>\n\t\t";
+		self.audio.src = src;
+		self.audioEl.removeAttribute('hidden');
+		self.audioStop.removeAttribute('hidden');
+
+		// badURL();
+	}
+
+	function badURL () {
+		self.sourceTitle.innerHTML = "bad URL";
+		self.sourceIcon.innerHTML = self.icons.error;
+		setTimeout(function () {
+			cb && cb('Bad url');
+		}, 1000);
+	}
+
+	return this;
+};
+
+/**
+ * Show/hide source input default view
+ */
+StartApp.prototype.showInput = function () {
+	this.sourceLinks.removeAttribute('hidden');
+	this.sourceInputURL.setAttribute('hidden', true);
+	this.sourceIcon.innerHTML = this.file ? this.icons.open : this.url ? this.icons.url : this.mic ? this.icons.mic : this.icons.open;
+	this.sourceTitle.innerHTML = '';
+	this.audioEl.setAttribute('hidden', true);
+
+	return this;
 }
 
-},{"domify":27,"eases/circ-out":28,"eases/expo-in-out":29,"raf":51,"svg-create-element":58}],61:[function(require,module,exports){
-var AudioContext = window.AudioContext || window.webkitAudioContext
+StartApp.prototype.hideInput = function () {
+	this.sourceLinks.setAttribute('hidden', true);
 
-module.exports = WebAudioAnalyser
+	return this;
+};
 
-function WebAudioAnalyser(audio, ctx, opts) {
-  var this$1 = this;
 
-  if (!(this instanceof WebAudioAnalyser)) return new WebAudioAnalyser(audio, ctx, opts)
-    try {
-  if (!(ctx instanceof AudioContext)) (opts = ctx), (ctx = null)
-} catch (e) {return;}
-  opts = opts || {}
-  this.ctx = ctx = ctx || new AudioContext
+/**
+ * Play/stop/reset audio
+ */
+StartApp.prototype.play = function () {
+	this.audio.play();
+	this.audioEl.title = "Pause";
+	this.audioIcon.innerHTML = this.icons.pause;
+	this.audioStop.setAttribute('hidden', true);
 
-  if (!(audio instanceof AudioNode)) {
-    audio = (audio instanceof Audio || audio instanceof HTMLAudioElement)
-      ? ctx.createMediaElementSource(audio)
-      : ctx.createMediaStreamSource(audio)
-  }
-
-  this.analyser = ctx.createAnalyser()
-  this.stereo   = !!opts.stereo
-  this.audible  = opts.audible !== false
-  this.wavedata = null
-  this.freqdata = null
-  this.splitter = null
-  this.merger   = null
-  this.source   = audio
-
-  if (!this.stereo) {
-    this.output = this.source
-    this.source.connect(this.analyser)
-    if (this.audible)
-      this.analyser.connect(ctx.destination)
-  } else {
-    this.analyser = [this.analyser]
-    this.analyser.push(ctx.createAnalyser())
-
-    this.splitter = ctx.createChannelSplitter(2)
-    this.merger   = ctx.createChannelMerger(2)
-    this.output   = this.merger
-
-    this.source.connect(this.splitter)
-
-    for (var i = 0; i < 2; i++) {
-      this$1.splitter.connect(this$1.analyser[i], i, 0)
-      this$1.analyser[i].connect(this$1.merger, 0, i)
-    }
-
-    if (this.audible)
-      this.merger.connect(ctx.destination)
-  }
+	return this;
 }
+StartApp.prototype.pause = function () {
+	this.audio.pause();
+	this.audioEl.title = "Play";
+	this.audioIcon.innerHTML = this.icons.play;
+	this.audioStop.removeAttribute('hidden');
 
-WebAudioAnalyser.prototype.waveform = function(output, channel) {
-  if (!output) output = this.wavedata || (
-    this.wavedata = new Uint8Array((this.analyser[0] || this.analyser).frequencyBinCount)
-  )
-
-  var analyser = this.stereo
-    ? this.analyser[channel || 0]
-    : this.analyser
-
-  analyser.getByteTimeDomainData(output)
-
-  return output
+	return this;
 }
+StartApp.prototype.reset = function () {
+	this.source = '';
+	this.sourceTitle.innerHTML = '';
+	this.sourceInputURL.value = '';
+	this.audio.currentTime = 0;
 
-WebAudioAnalyser.prototype.frequencies = function(output, channel) {
-  if (!output) output = this.freqdata || (
-    this.freqdata = new Uint8Array((this.analyser[0] || this.analyser).frequencyBinCount)
-  )
-
-  var analyser = this.stereo
-    ? this.analyser[channel || 0]
-    : this.analyser
-
-  analyser.getByteFrequencyData(output)
-
-  return output
+	this.audio.src = '';
+	this.pause();
+	this.audioStop.querySelector('i').innerHTML = this.icons.eject;
+	this.audioStop.setAttribute('hidden', true);
+	this.showInput();
 }
-
-},{}],62:[function(require,module,exports){
-var window = require("global/window")
-var once = require("once")
-
-var messages = {
-    "0": "Internal XMLHttpRequest Error",
-    "4": "4xx Client Error",
-    "5": "5xx Server Error"
+StartApp.prototype.getTime = function (time) {
+	return pad((time / 60)|0, 2, 0) + ':' + pad((time % 60)|0, 2, 0);
 }
-
-var XHR = window.XMLHttpRequest || noop
-var XDR = "withCredentials" in (new XHR()) ?
-        window.XMLHttpRequest : window.XDomainRequest
-
-module.exports = createXHR
-
-function createXHR(options, callback) {
-    if (typeof options === "string") {
-        options = { uri: options }
-    }
-
-    options = options || {}
-    callback = once(callback)
-
-    var xhr
-
-    if (options.cors) {
-        xhr = new XDR()
-    } else {
-        xhr = new XHR()
-    }
-
-    var uri = xhr.url = options.uri
-    var method = xhr.method = options.method || "GET"
-    var body = options.body || options.data
-    var headers = xhr.headers = options.headers || {}
-    var isJson = false
-
-    if ("json" in options) {
-        isJson = true
-        headers["Content-Type"] = "application/json"
-        body = JSON.stringify(options.json)
-    }
-
-    xhr.onreadystatechange = readystatechange
-    xhr.onload = load
-    xhr.onerror = error
-    // IE9 must have onprogress be set to a unique function.
-    xhr.onprogress = function () {
-        // IE must die
-    }
-    // hate IE
-    xhr.ontimeout = noop
-    xhr.open(method, uri)
-    if (options.cors) {
-        xhr.withCredentials = true
-    }
-    xhr.timeout = "timeout" in options ? options.timeout : 5000
-
-    if ( xhr.setRequestHeader) {
-        Object.keys(headers).forEach(function (key) {
-            xhr.setRequestHeader(key, headers[key])
-        })
-    }
-
-    xhr.send(body)
-
-    return xhr
-
-    function readystatechange() {
-        if (xhr.readyState === 4) {
-            load()
-        }
-    }
-
-    function load() {
-        var error = null
-        var status = xhr.statusCode = xhr.status
-        var body = xhr.body = xhr.response ||
-            xhr.responseText || xhr.responseXML
-
-        if (status === 0 || (status >= 400 && status < 600)) {
-            var message = xhr.responseText ||
-                messages[String(xhr.status).charAt(0)]
-            error = new Error(message)
-
-            error.statusCode = xhr.status
-        }
-
-        if (isJson) {
-            try {
-                body = xhr.body = JSON.parse(body)
-            } catch (e) {}
-        }
-
-        callback(error, xhr, body)
-    }
-
-    function error(evt) {
-        callback(evt, xhr)
-    }
-}
-
-
-function noop() {}
-
-},{"global/window":63,"once":64}],63:[function(require,module,exports){
+},{"audio-context":16,"color-parse":20,"color-space/hsl":21,"events":4,"inherits":36,"insert-css":37,"is-mobile":40,"left-pad":41,"raf":53,"right-now":54,"xhr":59,"xtend/mutable":62}],57:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
-    module.exports = window
+    module.exports = window;
 } else if (typeof global !== "undefined") {
-    module.exports = global
+    module.exports = global;
+} else if (typeof self !== "undefined"){
+    module.exports = self;
 } else {
-    module.exports = {}
+    module.exports = {};
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],64:[function(require,module,exports){
+},{}],58:[function(require,module,exports){
 module.exports = once
 
 once.proto = once(function () {
@@ -5898,7 +6162,244 @@ function once (fn) {
   }
 }
 
-},{}],65:[function(require,module,exports){
+},{}],59:[function(require,module,exports){
+"use strict";
+var window = require("global/window")
+var once = require("once")
+var isFunction = require("is-function")
+var parseHeaders = require("parse-headers")
+var xtend = require("xtend")
+
+module.exports = createXHR
+createXHR.XMLHttpRequest = window.XMLHttpRequest || noop
+createXHR.XDomainRequest = "withCredentials" in (new createXHR.XMLHttpRequest()) ? createXHR.XMLHttpRequest : window.XDomainRequest
+
+forEachArray(["get", "put", "post", "patch", "head", "delete"], function(method) {
+    createXHR[method === "delete" ? "del" : method] = function(uri, options, callback) {
+        options = initParams(uri, options, callback)
+        options.method = method.toUpperCase()
+        return _createXHR(options)
+    }
+})
+
+function forEachArray(array, iterator) {
+    for (var i = 0; i < array.length; i++) {
+        iterator(array[i])
+    }
+}
+
+function isEmpty(obj){
+    for(var i in obj){
+        if(obj.hasOwnProperty(i)) return false
+    }
+    return true
+}
+
+function initParams(uri, options, callback) {
+    var params = uri
+
+    if (isFunction(options)) {
+        callback = options
+        if (typeof uri === "string") {
+            params = {uri:uri}
+        }
+    } else {
+        params = xtend(options, {uri: uri})
+    }
+
+    params.callback = callback
+    return params
+}
+
+function createXHR(uri, options, callback) {
+    options = initParams(uri, options, callback)
+    return _createXHR(options)
+}
+
+function _createXHR(options) {
+    var callback = options.callback
+    if(typeof callback === "undefined"){
+        throw new Error("callback argument missing")
+    }
+    callback = once(callback)
+
+    function readystatechange() {
+        if (xhr.readyState === 4) {
+            loadFunc()
+        }
+    }
+
+    function getBody() {
+        // Chrome with requestType=blob throws errors arround when even testing access to responseText
+        var body = undefined
+
+        if (xhr.response) {
+            body = xhr.response
+        } else if (xhr.responseType === "text" || !xhr.responseType) {
+            body = xhr.responseText || xhr.responseXML
+        }
+
+        if (isJson) {
+            try {
+                body = JSON.parse(body)
+            } catch (e) {}
+        }
+
+        return body
+    }
+
+    var failureResponse = {
+                body: undefined,
+                headers: {},
+                statusCode: 0,
+                method: method,
+                url: uri,
+                rawRequest: xhr
+            }
+
+    function errorFunc(evt) {
+        clearTimeout(timeoutTimer)
+        if(!(evt instanceof Error)){
+            evt = new Error("" + (evt || "Unknown XMLHttpRequest Error") )
+        }
+        evt.statusCode = 0
+        callback(evt, failureResponse)
+    }
+
+    // will load the data & process the response in a special response object
+    function loadFunc() {
+        if (aborted) return
+        var status
+        clearTimeout(timeoutTimer)
+        if(options.useXDR && xhr.status===undefined) {
+            //IE8 CORS GET successful response doesn't have a status field, but body is fine
+            status = 200
+        } else {
+            status = (xhr.status === 1223 ? 204 : xhr.status)
+        }
+        var response = failureResponse
+        var err = null
+
+        if (status !== 0){
+            response = {
+                body: getBody(),
+                statusCode: status,
+                method: method,
+                headers: {},
+                url: uri,
+                rawRequest: xhr
+            }
+            if(xhr.getAllResponseHeaders){ //remember xhr can in fact be XDR for CORS in IE
+                response.headers = parseHeaders(xhr.getAllResponseHeaders())
+            }
+        } else {
+            err = new Error("Internal XMLHttpRequest Error")
+        }
+        callback(err, response, response.body)
+
+    }
+
+    var xhr = options.xhr || null
+
+    if (!xhr) {
+        if (options.cors || options.useXDR) {
+            xhr = new createXHR.XDomainRequest()
+        }else{
+            xhr = new createXHR.XMLHttpRequest()
+        }
+    }
+
+    var key
+    var aborted
+    var uri = xhr.url = options.uri || options.url
+    var method = xhr.method = options.method || "GET"
+    var body = options.body || options.data || null
+    var headers = xhr.headers = options.headers || {}
+    var sync = !!options.sync
+    var isJson = false
+    var timeoutTimer
+
+    if ("json" in options) {
+        isJson = true
+        headers["accept"] || headers["Accept"] || (headers["Accept"] = "application/json") //Don't override existing accept header declared by user
+        if (method !== "GET" && method !== "HEAD") {
+            headers["content-type"] || headers["Content-Type"] || (headers["Content-Type"] = "application/json") //Don't override existing accept header declared by user
+            body = JSON.stringify(options.json)
+        }
+    }
+
+    xhr.onreadystatechange = readystatechange
+    xhr.onload = loadFunc
+    xhr.onerror = errorFunc
+    // IE9 must have onprogress be set to a unique function.
+    xhr.onprogress = function () {
+        // IE must die
+    }
+    xhr.ontimeout = errorFunc
+    xhr.open(method, uri, !sync, options.username, options.password)
+    //has to be after open
+    if(!sync) {
+        xhr.withCredentials = !!options.withCredentials
+    }
+    // Cannot set timeout with sync request
+    // not setting timeout on the xhr object, because of old webkits etc. not handling that correctly
+    // both npm's request and jquery 1.x use this kind of timeout, so this is being consistent
+    if (!sync && options.timeout > 0 ) {
+        timeoutTimer = setTimeout(function(){
+            aborted=true//IE9 may still call readystatechange
+            xhr.abort("timeout")
+            var e = new Error("XMLHttpRequest timeout")
+            e.code = "ETIMEDOUT"
+            errorFunc(e)
+        }, options.timeout )
+    }
+
+    if (xhr.setRequestHeader) {
+        for(key in headers){
+            if(headers.hasOwnProperty(key)){
+                xhr.setRequestHeader(key, headers[key])
+            }
+        }
+    } else if (options.headers && !isEmpty(options.headers)) {
+        throw new Error("Headers cannot be set on an XDomainRequest object")
+    }
+
+    if ("responseType" in options) {
+        xhr.responseType = options.responseType
+    }
+
+    if ("beforeSend" in options &&
+        typeof options.beforeSend === "function"
+    ) {
+        options.beforeSend(xhr)
+    }
+
+    xhr.send(body)
+
+    return xhr
+
+
+}
+
+function noop() {}
+
+},{"global/window":57,"is-function":39,"once":58,"parse-headers":49,"xtend":61}],60:[function(require,module,exports){
+
+exports = module.exports = trim;
+
+function trim(str){
+  return str.replace(/^\s*|\s*$/g, '');
+}
+
+exports.left = function(str){
+  return str.replace(/^\s*/, '');
+};
+
+exports.right = function(str){
+  return str.replace(/\s*$/, '');
+};
+
+},{}],61:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -5921,7 +6422,7 @@ function extend() {
     return target
 }
 
-},{}],66:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -5942,7 +6443,7 @@ function extend(target) {
     return target
 }
 
-},{}],67:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 // var test = require('tst');
 // var Formant = require('audio-formant');
 // var Speaker = require('audio-speaker');
@@ -5952,137 +6453,95 @@ var Spectrum = require('./');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
-var SCBadge = require('soundcloud-badge');
-var Analyser = require('web-audio-analyser');
-var Stats = require('stats.js');
 var db = require('decibels');
 var colorScales = require('colormap/colorScales');
-var tap = require('tap-to-start');
-
-tap({
-	background: '#2F0F3E',
-	foreground: '#E86F56',
-	skip: true
-}, startEverything);
+var startApp = require('start-app');
+var ctx = require('audio-context');
+// var createAudioContext = require('ios-safe-audio-context')
 
 
-function startEverything () {
-	var stats = new Stats();
-	stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-	document.body.appendChild( stats.dom );
-	stats.begin();
-	stats.dom.style.left = 'auto';
-	stats.dom.style.right = '1rem';
-	stats.dom.style.top = '1rem';
-
-
-	//stream soundcloud
-	var audio = new Audio;
-
-	try {
-	var badge = SCBadge({
-		client_id: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
-		// song: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
-		// song: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
-		song: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
-		// song: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
-		// song: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
-		// song: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
-		// song: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
-		dark: false,
-		getFonts: false
-	}, function(err, src, data, div) {
-		if (err) throw err;
-
-		//TODO: read url from href here
-		audio.src = src;
-		audio.crossOrigin = 'Anonymous';
-		audio.addEventListener('canplay', function() {
-			audio.play();
-		}, false);
-	});
-	} catch (e) {
-		//IE of course...
-	}
+var app = startApp({
+	color: '#E86F56',
+	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
+	autoplay: true,
+	// source: './Liwei.mp3',
+	source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
+	// source: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
+	// source: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
+	// source: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
+	// source: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
+});
 
 
 
-	var analyser = Analyser(audio, { audible: true, stereo: false })
+var source = ctx.createMediaElementSource(app.audio);
+var analyser = ctx.createAnalyser();
+analyser.frequencyBinCount = 2048;
+analyser.smoothingTimeConstant = 0;
+source.connect(analyser);
+analyser.connect(ctx.destination);
 
 
-	//generate input sine
-	var N = 2048;
-	var sine = new Float32Array(N);
-	var saw = new Float32Array(N);
-	var noise = new Float32Array(N);
-	var rate = 44100;
+//generate input sine
+var N = 2048;
+var sine = new Float32Array(N);
+var saw = new Float32Array(N);
+var noise = new Float32Array(N);
+var rate = 44100;
 
-	for (var i = 0; i < N; i++) {
-		sine[i] = Math.sin(10000 * Math.PI * 2 * (i / rate));
-		saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
-		noise[i] = Math.random() * 2 - 1;
-	}
+for (var i = 0; i < N; i++) {
+	sine[i] = Math.sin(10000 * Math.PI * 2 * (i / rate));
+	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
+	noise[i] = Math.random() * 2 - 1;
+}
 
-	//normalize browser style
-	if (isBrowser) {
-		document.body.style.margin = '0';
-		document.body.style.boxSizing = 'border-box';
-		document.body.style.fontFamily = 'sans-serif';
-	}
+// var frequencies = ft(sine);
+// var frequencies = new Float32Array(1024).fill(0.5);
+// var frequencies = ft(noise);
+//NOTE: ios does not allow setting too big this value
+var frequencies = new Float32Array(analyser.frequencyBinCount);
+for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
+// frequencies = frequencies
+// .map((v, i) => v*blackman(i, noise.length))
+// .map((v) => db.fromGain(v));
 
-	// var frequencies = ft(sine);
-	// var frequencies = new Float32Array(1024).fill(0.5);
-	// var frequencies = ft(noise);
-	analyser.analyser.fftSize = 4096*2;
-	var frequencies = new Float32Array(analyser.analyser.frequencyBinCount);
-	console.log(frequencies.length)
-	for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
+var spectrum = new Spectrum({
+	// autostart: false,
+	// frequencies: frequencies,
+	fill: 'cdom',
+	grid: true,
+	minFrequency: 40,
+	maxFrequency: 20000,
+	logarithmic: true,
+	// smoothing: .7,
+	details: 1,
+	maxDecibels: 0,
+	mask: createMask(10, 10),
+	align: .5,
+	trail: 38,
+	autostart: true,
+	// balance: .5,
+	// antialias: true,
+	// fill: [1,1,1,0],
+	// fill: './images/stretch.png',
+	group: 6,
+	// background: [27/255,0/255,37/255, 1],
+	//background: [1,0,0,1]//'./images/bg-small.jpg'
+	// viewport: function (w, h) {
+	// 	return [50,20,w-70,h-60];
+	// }
+}).on('render', function () {
+	// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
+	// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-	// frequencies = frequencies
-	// .map((v, i) => v*blackman(i, noise.length))
-	// .map((v) => db.fromGain(v));
+	analyser.getFloatFrequencyData(frequencies);
+	spectrum.setFrequencies(frequencies);
+});
 
-	var spectrum = new Spectrum({
-		// autostart: false,
-		frequencies: frequencies,
-		fill: 'cdom',
-		grid: true,
-		minFrequency: 40,
-		maxFrequency: 20000,
-		logarithmic: true,
-		smoothing: .1,
-		details: 1,
-		maxDecibels: 0,
-		mask: createMask(10, 10),
-		align: .5,
-		trail: 38,
-		// autostart: false,
-		// balance: .5,
-		// antialias: true,
-		// fill: [1,1,1,0],
-		// fill: './images/stretch.png',
-		group: 6,
-		// background: [27/255,0/255,37/255, 1],
-		//background: [1,0,0,1]//'./images/bg-small.jpg'
-		// viewport: function (w, h) {
-		// 	return [50,20,w-70,h-60];
-		// }
-	}).on('render', function () {
-		stats.end();
-		stats.begin();
-
-		// analyser.analyser.getFloatTimeDomainData(waveform);
-		// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
-		// frequencies = frequencies.map((f, i) => db.fromGain(f));
-
-		analyser.analyser.getFloatFrequencyData(frequencies);
-
-		spectrum.setFrequencies(frequencies);
-	});
-
-	createColormapSelector(spectrum);
-};
+createColormapSelector(spectrum);
 
 
 // test('line webgl');
@@ -6122,9 +6581,11 @@ function createColormapSelector (spectrum) {
 	container.style.bottom = '0';
 	container.style.left = '0';
 	container.style.right = '0';
-	container.style.padding = '.5rem';
+	container.style.padding = '.5rem .75rem';
 	container.style.border = '0';
 	container.style.zIndex = 999;
+	container.style.lineHeight = '1.5rem';
+	container.style.fontSize = '.8rem';
 	document.body.appendChild(container);
 
 	//append style switcher
@@ -6164,7 +6625,8 @@ function createColormapSelector (spectrum) {
 	weightingEl.style.width = '4rem';
 	weightingEl.style.border = '0';
 	weightingEl.style.color = 'inherit';
-	weightingEl.style.marginLeft = '1rem';
+	weightingEl.style.marginRight = '1rem';
+	weightingEl.style.fontSize = '.8rem';
 	weightingEl.style.background = 'none';
 	weightingEl.title = 'Noise weighting';
 	weightingEl.innerHTML = "\n\t\t<option value=\"a\">A</option>\n\t\t<option value=\"b\">B</option>\n\t\t<option value=\"c\">C</option>\n\t\t<option value=\"d\">D</option>\n\t\t<option value=\"itu\" selected>ITU</option>\n\t\t<option value=\"z\">Z (none)</option>\n\t";
@@ -6254,7 +6716,7 @@ function createColormapSelector (spectrum) {
 	function updateView () {
 		spectrum.update();
 		if (Array.isArray(spectrum.fill)) {
-			container.style.color = 'rgb(' + spectrum.fill.slice(-4, -1).map(function (v) { return v*255; }).join(', ') + ')';
+			app.setColor('rgb(' + spectrum.fill.slice(-4, -1).map(function (v) { return v*255; }).join(', ') + ')');
 		}
 	}
 }
@@ -6269,12 +6731,13 @@ function createSwitch (name, cb) {
 	checkbox.style.width = '1rem';
 	checkbox.style.height = '1rem';
 	checkbox.style.verticalAlign = 'middle';
+	checkbox.style.fontSize = '.8rem';
 
 	switcher.style.fontSize = '.8rem';
 	switcher.style.verticalAlign = 'middle';
 	switcher.style.height = '1rem';
 	switcher.classList.add(name + '-switcher');
-	switcher.style.margin = '0 0 0 .5rem';
+	switcher.style.margin = '0 .5rem 0 0';
 	switcher.style.border = '0';
 	switcher.style.background = 'none';
 	switcher.style.color = 'inherit';
@@ -6299,7 +6762,8 @@ function createSlider (opts, cb) {
 	sliderEl.style.height = '1rem';
 	sliderEl.style.border = '0';
 	sliderEl.style.color = 'inherit';
-	sliderEl.style.margin = '0 0 0 1rem';
+	sliderEl.style.fontSize = '.8rem';
+	sliderEl.style.margin = '0 1rem 0 0';
 	sliderEl.style.verticalAlign = 'middle';
 	sliderEl.style.background = 'none';
 	sliderEl.title = title + ': ' + sliderEl.value;
@@ -6341,4 +6805,4 @@ function createMask (w, h) {
 	return canvas;
 }
 
-},{"./":11,"colormap/colorScales":22,"decibels":25,"fourier-transform":32,"is-browser":39,"scijs-window-functions/blackman-harris":53,"soundcloud-badge":54,"stats.js":57,"tap-to-start":60,"web-audio-analyser":61}]},{},[67]);
+},{"./":7,"audio-context":16,"colormap/colorScales":23,"decibels":26,"fourier-transform":31,"is-browser":38,"scijs-window-functions/blackman-harris":55,"start-app":56}]},{},[63]);
