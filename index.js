@@ -487,15 +487,12 @@ Spectrum.prototype.setBackground = function (bg) {
 		else if (Array.isArray(bg)) {
 			//map 0..1 range to 0..255
 			if (bg[0] && bg[0] <= 1 && bg[1] && bg[1] <= 1 && bg[2] && bg[2] <= 1) {
-				bg = bg.map((v) => v*255);
+				bg = [
+					bg[0] * 255, bg[1] * 255, bg[2] * 255, bg[3] || 1
+				];
 			}
 
-			if (bg.length === 3) {
-				bgStyle = `rgb(${bg.join(', ')})`;
-			}
-			else {
-				bgStyle = `rgba(${bg.join(', ')})`;
-			}
+			bgStyle = `rgba(${bg.slice(0,3).map(v => Math.round(v)).join(', ')}, ${bg[3]})`;
 		}
 		this.canvas.style.background = bgStyle;
 	}
