@@ -91,7 +91,7 @@ Spectrum.prototype.minDecibels = -100;
 Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
 
-Spectrum.prototype.smoothing = 0.5;
+Spectrum.prototype.smoothing = 0.75;
 Spectrum.prototype.details = 1;
 
 Spectrum.prototype.snap = null;
@@ -300,7 +300,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	var smoothing = (bigger === this.frequencies ? 1 - this.smoothing : this.smoothing);
 
 	for (var i = 0; i < bigger.length; i++) {
-		bigger[i] = clamp(bigger[i], -200, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -200, 0) * (1 - smoothing);
+		bigger[i] = clamp(bigger[i], -100, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -100, 0) * (1 - smoothing);
 	}
 
 	//save actual frequencies
@@ -312,7 +312,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 	//apply a-weighting
 	if (weighting[this.weighting]) {
 		var w = weighting[this.weighting];
-		magnitudes = magnitudes.map((mag, i, data) => clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -100, 0));
+		magnitudes = magnitudes.map((mag, i, data) => clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -200, 0));
 	}
 
 	//snap magnitudes
@@ -491,10 +491,10 @@ Spectrum.prototype.setBackground = function (bg) {
 			}
 
 			if (bg.length === 3) {
-				bgStyle = `rgb(${bg.join(', ')}`;
+				bgStyle = `rgb(${bg.join(', ')})`;
 			}
 			else {
-				bgStyle = `rgba(${bg.join(', ')}`;
+				bgStyle = `rgba(${bg.join(', ')})`;
 			}
 		}
 		this.canvas.style.background = bgStyle;
