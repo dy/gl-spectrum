@@ -2438,15 +2438,12 @@ Spectrum.prototype.setBackground = function (bg) {
 		else if (Array.isArray(bg)) {
 			//map 0..1 range to 0..255
 			if (bg[0] && bg[0] <= 1 && bg[1] && bg[1] <= 1 && bg[2] && bg[2] <= 1) {
-				bg = bg.map(function (v) { return v*255; });
+				bg = [
+					bg[0] * 255, bg[1] * 255, bg[2] * 255, bg[3] || 1
+				];
 			}
 
-			if (bg.length === 3) {
-				bgStyle = "rgb(" + (bg.join(', ')) + ")";
-			}
-			else {
-				bgStyle = "rgba(" + (bg.join(', ')) + ")";
-			}
+			bgStyle = "rgba(" + (bg.slice(0,3).map(function ( v ) { return Math.round(v); }).join(', ')) + ", " + (bg[3]) + ")";
 		}
 		this.canvas.style.background = bgStyle;
 	}
@@ -6465,9 +6462,9 @@ var app = startApp({
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	autoplay: true,
 	// source: './Liwei.mp3',
-	source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
-	// source: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	source: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// source: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// source: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
@@ -6511,7 +6508,7 @@ for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 var spectrum = new Spectrum({
 	// autostart: false,
 	// frequencies: frequencies,
-	fill: 'cdom',
+	fill: 'inferno',
 	grid: true,
 	minFrequency: 40,
 	maxFrequency: 20000,
