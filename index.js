@@ -2128,21 +2128,6 @@ function Spectrum (options) {
 	if (!this.is2d) {
 		var gl = this.gl;
 
-		var gl = this.gl;
-		var float = gl.getExtension('OES_texture_float');
-		if (!float) {
-			var float = gl.getExtension('OES_texture_half_float');
-			if (!float) {
-				throw Error('WebGL does not support floats.');
-			}
-			var floatLinear = gl.getExtension('OES_texture_half_float_linear');
-		}
-		else {
-			var floatLinear = gl.getExtension('OES_texture_float_linear');
-
-		}
-		if (!floatLinear) throw Error('WebGL does not support floats.');
-
 		//setup alpha
 		gl.enable( gl.BLEND );
 		gl.blendEquation( gl.FUNC_ADD );
@@ -2158,6 +2143,24 @@ function Spectrum (options) {
 		this.trailLocation = gl.getUniformLocation(this.program, 'trail');
 		this.balanceLocation = gl.getUniformLocation(this.program, 'balance');
 		this.peakLocation = gl.getUniformLocation(this.program, 'peak');
+
+		this.setTexture({
+			frequencies: {
+				filter: gl.LINEAR,
+				wrap: gl.CLAMP_TO_EDGE,
+				format: gl.ALPHA
+			},
+			fill: {
+				filter: gl.LINEAR,
+				wrap: gl.CLAMP_TO_EDGE,
+				format: gl.RGBA
+			},
+			mask: {
+				type: gl.FLOAT,
+				format: gl.LUMINOCITY,
+				wrap: gl.CLAMP_TO_EDGE
+			}
+		});
 	}
 
 	this.freqBuffer = [];
@@ -2175,7 +2178,7 @@ inherits(Spectrum, Component);
 Spectrum.prototype.antialias = false;
 Spectrum.prototype.premultipliedAlpha = true;
 Spectrum.prototype.alpha = true;
-
+Spectrum.prototype.float = true;
 
 Spectrum.prototype.maxDecibels = -30;
 Spectrum.prototype.minDecibels = -100;
@@ -2218,6 +2221,7 @@ Spectrum.prototype.mask = null;
 
 //group freq range by subbands
 Spectrum.prototype.group = false;
+
 
 //scale verteces to frequencies values and apply alignment
 Spectrum.prototype.vert = "\n\tprecision highp float;\n\n\tattribute vec2 position;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform float align;\n\tuniform float minFrequency;\n\tuniform float maxFrequency;\n\tuniform float logarithmic;\n\tuniform float sampleRate;\n\tuniform vec4 viewport;\n\tuniform float group;\n\tuniform float peak;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tconst float log10 = " + (Math.log(10)) + ";\n\n\tfloat lg (float x) {\n\t\treturn log(x) / log10;\n\t}\n\n\t//return a or b based on weight\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\t//get mapped frequency\n\tfloat f (float ratio) {\n\t\tfloat halfRate = sampleRate * .5;\n\n\t\tfloat logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\n\t\tratio = decide(ratio, (logF - minFrequency) / (maxFrequency - minFrequency), logarithmic);\n\n\t\tfloat leftF = minFrequency / halfRate;\n\t\tfloat rightF = maxFrequency / halfRate;\n\n\t\tratio = leftF + ratio * (rightF - leftF);\n\n\t\treturn ratio;\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = position;\n\t\tfloat _group = max(group, .5);\n\t\tfloat groupRatio = _group / viewport.z;\n\n\t\t//round x-coord to the step, @c is a precision fix constant\n\t\tfloat c = 1./viewport.z;\n\t\tfloat leftX = floor((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tfloat rightX = ceil((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tcoord.x = decide(leftX, rightX, step(coord.x - leftX + c*.5, groupRatio * .5));\n\n\t\tfloat mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;\n\t\tmag = clamp(mag, 0., 1.);\n\n\t\tvMag = mag;\n\t\tvLeft = leftX;\n\t\tvRight = rightX;\n\n\t\t//ensure mask borders are set\n\t\tmag += maskSize.y / viewport.w;\n\n\t\t//map y-coord to alignment\n\t\tcoord.y = coord.y * mag - mag * align + align;\n\n\t\t//save distance from the align\n\t\tvDist = (coord.y - align) * (1. / max(align, 1. - align));\n\n\t\tgl_Position = vec4(coord*2. - 1., 0, 1);\n\t}\n";
@@ -2289,13 +2293,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 		this.trailFrequencies = trail;
 	}
 
-	return this.setTexture('frequencies', {
-		data: magnitudes,
-		format: gl.ALPHA,
-		magFilter: this.gl.LINEAR,
-		minFilter: this.gl.LINEAR,
-		wrap: this.gl.CLAMP_TO_EDGE
-	});
+	return this.setTexture('frequencies', magnitudes);
 };
 
 
@@ -2376,12 +2374,7 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	else if (!Array.isArray(cm)) {
 		this.fill = cm;
 
-		this.setTexture('fill', {
-			data: this.fill,
-			magFilter: this.gl.LINEAR,
-			minFilter: this.gl.LINEAR,
-			wrap: this.gl.CLAMP_TO_EDGE
-		});
+		this.setTexture('fill', this.fill);
 
 		return this;
 	}
@@ -2404,11 +2397,7 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	this.setTexture('fill', {
 		data: this.fill,
 		width: 1,
-		height: (this.fill.length / 4)|0,
-		format: this.gl.RGBA,
-		magFilter: this.gl.LINEAR,
-		minFilter: this.gl.LINEAR,
-		wrap: this.gl.CLAMP_TO_EDGE
+		height: (this.fill.length / 4)|0
 	});
 
 	//ensure bg
@@ -2458,12 +2447,7 @@ Spectrum.prototype.setBackground = function (bg) {
 Spectrum.prototype.setMask = function (mask) {
 	this.mask = mask || [1,1,1,1];
 
-	this.setTexture('mask', {
-		data: this.mask,
-		type: this.gl.FLOAT,
-		format: this.gl.LUMINOCITY,
-		wrap: this.gl.CLAMP_TO_EDGE
-	});
+	this.setTexture('mask', this.mask);
 
 	this.gl.uniform2f(this.maskSizeLocation, this.textures.mask.width, this.textures.mask.height);
 
@@ -4205,7 +4189,7 @@ function Component (options) {
 
 	//null-container means background renderer, so only undefined is recognized as default
 	if (this.container === undefined) {
-		this.container = this.canvas.parentNode || (isBrowser ? document.body : {});
+		this.container = this.canvas.parentNode || (isBrowser ? document.body || document.documentElement : {});
 		this.container.appendChild(this.canvas);
 	}
 
@@ -4214,15 +4198,24 @@ function Component (options) {
 	var gl = this.gl = this.context;
 
 	//cache of textures/attributes
-	this.textures = extend({}, this.textures);
+	this.textures = this.textures || {};
 	this.attributes = extend({position: [-1,-1, -1,4, 4,-1]}, this.attributes);
 
 	//setup webgl context
 	if (!this.is2d) {
 		if (this.float) {
 			var float = gl.getExtension('OES_texture_float');
-			if (!float) throw Error('WebGL does not support floats.');
-			var floatLinear = gl.getExtension('OES_texture_float_linear');
+			if (!float) {
+				var float = gl.getExtension('OES_texture_half_float');
+				if (!float) {
+					throw Error('WebGL does not support floats.');
+				}
+				var floatLinear = gl.getExtension('OES_texture_half_float_linear');
+			}
+			else {
+				var floatLinear = gl.getExtension('OES_texture_float_linear');
+
+			}
 			if (!floatLinear) throw Error('WebGL does not support floats.');
 		}
 
@@ -4234,19 +4227,19 @@ function Component (options) {
 		gl.linkProgram(this.program);
 
 		//stub textures with empty data (to avoid errors)
-		var numUniforms = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS);
-		for(var i=0; i<numUniforms; ++i) {
-			var info = gl.getActiveUniform(this$1.program, i);
-			if (info && info.type === gl.SAMPLER_2D) {
-				if (!this$1.textures[info.name]) {
-					this$1.textures[info.name] = null
+		if (this.autoinitTextures) {
+			var numUniforms = gl.getProgramParameter(this.program, gl.ACTIVE_UNIFORMS);
+			for(var i=0; i<numUniforms; ++i) {
+				var info = gl.getActiveUniform(this$1.program, i);
+				if (info && info.type === gl.SAMPLER_2D) {
+					if (!this$1.textures[info.name]) {
+						this$1.textures[info.name] = null
+					}
 				}
 			}
 		}
 		//preset textures
 		this.setTexture(this.textures);
-
-		gl.useProgram(this.program);
 
 		this.viewportLocation = gl.getUniformLocation(this.program, 'viewport');
 	}
@@ -4275,12 +4268,13 @@ inherits(Component, Emitter);
  */
 Component.prototype.context = 'webgl';
 
-Component.prototype.autostart = true;
-
-Component.prototype.antialias = true;
+//canvas props
+Component.prototype.antialias = false;
 Component.prototype.alpha = true;
 Component.prototype.premultipliedAlpha = true;
 
+//start rendering cycle on raf automatically
+Component.prototype.autostart = true;
 
 Component.prototype.vert = "\n\tattribute vec2 position;\n\tvoid main () {\n\t\tgl_Position = vec4(position, 0, 1);\n\t}\n";
 
@@ -4290,6 +4284,10 @@ Component.prototype.frag = "\n\tprecision mediump float;\n\tuniform vec4 viewpor
 
 //enable floating-point textures
 Component.prototype.float = true;
+
+
+//autoinit textures prevents errors in expense of extra-texture call
+Component.prototype.autoinitTextures = true;
 
 
 /**
@@ -4302,7 +4300,7 @@ Component.prototype.setTexture = function (a, b) {
 
 	if (arguments.length === 2 || typeof a === 'string') {
 		var opts = {};
-		opts[a] = b;
+		opts[typeof a === 'string' ? a : ''] = b;
 	}
 	else {
 		var opts = a || {};
@@ -4314,60 +4312,61 @@ Component.prototype.setTexture = function (a, b) {
 
 	for (var name in opts) {
 		var obj = this.textures[name];
+
 		if (obj && !isPlainObject(obj)) {
 			obj = this.textures[name] = {name: name, data: obj};
 		}
-		else if (obj && obj.data === opts[name]) {
-			continue;
+		//if no object - create and bind texture
+		else if (!obj) {
+			obj = {name: name};
+
+			//if texture name is passed - save obj
+			if (name) {
+				this.textures[name] = obj;
+			}
 		}
 
 		//check if passed some data/image-like object for the texture or settings object
 		var opt = isPlainObject(opts[name]) ? opts[name] : {data: opts[name]};
 
-		//if no object - create and bind texture
-		if (!obj) {
-			obj = this.textures[name] = {name: name};
+		if (!obj.name) obj.name = name;
+
+		if (!obj.location && name) {
+			obj.location = gl.getUniformLocation(this.program, name);
 		}
 
-		if (!obj.name) obj.name = name;
+		if (obj.name && obj.unit == null || opt.unit != null) {
+			var textureCount = texturesCache.get(this.context) || 0;
+			obj.unit = opt.unit != null ? opt.unit : textureCount++;
+			textureCount = Math.max(textureCount, obj.unit);
+			texturesCache.set(this.context, textureCount);
+			obj.location && gl.uniform1i(obj.location, obj.unit);
+		}
 
 		if (!obj.texture) {
 			obj.texture = gl.createTexture();
 		}
 
-		if (!obj.location) {
-			obj.location = gl.getUniformLocation(this.program, name);
-		}
+		gl.activeTexture(gl.TEXTURE0 + obj.unit);
+		gl.bindTexture(gl.TEXTURE_2D, obj.texture);
 
-		if (obj.unit == null || opt.unit != null) {
-			var textureCount = texturesCache.get(this.context) || 0;
-			obj.unit = opt.unit != null ? opt.unit : textureCount++;
-			textureCount = Math.max(textureCount, obj.unit);
-			texturesCache.set(this.context, textureCount);
-			gl.activeTexture(gl.TEXTURE0 + obj.unit);
-			gl.bindTexture(gl.TEXTURE_2D, obj.texture);
-			gl.uniform1i(obj.location, obj.unit);
-		}
-		else {
-			gl.activeTexture(gl.TEXTURE0 + obj.unit);
-		}
-
-		if (!obj.wrapS || opt.wrapS || opt.wrap) {
-			obj.wrapS = opt.wrap && opt.wrap[0] || opt.wrapS || opt.wrap || gl.REPEAT;
+		if (opt.wrap || opt.wrapS || !obj.wrapS) {
+			obj.wrapS = opt.wrap && opt.wrap[0] || opt.wrapS || opt.wrap || obj.wrapS || gl.REPEAT;
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, obj.wrapS);
 		}
-		if (!obj.wrapT || opt.wrapT || opt.wrap) {
-			obj.wrapT = opt.wrap && opt.wrap[1] || opt.wrapT || opt.wrap || gl.REPEAT;
+
+		if (opt.wrap || opt.wrapT || !obj.wrapT) {
+			obj.wrapT = opt.wrap && opt.wrap[1] || opt.wrapT || opt.wrap || obj.wrapT || gl.REPEAT;
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, obj.wrapT);
 		}
 
-		if (!obj.minFilter || opt.minFilter) {
-			obj.minFilter = opt.minFilter || gl.NEAREST;
+		if (opt.filter || opt.minFilter || !obj.minFilter) {
+			obj.minFilter = opt.minFilter || opt.filter || obj.minFilter || gl.NEAREST;
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, obj.minFilter);
 		}
 
-		if (!obj.magFilter || opt.magFilter) {
-			obj.magFilter = opt.magFilter || gl.NEAREST;
+		if (opt.filter || opt.magFilter || !obj.magFilter) {
+			obj.magFilter = opt.magFilter || opt.filter || obj.magFilter || gl.NEAREST;
 			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, obj.magFilter);
 		}
 
@@ -4379,7 +4378,8 @@ Component.prototype.setTexture = function (a, b) {
 			obj.format = opt.format || obj.format || gl.RGBA;
 		}
 
-		var data = opt.data || [0, 0, 0, 1];
+
+		var data = opt.data || null;
 		if (isBrowser) {
 			if (typeof data === 'string') {
 				if (data === (obj.data && obj.data._src) || data === (obj.data && obj.data.src)) {
@@ -4398,31 +4398,30 @@ Component.prototype.setTexture = function (a, b) {
 					return this;
 				}
 				image.addEventListener('load', function () {
-					this$1.setTexture(obj.name, image)
+					this$1.setTexture(obj.name || obj.texture, image)
 				});
-				data = [0, 0, 0, 1];
+				data = null;
 			}
 		}
 
 		//handle raw data case
-		if (Array.isArray(data) || ArrayBuffer.isView(data)) {
+		if (data == null || Array.isArray(data) || ArrayBuffer.isView(data)) {
 			if (opt && opt.shape) {
 				obj.width = opt.shape[0];
 				obj.height = opt.shape[1];
 			}
 			else {
-				obj.width = opt.width || data.width || (obj.format === gl.ALPHA ? data.length : Math.max(data.length / 4, 1));
-				obj.height = opt.height || data.height || 1;
+				var len = data && data.length || 1;
+				obj.width = opt.width || data && data.width || (obj.format === gl.ALPHA ? len : Math.max(len / 4, 1));
+				obj.height = opt.height || (data && data.height) || 1;
 			}
-
-			obj.data = new Float32Array(data);
+			obj.data = data == null ? null : obj.type === gl.FLOAT ? new Float32Array(data) : obj.type === gl.UNSIGNED_SHORT ? new Uint16Array(data) : new Uint8Array(data);
 
 			gl.texImage2D(gl.TEXTURE_2D, 0, obj.format, obj.width, obj.height, 0, obj.format, obj.type, obj.data);
 		} else {
-			obj.width = data.width;
-			obj.height = data.height;
+			obj.width = data && data.width || 1;
+			obj.height = data && data.height || 1;
 			obj.data = data;
-
 			gl.texImage2D(gl.TEXTURE_2D, 0, obj.format, obj.format, obj.type, obj.data);
 		}
 	}
@@ -4430,6 +4429,17 @@ Component.prototype.setTexture = function (a, b) {
 	return this;
 };
 
+
+//return a new texture with default settings
+Component.prototype.createTexture = function (opt) {
+	var gl = this.gl;
+
+	var texture = gl.createTexture();
+
+	this.setTexture(texture, opt);
+
+	return texture;
+};
 
 
 //create and set buffer
@@ -4576,7 +4586,6 @@ Component.prototype.resize = function () {
 		//this trickery inverts viewport Y
 		var top = h-(this.viewport[3]+this.viewport[1]);
 		this.glViewport = [this.viewport[0], top, this.viewport[2], this.viewport[3] + Math.min(top, 0)];
-
 		gl.useProgram(this.program);
 		gl.uniform4fv(this.viewportLocation, this.glViewport);
 	}
@@ -4605,7 +4614,6 @@ Component.prototype.start = function () {
  */
 Component.prototype.render = function () {
 	var gl = this.context;
-
 
 	if (!this.is2d) {
 		//save viewport
@@ -4687,7 +4695,6 @@ Component.prototype.createProgram = function (vSrc, fSrc) {
 
 	return program;
 }
-
 
 },{"canvas-fit":17,"events":4,"get-canvas-context":32,"inherits":36,"is-browser":38,"mutype/is-object":49,"raf-loop":53,"xtend/mutable":63}],35:[function(require,module,exports){
 (function (global){
@@ -5511,8 +5518,7 @@ var Emitter = require('events').EventEmitter;
 var inherits = require('inherits');
 var extend = require('xtend/mutable');
 var sf = 0;
-var className = ((require('insert-css')("._99a524de {\r\n\tmin-height: 100vh;\r\n\tmargin: 0;\r\n\tfont-family: sans-serif;\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._99a524de * {\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._99a524de a {\r\n\tcolor: inherit;\r\n}\r\n\r\n._99a524de [hidden] {\r\n\tdisplay: none!important;\r\n}\r\n\r\n._99a524de:after {\r\n\tcontent: '';\r\n}\r\n._99a524de.dragover:after {\r\n\tcontent: '⎗';\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tmargin: auto;\r\n\twidth: 20vh;\r\n\theight: 20vh;\r\n\tz-index: 2;\r\n\tfont-size: 20vh;\r\n\ttext-align: center;\r\n\tline-height: 20vh;\r\n\tdisplay: block;\r\n}\r\n\r\n._99a524de.dragover:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tbottom: 0;\r\n\tmargin: 0;\r\n\tborder: .2rem dashed;\r\n\tz-index: 1;\r\n\tdisplay: block;\r\n}\r\n\r\n._99a524de.dragover .source {\r\n}\r\n\r\n._99a524de .source {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tposition: absolute;\r\n\ttop: .75rem;\r\n\tleft: .75rem;\r\n\tdisplay: block;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\toutline: none;\r\n\tfill: currentColor;\r\n\tz-index: 999;\r\n}\r\n._99a524de .source-input {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tborder: 0;\r\n\tdisplay: inline;\r\n\tvertical-align: baseline;\r\n\tline-height: 1rem;\r\n\theight: 1rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\tfont-weight: bolder;\r\n\toutline: none;\r\n\tbackground: none;\r\n\t-webkit-appearance: none;\r\n\tappearance: none;\r\n\tborder-radius: 0;\r\n\tbox-shadow: 0 2px;\r\n\tcolor: inherit;\r\n}\r\n._99a524de .source-input:focus{\r\n\toutline: none;\r\n}\r\n._99a524de .source-input-file {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\topacity: 0;\r\n\tborder: none;\r\n\tcursor: pointer;\r\n}\r\n._99a524de .source-input-url {\r\n\tfont-family: sans-serif;\r\n\tfont-weight: bold;\r\n\tmin-width: 40vw;\r\n}\r\n._99a524de .source-input-url:focus {\r\n}\r\n._99a524de input[type=file],\r\n._99a524de input[type=file]::-webkit-file-upload-button {\r\n\tcursor: pointer;\r\n}\r\n._99a524de i {\r\n\tfill: currentColor;\r\n}\r\n._99a524de .source i {\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tdisplay: inline-block;\r\n\tposition: relative;\r\n}\r\n._99a524de .source i svg {\r\n\tmargin-bottom: -.52rem;\r\n}\r\n._99a524de i svg {\r\n\tmax-width: 100%;\r\n\tmax-height: 100%;\r\n}\r\n._99a524de .source-link {\r\n\tposition: relative;\r\n\tfont-weight: bold;\r\n\ttext-decoration: none;\r\n\tbox-shadow: 0px 2px;\r\n\twhite-space: nowrap;\r\n\tcursor: pointer;\r\n}\r\n\r\n._99a524de .text-length-limiter {\r\n\tdisplay: inline-block;\r\n\tmax-width: 40vw;\r\n\tvertical-align: top;\r\n\twhite-space: nowrap;\r\n\ttext-overflow: ellipsis;\r\n\toverflow: hidden;\r\n}\r\n._99a524de .source-title {\r\n\tdisplay: inline;\r\n}\r\n\r\n._99a524de .fps {\r\n\tposition: fixed;\r\n\ttop: .75rem;\r\n\tright: .75rem;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tz-index: 999;\r\n}\r\n\r\n\r\n._99a524de .fps-canvas {\r\n\theight: 1rem;\r\n\twidth: 2rem;\r\n\tdisplay: inline-block;\r\n\tvertical-align: baseline;\r\n\tmargin-right: .15rem;\r\n\tmargin-bottom: -.15rem;\r\n}\r\n\r\n._99a524de .fps-text {\r\n}\r\n\r\n._99a524de .fps-value {\r\n}\r\n\r\n._99a524de .audio-playback {\r\n\r\n}\r\n\r\n._99a524de .progress {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\theight: .2rem;\r\n\tbackground: currentColor;\r\n\ttransition: .1s linear width;\r\n\tz-index: 999;\r\n}\r\n\r\n@media (max-width: 640px) {\r\n\t._99a524de .text-length-limiter {\r\n\t\tmax-width: 30%;\r\n\t}\r\n\t._99a524de .source {\r\n\t\tright: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n\t._99a524de .fps {\r\n\t\ttop: auto;\r\n\t\tbottom: .75rem;\r\n\t\tright: .75rem;\r\n\t\tleft: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n}") || true) && "_99a524de");
-var ctx = require('audio-context');
+var className = ((require('insert-css')("._a3cacb3c {\r\n\tmin-height: 100vh;\r\n\tmargin: 0;\r\n\tfont-family: sans-serif;\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._a3cacb3c * {\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._a3cacb3c a {\r\n\tcolor: inherit;\r\n}\r\n\r\n._a3cacb3c [hidden] {\r\n\tdisplay: none!important;\r\n}\r\n\r\n._a3cacb3c:after {\r\n\tcontent: '';\r\n}\r\n._a3cacb3c.dragover:after {\r\n\tcontent: '⎗';\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tmargin: auto;\r\n\twidth: 20vh;\r\n\theight: 20vh;\r\n\tz-index: 2;\r\n\tfont-size: 20vh;\r\n\ttext-align: center;\r\n\tline-height: 20vh;\r\n\tdisplay: block;\r\n}\r\n\r\n._a3cacb3c.dragover:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tbottom: 0;\r\n\tmargin: 0;\r\n\tborder: .2rem dashed;\r\n\tz-index: 1;\r\n\tdisplay: block;\r\n}\r\n\r\n._a3cacb3c.dragover .source {\r\n}\r\n\r\n._a3cacb3c.dragover .audio-stop,._a3cacb3c.dragover .audio-playback {\r\n\tdisplay: none;\r\n}\r\n\r\n._a3cacb3c .source {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tposition: absolute;\r\n\ttop: .75rem;\r\n\tleft: .75rem;\r\n\tdisplay: block;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\toutline: none;\r\n\tfill: currentColor;\r\n\tz-index: 999;\r\n}\r\n._a3cacb3c .source-input {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tborder: 0;\r\n\tdisplay: inline;\r\n\tvertical-align: baseline;\r\n\tline-height: 1rem;\r\n\theight: 1rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\tfont-weight: bolder;\r\n\toutline: none;\r\n\tbackground: none;\r\n\t-webkit-appearance: none;\r\n\tappearance: none;\r\n\tborder-radius: 0;\r\n\tbox-shadow: 0 2px;\r\n\tcolor: inherit;\r\n}\r\n._a3cacb3c .source-input:focus{\r\n\toutline: none;\r\n}\r\n._a3cacb3c .source-input-file {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\topacity: 0;\r\n\tborder: none;\r\n\tcursor: pointer;\r\n}\r\n._a3cacb3c .source-input-url {\r\n\tfont-family: sans-serif;\r\n\tfont-weight: bold;\r\n\tmin-width: 40vw;\r\n}\r\n._a3cacb3c .source-input-url:focus {\r\n}\r\n._a3cacb3c input[type=file],\r\n._a3cacb3c input[type=file]::-webkit-file-upload-button {\r\n\tcursor: pointer;\r\n}\r\n._a3cacb3c i {\r\n\tfill: currentColor;\r\n}\r\n._a3cacb3c .source i {\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tdisplay: inline-block;\r\n\tposition: relative;\r\n}\r\n._a3cacb3c .source i svg {\r\n\tmargin-bottom: -.52rem;\r\n}\r\n._a3cacb3c i svg {\r\n\tmax-width: 100%;\r\n\tmax-height: 100%;\r\n}\r\n._a3cacb3c .source-link {\r\n\tposition: relative;\r\n\tfont-weight: bold;\r\n\ttext-decoration: none;\r\n\tbox-shadow: 0px 2px;\r\n\twhite-space: nowrap;\r\n\tcursor: pointer;\r\n}\r\n\r\n._a3cacb3c .text-length-limiter {\r\n\tdisplay: inline-block;\r\n\tmax-width: 40vw;\r\n\tvertical-align: top;\r\n\twhite-space: nowrap;\r\n\ttext-overflow: ellipsis;\r\n\toverflow: hidden;\r\n}\r\n._a3cacb3c .source-title {\r\n\tdisplay: inline;\r\n}\r\n\r\n._a3cacb3c .fps {\r\n\tposition: fixed;\r\n\ttop: .75rem;\r\n\tright: .75rem;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tz-index: 999;\r\n}\r\n\r\n\r\n._a3cacb3c .fps-canvas {\r\n\theight: 1rem;\r\n\twidth: 2rem;\r\n\tdisplay: inline-block;\r\n\tvertical-align: baseline;\r\n\tmargin-right: .15rem;\r\n\tmargin-bottom: -.15rem;\r\n}\r\n\r\n._a3cacb3c .fps-text {\r\n}\r\n\r\n._a3cacb3c .fps-value {\r\n}\r\n\r\n._a3cacb3c .audio-playback {\r\n\r\n}\r\n\r\n._a3cacb3c .progress {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\theight: .2rem;\r\n\tbackground: currentColor;\r\n\ttransition: .1s linear width;\r\n\tz-index: 999;\r\n}\r\n\r\n@media (max-width: 640px) {\r\n\t._a3cacb3c .text-length-limiter {\r\n\t\tmax-width: 30%;\r\n\t}\r\n\t._a3cacb3c .source {\r\n\t\tright: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n\t._a3cacb3c .fps {\r\n\t\ttop: auto;\r\n\t\tbottom: .75rem;\r\n\t\tright: .75rem;\r\n\t\tleft: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n}") || true) && "_a3cacb3c");
 
 var raf = require('raf');
 var now = require('right-now');
@@ -5522,6 +5528,7 @@ var pad = require('left-pad');
 var isMobile = require('is-mobile')();
 var xhr = require('xhr');
 var isUrl = require('is-url');
+var ctx = require('audio-context');
 
 module.exports = StartApp;
 
@@ -5572,12 +5579,12 @@ function StartApp (opts, cb) {
 	}
 
 	//create layout
-	this.sourceEl.innerHTML = "\n\t\t<i class=\"source-icon\">" + (this.icons.loading) + "</i>\n\t\t<span class=\"source-text\"></span>\n\t\t<a href=\"#audio\" class=\"audio-playback\" hidden><i class=\"audio-icon\">" + (this.icons.play) + "</i></a><a href=\"#stop\" class=\"audio-stop\" title=\"Reset\" hidden><i class=\"audio-icon\">" + (this.icons.eject) + "</i></a>\n\t";
+	this.sourceEl.innerHTML = "\n\t\t<i class=\"source-icon\" hidden>" + (this.icons.loading) + "</i>\n\t\t<span class=\"source-text\"></span>\n\t\t<a href=\"#audio\" class=\"audio-playback\" hidden><i class=\"audio-icon\">" + (this.icons.play) + "</i></a><a href=\"#stop\" class=\"audio-stop\" title=\"Reset\" hidden><i class=\"audio-icon\">" + (this.icons.eject) + "</i></a>\n\t";
 	this.sourceIcon = this.sourceEl.querySelector('.source-icon');
-	this.sourceText = this.sourceEl.querySelector('.source-text');
+	this.sourceContent = this.sourceEl.querySelector('.source-text');
 	this.sourceIcon.innerHTML = this.file ? this.icons.open : this.url ? this.icons.url : this.mic ? this.icons.mic : this.icons.open;
 
-	this.sourceText.innerHTML = "\n\t\t<span class=\"source-links\">\n\t\t\t<a href=\"#open-file\" " + (this.file ? '' : 'hidden') + " class=\"source-link source-link-file\">Open file</a>" + (this.file && this.url && this.mic ? ',' : this.file && (this.url || this.mic) ? ' or' : '') + "\n\t\t\t<a href=\"#enter-url\" " + (this.url ? '' : 'hidden') + " class=\"source-link source-link-url\">enter URL</a>\n\t\t\t" + (this.url && this.mic ? ' or' : '') + "\n\t\t\t<a href=\"#enable-mic\" " + (this.mic ? '' : 'hidden') + " class=\"source-link source-link-mic\">\n\t\t\t\tenable microphone\n\t\t\t</a>\n\t\t</span>\n\t\t<input class=\"source-input source-input-file\" hidden type=\"file\"/>\n\t\t<input placeholder=\"http://url.to/audio\" hidden class=\"source-input source-input-url\" type=\"url\" value=\"" + (this.source || '') + "\"/>\n\t\t<strong class=\"source-title\"></strong>\n\t";
+	this.sourceContent.innerHTML = "\n\t\t<span class=\"source-links\">\n\t\t\t<a href=\"#open-file\" " + (this.file ? '' : 'hidden') + " class=\"source-link source-link-file\">Open file</a>" + (this.file && this.url && this.mic ? ',' : this.file && (this.url || this.mic) ? ' or' : '') + "\n\t\t\t<a href=\"#enter-url\" " + (this.url ? '' : 'hidden') + " class=\"source-link source-link-url\">enter URL</a>\n\t\t\t" + (this.url && this.mic ? ' or' : '') + "\n\t\t\t<a href=\"#enable-mic\" " + (this.mic ? '' : 'hidden') + " class=\"source-link source-link-mic\">\n\t\t\t\tenable microphone\n\t\t\t</a>\n\t\t</span>\n\t\t<input class=\"source-input source-input-file\" hidden type=\"file\"/>\n\t\t<input placeholder=\"http://url.to/audio\" hidden class=\"source-input source-input-url\" type=\"url\" value=\"" + (this.source || '') + "\"/>\n\t\t<strong class=\"source-title\" hidden></strong>\n\t";
 	this.sourceTitle = this.sourceEl.querySelector('.source-title');
 	this.sourceLinks = this.sourceEl.querySelector('.source-links');
 	this.sourceInputFile = this.sourceEl.querySelector('.source-input-file');
@@ -5605,14 +5612,18 @@ function StartApp (opts, cb) {
 		this$1.hideInput();
 		this$1.sourceIcon.innerHTML = this$1.icons.loading;
 		this$1.sourceTitle.innerHTML = "loading";
+		this$1.sourceIcon.setAttribute('title', this$1.sourceTitle.textContent);
 		this$1.sourceInputURL.setAttribute('hidden', true);
 		this$1.setSource(this$1.sourceInputURL.value, function (err) {
 			this$1.hideInput();
 			//in case of error allow second chance
 			if (err) {
 				this$1.sourceTitle.innerHTML = "";
-				this$1.sourceInputURL.removeAttribute('hidden');
+				this$1.sourceIcon.setAttribute('title', this$1.sourceTitle.textContent);
 				this$1.sourceIcon.innerHTML = this$1.icons.url;
+				this$1.sourceInputURL.removeAttribute('hidden');
+				this$1.sourceInputURL.focus();
+
 				return;
 			}
 		});
@@ -5644,16 +5655,28 @@ function StartApp (opts, cb) {
 		function enableMic(stream) {
 			self.hideInput();
 			self.sourceTitle.innerHTML = "Microphone";
+			self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
 			self.sourceIcon.innerHTML = self.icons.mic;
 
-			self.audio.src = URL.createObjectURL(stream);
-			self.play();
+			//an alternative way to start media stream - do not work in chrome
+			var streamUrl = URL.createObjectURL(stream);
+			// self.audio.src = streamUrl;
+			// self.play();
+
+			//create media stream source node
+			self.micNode = self.context.createMediaStreamSource(stream);
+			self.micNode.connect(self.context.destination);
+
 			self.audioStop.querySelector('i').innerHTML = self.icons.stop;
-			self.audioStop.removeAttribute('hidden');
+			self.stop && self.audioStop.removeAttribute('hidden');
+
+			self.emit('ready', self.micNode);
+			self.emit('source', streamUrl);
 		}
 		function errMic (err) {
 			self.hideInput();
 			self.sourceTitle.innerHTML = err;//`microphone is not allowed`;
+			self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
 			self.sourceIcon.innerHTML = self.icons.error;
 			setTimeout(function () {
 				if (!self.source) self.showInput();
@@ -5669,10 +5692,13 @@ function StartApp (opts, cb) {
 	this.audioEl = this.sourceEl.querySelector('.audio-playback');
 	this.audioStop = this.sourceEl.querySelector('.audio-stop');
 	this.audioIcon = this.sourceEl.querySelector('.audio-icon');
+	this.audioNode = this.context.createMediaElementSource(this.audio);
+	this.audioNode.connect(this.context.destination);
 	this.audio.addEventListener('canplay', function () {
+		this$1.emit('ready', this$1.audioNode);
 		this$1.source && this$1.autoplay && this$1.play();
 	});
-	this.audioEl.addEventListener('click', function (e) {
+	this.playPause && this.audioEl.addEventListener('click', function (e) {
 		e.preventDefault();
 		if (this$1.audio.paused) {
 			this$1.play();
@@ -5681,7 +5707,7 @@ function StartApp (opts, cb) {
 			this$1.pause();
 		}
 	});
-	this.audioStop.addEventListener('click', function (e) {
+	this.stop && this.audioStop.addEventListener('click', function (e) {
 		this$1.reset();
 	});
 
@@ -5693,7 +5719,7 @@ function StartApp (opts, cb) {
 	this.container.appendChild(progress);
 	setInterval(function () {
 		if (this$1.audio) {
-			progress.style.width = ((audio.currentTime / audio.duration * 100) || 0) + '%';
+			progress.style.width = ((this$1.audio.currentTime / this$1.audio.duration * 100) || 0) + '%';
 			progress.setAttribute('title', ((this$1.getTime(this$1.audio.currentTime)) + " / " + (this$1.getTime(this$1.audio.duration)) + " played"));
 		}
 	}, 500)
@@ -5765,11 +5791,26 @@ inherits(StartApp, Emitter);
 //Allow dropping files to browser
 StartApp.prototype.dragAndDrop = true;
 
+//show playpayse buttons
+StartApp.prototype.playPause = true;
+
+//show stop button
+StartApp.prototype.stop = true;
+
+//show title of track/status messages
+StartApp.prototype.title = true;
+
+//show icon
+StartApp.prototype.icon = true;
+
 //Enable file select
 StartApp.prototype.file = true;
 
 //Enable url select
 StartApp.prototype.url = true;
+
+//Default audio context
+StartApp.prototype.context = ctx;
 
 //Enable mic input
 StartApp.prototype.mic = !!(navigator.mediaDevices || navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia);
@@ -5786,6 +5827,7 @@ StartApp.prototype.fps = true;
 //autostart play
 StartApp.prototype.autoplay = true;
 StartApp.prototype.loop = true;
+
 
 //enable progress indicator
 StartApp.prototype.progress = true;
@@ -5805,7 +5847,7 @@ StartApp.prototype.icons = {
 	eject: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M631.487 257.578l-311.033 199.782c-8.736 5.828-12.814 14.564-12.814 23.879s4.078 18.053 12.814 23.879l311.612 200.361c18.642 12.235 43.68-1.166 43.68-23.879v-400.142c-0.579-22.718-25.050-36.114-44.27-23.879z\"></path>\n<path d=\"M249.975 252.331h-40.772c-31.457 0-57.083 25.629-57.083 57.083v343.648c0 31.457 25.629 57.083 57.083 57.083h40.772c31.457 0 57.083-25.629 57.083-57.083v-343.648c0-31.457-25.629-57.083-57.083-57.083z\"></path>\n</svg>\n"
 };
 
-//do mobile routines
+//do mobile routines like meta, splashscreen etc
 StartApp.prototype.mobile = true;
 
 
@@ -5848,6 +5890,7 @@ StartApp.prototype.update = function (opts) {
 
 			this$1.hideInput();
 			this$1.sourceTitle.innerHTML = "drop audio file";
+			this$1.sourceIcon.setAttribute('title', this$1.sourceTitle.textContent);
 			this$1.sourceIcon.innerHTML = this$1.icons.record;
 		});
 
@@ -5858,6 +5901,7 @@ StartApp.prototype.update = function (opts) {
 			this$1.container.classList.remove('dragover');
 			if (this$1.source) {
 				this$1.sourceTitle.innerHTML = title;
+				this$1.sourceIcon.setAttribute('title', this$1.sourceTitle.textContent);
 				this$1.sourceIcon.innerHTML = icon;
 			}
 			else {
@@ -5874,6 +5918,7 @@ StartApp.prototype.update = function (opts) {
 			this$1.setSource(dt.files, function (err, data) {
 				if (err) {
 					this$1.sourceTitle.innerHTML = title;
+					this$1.sourceIcon.setAttribute('title', this$1.sourceTitle.textContent);
 					this$1.sourceIcon.innerHTML = icon;
 				}
 			});
@@ -5891,8 +5936,16 @@ StartApp.prototype.update = function (opts) {
 		this.fpsEl.setAttribute('hidden', true);
 	}
 
-	if (this.time) {
+	if (this.title) {
+		this.sourceTitle.removeAttribute('hidden');
+	} else {
+		this.sourceTitle.setAttribute('hidden', true);
+	}
 
+	if (this.icon) {
+		this.sourceIcon.removeAttribute('hidden');
+	} else {
+		this.sourceIcon.setAttribute('hidden', true);
 	}
 
 	return this;
@@ -5952,6 +6005,7 @@ StartApp.prototype.setSource = function (src, cb) {
 
 		if (!src) {
 			this.sourceTitle.innerHTML = "not an audio";
+			this.sourceIcon.setAttribute('title', this.sourceTitle.textContent);
 			this.sourceIcon.innerHTML = this.icons.error;
 			setTimeout(function () {
 				if (!this$1.source) this$1.showInput();
@@ -5966,12 +6020,13 @@ StartApp.prototype.setSource = function (src, cb) {
 		var url = URL.createObjectURL(src);
 		this.sourceIcon.innerHTML = this.icons.record;
 		this.sourceTitle.innerHTML = "<a class=\"source-link\" href=\"" + url + "\" target=\"_blank\" title=\"" + (src.name) + "\"><span class=\"text-length-limiter\">" + (src.name) + "</span></a>";
+		this.sourceIcon.setAttribute('title', this.sourceTitle.textContent);
 
 		this.source = url;
 
 		this.audio.src = url;
-		this.audioEl.removeAttribute('hidden');
-		this.audioStop.removeAttribute('hidden');
+		this.playPause && this.audioEl.removeAttribute('hidden');
+		this.stop && this.audioStop.removeAttribute('hidden');
 
 		this.emit('source', url);
 		cb && cb(null, url);
@@ -5983,6 +6038,7 @@ StartApp.prototype.setSource = function (src, cb) {
 	if (/soundcloud/.test(src)) {
 		this.sourceIcon.innerHTML = this.icons.loading;
 		this.sourceTitle.innerHTML = 'connecting to soundcloud';
+		this.sourceIcon.setAttribute('title', this.sourceTitle.textContent);
 		var token = this.token.soundcloud || this.token;
 
 		//sad ios workaround
@@ -6039,16 +6095,18 @@ StartApp.prototype.setSource = function (src, cb) {
 			}
 
 			var maxTitle = window.innerWidth * .05;
-			self.sourceTitle.innerHTML = "\n\t\t\t\t<a class=\"source-link\" href=\"" + (json.permalink_url) + "\" target=\"_blank\" title=\"" + (json.title) + "\"><span class=\"text-length-limiter\">" + (json.title) + "</span></a>\n\t\t\t";
+			self.sourceTitle.innerHTML = "\n\t\t\t\t<a class=\"source-link\" href=\"" + (json.permalink_url) + "\" target=\"_blank\" title=\"" + (json.title) + "\"><span class=\"text-length-limiter\">" + (json.title) + "</span></a>";
+			self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
 			if (json.user) {
-				self.sourceTitle.innerHTML += "by\n\t\t\t\t<a class=\"source-link\" href=\"" + (json.user.permalink_url) + "\" target=\"_blank\" title=\"" + (json.user.username) + "\"><span class=\"text-length-limiter\">" + (json.user.username) + "</span></a>\n\t\t\t\t";
+				self.sourceTitle.innerHTML += " by <a class=\"source-link\" href=\"" + (json.user.permalink_url) + "\" target=\"_blank\" title=\"" + (json.user.username) + "\"><span class=\"text-length-limiter\">" + (json.user.username) + "</span></a>\n\t\t\t\t";
+				self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
 			}
 
 			self.source = streamUrl;
 
 			self.audio.src = streamUrl;
-			self.audioEl.removeAttribute('hidden');
-			self.audioStop.removeAttribute('hidden');
+			self.playPause && self.audioEl.removeAttribute('hidden');
+			self.stop && self.audioStop.removeAttribute('hidden');
 
 			self.emit('source', streamUrl);
 
@@ -6086,9 +6144,10 @@ StartApp.prototype.setSource = function (src, cb) {
 			self.source = src;
 
 			self.sourceTitle.innerHTML = "\n\t\t\t\t<a class=\"source-link\" href=\"" + src + "\" target=\"_blank\" title=\"Open " + src + "\"><span class=\"text-length-limiter\">" + src + "</span></a>\n\t\t\t";
+			self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
 			self.audio.src = src;
-			self.audioEl.removeAttribute('hidden');
-			self.audioStop.removeAttribute('hidden');
+			self.playPause && self.audioEl.removeAttribute('hidden');
+			self.stop && self.audioStop.removeAttribute('hidden');
 
 			this$1.emit('source', src);
 			cb && cb(null, src);
@@ -6097,6 +6156,7 @@ StartApp.prototype.setSource = function (src, cb) {
 
 	function badURL (err) {
 		self.sourceTitle.innerHTML = err || "bad URL";
+		self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
 		self.sourceIcon.innerHTML = self.icons.error;
 		setTimeout(function () {
 			cb && cb('Bad url');
@@ -6106,6 +6166,7 @@ StartApp.prototype.setSource = function (src, cb) {
 	return this;
 };
 
+
 /**
  * Show/hide source input default view
  */
@@ -6114,6 +6175,7 @@ StartApp.prototype.showInput = function () {
 	this.sourceInputURL.setAttribute('hidden', true);
 	this.sourceIcon.innerHTML = this.file ? this.icons.open : this.url ? this.icons.url : this.mic ? this.icons.mic : this.icons.open;
 	this.sourceTitle.innerHTML = '';
+	this.sourceIcon.setAttribute('title', this.sourceTitle.textContent);
 	this.audioEl.setAttribute('hidden', true);
 
 	return this;
@@ -6133,7 +6195,9 @@ StartApp.prototype.play = function () {
 	this.audio.play();
 	this.audioEl.title = "Pause";
 	this.audioIcon.innerHTML = this.icons.pause;
-	this.audioStop.setAttribute('hidden', true);
+	this.playPause && this.stop && this.audioStop.setAttribute('hidden', true);
+
+	this.emit('play');
 
 	return this;
 }
@@ -6141,21 +6205,32 @@ StartApp.prototype.pause = function () {
 	this.audio.pause();
 	this.audioEl.title = "Play";
 	this.audioIcon.innerHTML = this.icons.play;
-	this.audioStop.removeAttribute('hidden');
+	this.playPause && this.stop && this.audioStop.removeAttribute('hidden');
+
+	this.emit('pause');
 
 	return this;
 }
 StartApp.prototype.reset = function () {
 	this.source = '';
 	this.sourceTitle.innerHTML = '';
+	this.sourceIcon.setAttribute('title', this.sourceTitle.textContent);
 	this.sourceInputURL.value = '';
 	this.audio.currentTime = 0;
 
 	this.audio.src = '';
 	this.pause();
 	this.audioStop.querySelector('i').innerHTML = this.icons.eject;
-	this.audioStop.setAttribute('hidden', true);
+	this.stop && this.audioStop.setAttribute('hidden', true);
 	this.showInput();
+
+	if (this.micNode) {
+		this.micNode.disconnect();
+	}
+
+	this.emit('stop');
+
+	return this;
 }
 StartApp.prototype.getTime = function (time) {
 	return pad((time / 60)|0, 2, 0) + ':' + pad((time % 60)|0, 2, 0);
@@ -6493,6 +6568,7 @@ var ctx = require('audio-context');
 
 
 var app = startApp({
+	context: ctx,
 	color: '#E86F56',
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	autoplay: true,
@@ -6506,14 +6582,16 @@ var app = startApp({
 	// source: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
 });
 
-
-
-var source = ctx.createMediaElementSource(app.audio);
+var source = null;
 var analyser = ctx.createAnalyser();
 analyser.frequencyBinCount = 2048;
 analyser.smoothingTimeConstant = .1;
-source.connect(analyser);
 analyser.connect(ctx.destination);
+
+app.on('ready', function (node) {
+	source = node;
+	source.connect(analyser);
+});
 
 
 //generate input sine
