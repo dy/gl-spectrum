@@ -15,6 +15,7 @@ var ctx = require('audio-context');
 
 
 var app = startApp({
+	context: ctx,
 	color: '#E86F56',
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	autoplay: true,
@@ -28,14 +29,16 @@ var app = startApp({
 	// source: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
 });
 
-
-
-var source = ctx.createMediaElementSource(app.audio);
+var source = null;
 var analyser = ctx.createAnalyser();
 analyser.frequencyBinCount = 2048;
-analyser.smoothingTimeConstant = 0;
-source.connect(analyser);
+analyser.smoothingTimeConstant = .1;
 analyser.connect(ctx.destination);
+
+app.on('ready', function (node) {
+	source = node;
+	source.connect(analyser);
+});
 
 
 //generate input sine
@@ -154,7 +157,7 @@ function createColormapSelector (spectrum) {
 	var html = '';
 	for (var name in colorScales ) {
 		if (name === 'alpha') continue;
-		html += `<option value="${name}"${(name === 'cdom') ? 'selected' : ''}>${name}</option>`
+		html += `<option value="${name}"${(name === 'inferno') ? 'selected' : ''}>${name}</option>`
 	}
 	switcher.innerHTML = html;
 	switcher.addEventListener('input', function () {

@@ -36,21 +36,6 @@ function Spectrum (options) {
 	if (!this.is2d) {
 		var gl = this.gl;
 
-		var gl = this.gl;
-		var float = gl.getExtension('OES_texture_float');
-		if (!float) {
-			var float = gl.getExtension('OES_texture_half_float');
-			if (!float) {
-				throw Error('WebGL does not support floats.');
-			}
-			var floatLinear = gl.getExtension('OES_texture_half_float_linear');
-		}
-		else {
-			var floatLinear = gl.getExtension('OES_texture_float_linear');
-
-		}
-		if (!floatLinear) throw Error('WebGL does not support floats.');
-
 		//setup alpha
 		gl.enable( gl.BLEND );
 		gl.blendEquation( gl.FUNC_ADD );
@@ -66,6 +51,24 @@ function Spectrum (options) {
 		this.trailLocation = gl.getUniformLocation(this.program, 'trail');
 		this.balanceLocation = gl.getUniformLocation(this.program, 'balance');
 		this.peakLocation = gl.getUniformLocation(this.program, 'peak');
+
+		this.setTexture({
+			frequencies: {
+				filter: gl.LINEAR,
+				wrap: gl.CLAMP_TO_EDGE,
+				format: gl.ALPHA
+			},
+			fill: {
+				filter: gl.LINEAR,
+				wrap: gl.CLAMP_TO_EDGE,
+				format: gl.RGBA
+			},
+			mask: {
+				type: gl.FLOAT,
+				format: gl.LUMINOCITY,
+				wrap: gl.CLAMP_TO_EDGE
+			}
+		});
 	}
 
 	this.freqBuffer = [];
@@ -83,7 +86,7 @@ inherits(Spectrum, Component);
 Spectrum.prototype.antialias = false;
 Spectrum.prototype.premultipliedAlpha = true;
 Spectrum.prototype.alpha = true;
-
+Spectrum.prototype.float = true;
 
 Spectrum.prototype.maxDecibels = -30;
 Spectrum.prototype.minDecibels = -100;
@@ -126,6 +129,7 @@ Spectrum.prototype.mask = null;
 
 //group freq range by subbands
 Spectrum.prototype.group = false;
+
 
 //scale verteces to frequencies values and apply alignment
 Spectrum.prototype.vert = `
@@ -340,13 +344,7 @@ Spectrum.prototype.setFrequencies = function (frequencies) {
 		this.trailFrequencies = trail;
 	}
 
-	return this.setTexture('frequencies', {
-		data: magnitudes,
-		format: gl.ALPHA,
-		magFilter: this.gl.LINEAR,
-		minFilter: this.gl.LINEAR,
-		wrap: this.gl.CLAMP_TO_EDGE
-	});
+	return this.setTexture('frequencies', magnitudes);
 };
 
 
@@ -425,12 +423,7 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	else if (!Array.isArray(cm)) {
 		this.fill = cm;
 
-		this.setTexture('fill', {
-			data: this.fill,
-			magFilter: this.gl.LINEAR,
-			minFilter: this.gl.LINEAR,
-			wrap: this.gl.CLAMP_TO_EDGE
-		});
+		this.setTexture('fill', this.fill);
 
 		return this;
 	}
@@ -453,11 +446,7 @@ Spectrum.prototype.setFill = function (cm, inverse) {
 	this.setTexture('fill', {
 		data: this.fill,
 		width: 1,
-		height: (this.fill.length / 4)|0,
-		format: this.gl.RGBA,
-		magFilter: this.gl.LINEAR,
-		minFilter: this.gl.LINEAR,
-		wrap: this.gl.CLAMP_TO_EDGE
+		height: (this.fill.length / 4)|0
 	});
 
 	//ensure bg
@@ -507,12 +496,7 @@ Spectrum.prototype.setBackground = function (bg) {
 Spectrum.prototype.setMask = function (mask) {
 	this.mask = mask || [1,1,1,1];
 
-	this.setTexture('mask', {
-		data: this.mask,
-		type: this.gl.FLOAT,
-		format: this.gl.LUMINOCITY,
-		wrap: this.gl.CLAMP_TO_EDGE
-	});
+	this.setTexture('mask', this.mask);
 
 	this.gl.uniform2f(this.maskSizeLocation, this.textures.mask.width, this.textures.mask.height);
 
