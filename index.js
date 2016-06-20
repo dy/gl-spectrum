@@ -2636,7 +2636,7 @@ Spectrum.prototype.draw = function () {
 	return this;
 };
 
-},{"a-weighting":12,"colormap":24,"flatten":29,"gl-component":34,"inherits":36,"is-browser":38,"mumath/clamp":43,"mumath/lg":45,"plot-grid":52,"xtend/mutable":63}],8:[function(require,module,exports){
+},{"a-weighting":12,"colormap":27,"flatten":38,"gl-component":45,"inherits":49,"is-browser":52,"mumath/clamp":70,"mumath/lg":72,"plot-grid":92,"xtend/mutable":114}],8:[function(require,module,exports){
 module.exports = function a (f) {
 	var f2 = f*f;
 	return 1.2588966 * 148840000 * f2*f2 /
@@ -2697,6 +2697,163 @@ module.exports = function (f) {
 };
 
 },{}],15:[function(require,module,exports){
+'use strict'
+
+/**
+ * Expose `arrayFlatten`.
+ */
+module.exports = flatten
+module.exports.from = flattenFrom
+module.exports.depth = flattenDepth
+module.exports.fromDepth = flattenFromDepth
+
+/**
+ * Flatten an array.
+ *
+ * @param  {Array} array
+ * @return {Array}
+ */
+function flatten (array) {
+  if (!Array.isArray(array)) {
+    throw new TypeError('Expected value to be an array')
+  }
+
+  return flattenFrom(array)
+}
+
+/**
+ * Flatten an array-like structure.
+ *
+ * @param  {Array} array
+ * @return {Array}
+ */
+function flattenFrom (array) {
+  return flattenDown(array, [], Infinity)
+}
+
+/**
+ * Flatten an array-like structure with depth.
+ *
+ * @param  {Array}  array
+ * @param  {number} depth
+ * @return {Array}
+ */
+function flattenDepth (array, depth) {
+  if (!Array.isArray(array)) {
+    throw new TypeError('Expected value to be an array')
+  }
+
+  return flattenFromDepth(array, depth)
+}
+
+/**
+ * Flatten an array-like structure with depth.
+ *
+ * @param  {Array}  array
+ * @param  {number} depth
+ * @return {Array}
+ */
+function flattenFromDepth (array, depth) {
+  if (typeof depth !== 'number') {
+    throw new TypeError('Expected the depth to be a number')
+  }
+
+  return flattenDownDepth(array, [], depth)
+}
+
+/**
+ * Flatten an array indefinitely.
+ *
+ * @param  {Array} array
+ * @param  {Array} result
+ * @return {Array}
+ */
+function flattenDown (array, result) {
+  for (var i = 0; i < array.length; i++) {
+    var value = array[i]
+
+    if (Array.isArray(value)) {
+      flattenDown(value, result)
+    } else {
+      result.push(value)
+    }
+  }
+
+  return result
+}
+
+/**
+ * Flatten an array with depth.
+ *
+ * @param  {Array}  array
+ * @param  {Array}  result
+ * @param  {number} depth
+ * @return {Array}
+ */
+function flattenDownDepth (array, result, depth) {
+  depth--
+
+  for (var i = 0; i < array.length; i++) {
+    var value = array[i]
+
+    if (depth > -1 && Array.isArray(value)) {
+      flattenDownDepth(value, result, depth)
+    } else {
+      result.push(value)
+    }
+  }
+
+  return result
+}
+
+},{}],16:[function(require,module,exports){
+/*!
+ * array-unique <https://github.com/jonschlinkert/array-unique>
+ *
+ * Copyright (c) 2014 Jon Schlinkert, contributors.
+ * Licensed under the MIT license.
+ */
+
+'use strict';
+
+module.exports = function unique(arr) {
+  if (!Array.isArray(arr)) {
+    throw new TypeError('array-unique expects an array.');
+  }
+
+  var len = arr.length;
+  var i = -1;
+
+  while (i++ < len) {
+    var j = i + 1;
+
+    for (; j < arr.length; ++j) {
+      if (arr[i] === arr[j]) {
+        arr.splice(j--, 1);
+      }
+    }
+  }
+  return arr;
+};
+
+},{}],17:[function(require,module,exports){
+/*!
+ * arrayify-compact <https://github.com/jonschlinkert/arrayify-compact>
+ *
+ * Copyright (c) 2014 Jon Schlinkert, contributors.
+ * Licensed under the MIT License
+ */
+
+'use strict';
+
+var flatten = require('array-flatten');
+
+module.exports = function(arr) {
+  return flatten(!Array.isArray(arr) ? [arr] : arr)
+    .filter(Boolean);
+};
+
+},{"array-flatten":15}],18:[function(require,module,exports){
 'use strict';
 
 var arraytools  = function () {
@@ -2885,13 +3042,13 @@ var arraytools  = function () {
 
 module.exports = arraytools();
 
-},{}],16:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 var window = require('global/window');
 
 var Context = window.AudioContext || window.webkitAudioContext;
 if (Context) module.exports = new Context;
 
-},{"global/window":35}],17:[function(require,module,exports){
+},{"global/window":46}],20:[function(require,module,exports){
 var size = require('element-size')
 
 module.exports = fit
@@ -2941,7 +3098,7 @@ function fit(canvas, parent, scale) {
   }
 }
 
-},{"element-size":28}],18:[function(require,module,exports){
+},{"element-size":33}],21:[function(require,module,exports){
 (function (Buffer){
 var clone = (function() {
 'use strict';
@@ -3105,7 +3262,7 @@ if (typeof module === 'object' && module.exports) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":2}],19:[function(require,module,exports){
+},{"buffer":2}],22:[function(require,module,exports){
 module.exports = {
 	"aliceblue": [240, 248, 255],
 	"antiquewhite": [250, 235, 215],
@@ -3256,7 +3413,7 @@ module.exports = {
 	"yellow": [255, 255, 0],
 	"yellowgreen": [154, 205, 50]
 };
-},{}],20:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 /**
  * @module color-parse
  */
@@ -3379,7 +3536,7 @@ function parse (cstr) {
 		alpha: alpha
 	};
 }
-},{"color-name":19}],21:[function(require,module,exports){
+},{"color-name":22}],24:[function(require,module,exports){
 /**
  * @module color-space/hsl
  */
@@ -3486,7 +3643,7 @@ rgb.hsl = function(rgb) {
 
 	return [h, s * 100, l * 100];
 };
-},{"./rgb":22}],22:[function(require,module,exports){
+},{"./rgb":25}],25:[function(require,module,exports){
 /**
  * RGB space.
  *
@@ -3500,7 +3657,7 @@ module.exports = {
 	channel: ['red', 'green', 'blue'],
 	alias: ['RGB']
 };
-},{}],23:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 module.exports={
 	"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],
 
@@ -3593,7 +3750,7 @@ module.exports={
 	"cubehelix": [{"index":0,"rgb":[0,0,0]},{"index":0.07,"rgb":[22,5,59]},{"index":0.13,"rgb":[60,4,105]},{"index":0.2,"rgb":[109,1,135]},{"index":0.27,"rgb":[161,0,147]},{"index":0.33,"rgb":[210,2,142]},{"index":0.4,"rgb":[251,11,123]},{"index":0.47,"rgb":[255,29,97]},{"index":0.53,"rgb":[255,54,69]},{"index":0.6,"rgb":[255,85,46]},{"index":0.67,"rgb":[255,120,34]},{"index":0.73,"rgb":[255,157,37]},{"index":0.8,"rgb":[241,191,57]},{"index":0.87,"rgb":[224,220,93]},{"index":0.93,"rgb":[218,241,142]},{"index":1,"rgb":[227,253,198]}]
 };
 
-},{}],24:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 /*
  * Ben Postlethwaite
  * January 2013
@@ -3730,24 +3887,1029 @@ function rgbaStr (rgba) {
     return 'rgba(' + rgba.join(',') + ')';
 }
 
-},{"./colorScales":23,"arraytools":15,"clone":18}],25:[function(require,module,exports){
+},{"./colorScales":26,"arraytools":18,"clone":21}],28:[function(require,module,exports){
 module.exports = function gainToDecibels(value) {
   if (value == null) return 0
   return Math.round(Math.round(20 * (0.43429 * Math.log(value)) * 100) / 100 * 10) / 10
 }
-},{}],26:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 module.exports = {
   fromGain: require('./from-gain'),
   toGain: require('./to-gain')
 }
-},{"./from-gain":25,"./to-gain":27}],27:[function(require,module,exports){
+},{"./from-gain":28,"./to-gain":30}],30:[function(require,module,exports){
 module.exports = function decibelsToGain(value){
   if (value <= -40){
     return 0
   }
   return Math.round(Math.exp(value / 8.6858) * 10000) / 10000
 }
-},{}],28:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
+/**
+ * Define stateful property on an object
+ */
+module.exports = defineState;
+
+var State = require('st8');
+
+
+/**
+ * Define stateful property on a target
+ *
+ * @param {object} target Any object
+ * @param {string} property Property name
+ * @param {object} descriptor State descriptor
+ *
+ * @return {object} target
+ */
+function defineState (target, property, descriptor, isFn) {
+	//define accessor on a target
+	if (isFn) {
+		target[property] = function () {
+			if (arguments.length) {
+				return state.set(arguments[0]);
+			}
+			else {
+				return state.get();
+			}
+		};
+	}
+
+	//define setter/getter on a target
+	else {
+		Object.defineProperty(target, property, {
+			set: function (value) {
+				return state.set(value);
+			},
+			get: function () {
+				return state.get();
+			}
+		});
+	}
+
+	//define state controller
+	var state = new State(descriptor, target);
+
+	return target;
+}
+},{"st8":107}],32:[function(require,module,exports){
+/**
+ * Simple draggable component
+ *
+ * @module draggy
+ */
+
+
+//work with css
+var css = require('mucss/css');
+var parseCSSValue = require('mucss/parse-value');
+var selection = require('mucss/selection');
+var offsets = require('mucss/offset');
+var getTranslate = require('mucss/translate');
+var intersect = require('intersects');
+
+//events
+var on = require('emmy/on');
+var off = require('emmy/off');
+var emit = require('emmy/emit');
+var Emitter = require('events');
+var getClientX = require('get-client-xy').x;
+var getClientY = require('get-client-xy').y;
+
+//utils
+var isArray = require('mutype/is-array');
+var isNumber = require('mutype/is-number');
+var isString = require('mutype/is-string');
+var isFn = require('mutype/is-fn');
+var defineState = require('define-state');
+var extend = require('xtend/mutable');
+var round = require('mumath/round');
+var between = require('mumath/clamp');
+var loop = require('mumath/mod');
+var getUid = require('get-uid');
+var q = require('queried');
+
+
+var win = window, doc = document, root = doc.documentElement;
+
+
+/**
+ * Draggable controllers associated with elements.
+ *
+ * Storing them on elements is
+ * - leak-prone,
+ * - pollutes element’s namespace,
+ * - requires some artificial key to store,
+ * - unable to retrieve controller easily.
+ *
+ * That is why weakmap.
+ */
+var draggableCache = Draggable.cache = new WeakMap;
+
+
+
+/**
+ * Make an element draggable.
+ *
+ * @constructor
+ *
+ * @param {HTMLElement} target An element whether in/out of DOM
+ * @param {Object} options An draggable options
+ *
+ * @return {HTMLElement} Target element
+ */
+function Draggable(target, options) {
+	if (!(this instanceof Draggable)) {
+		return new Draggable(target, options);
+	}
+
+	var self = this;
+
+	//ignore existing instance
+	var instance = draggableCache.get(target);
+	if (instance) {
+		instance.state = 'reset';
+
+		//take over options
+		extend(instance, options);
+
+		instance.update();
+
+		return instance;
+	}
+
+	else {
+		//get unique id for instance
+		//needed to track event binders
+		self.id = getUid();
+		self._ns = '.draggy_' + self.id;
+
+		//save element passed
+		self.element = target;
+
+		draggableCache.set(target, self);
+	}
+
+	//define mode of drag
+	defineState(self, 'css3', self.css3);
+	self.css3 = true;
+
+	//define state behaviour
+	defineState(self, 'state', self.state);
+
+	//define axis behaviour
+	defineState(self, 'axis', self.axis);
+	self.axis = null;
+
+	//preset handles
+	self.currentHandles = [];
+
+	//take over options
+	extend(self, options);
+
+	//define handle
+	if (self.handle === undefined) {
+		self.handle = self.element;
+	}
+
+	//setup droppable
+	if (self.droppable) {
+		self.initDroppable();
+	}
+
+	//try to calc out basic limits
+	self.update();
+
+	//go to initial state
+	self.state = 'idle';
+}
+
+
+/** Inherit draggable from Emitter */
+var proto = Draggable.prototype = Object.create(Emitter.prototype);
+
+
+/** Init droppable "plugin" */
+proto.initDroppable = function () {
+	var self = this;
+
+	on(self, 'dragstart', function () {
+		var self = this;
+		self.dropTargets = q.all(self.droppable);
+	});
+
+	on(self, 'drag', function () {
+		var self = this;
+
+		if (!self.dropTargets) {
+			return;
+		}
+
+		var selfRect = offsets(self.element);
+
+		self.dropTargets.forEach(function (dropTarget) {
+			var targetRect = offsets(dropTarget);
+
+			if (intersect(selfRect, targetRect, self.droppableTolerance)) {
+				if (self.droppableClass) {
+					dropTarget.classList.add(self.droppableClass);
+				}
+				if (!self.dropTarget) {
+					self.dropTarget = dropTarget;
+
+					emit(self, 'dragover', dropTarget);
+					emit(dropTarget, 'dragover', self);
+				}
+			}
+			else {
+				if (self.dropTarget) {
+					emit(self, 'dragout', dropTarget);
+					emit(dropTarget, 'dragout', self);
+
+					self.dropTarget = null;
+				}
+				if (self.droppableClass) {
+					dropTarget.classList.remove(self.droppableClass);
+				}
+			}
+		});
+	});
+
+	on(self, 'dragend', function () {
+		var self = this;
+
+		//emit drop, if any
+		if (self.dropTarget) {
+			emit(self.dropTarget, 'drop', self);
+			emit(self, 'drop', self.dropTarget);
+			self.dropTarget.classList.remove(self.droppableClass);
+			self.dropTarget = null;
+		}
+	});
+};
+
+
+/**
+ * Draggable behaviour
+ * @enum {string}
+ * @default is 'idle'
+ */
+proto.state = {
+	//idle
+	_: {
+		before: function () {
+			var self = this;
+
+			self.element.classList.add('draggy-idle');
+
+			//emit drag evts on element
+			emit(self.element, 'idle', null, true);
+			self.emit('idle');
+
+			//reset keys
+			self.ctrlKey = false;
+			self.shiftKey = false;
+			self.metaKey = false;
+			self.altKey = false;
+
+			//reset movement params
+			self.movementX = 0;
+			self.movementY = 0;
+			self.deltaX = 0;
+			self.deltaY = 0;
+
+			on(doc, 'mousedown' + self._ns + ' touchstart' + self._ns, function (e) {
+				//ignore non-draggy events
+				if (!e.draggies) {
+					return;
+				}
+
+				//ignore dragstart for not registered draggies
+				if (e.draggies.indexOf(self) < 0) {
+					return;
+				}
+
+				//if target is focused - ignore drag
+				//FIXME: detect focused by whitelist of tags, name supposition may be wrong (idk, form elements have names, so likely to be focused by click)
+				if (e.target.name !== undefined) {
+					return;
+				}
+
+				//multitouch has multiple starts
+				self.setTouch(e);
+
+				//update movement params
+				self.update(e);
+
+				//go to threshold state
+				self.state = 'threshold';
+			});
+		},
+		after: function () {
+			var self = this;
+
+			self.element.classList.remove('draggy-idle');
+
+			off(doc, self._ns);
+
+			//set up tracking
+			if (self.release) {
+				self._trackingInterval = setInterval(function (e) {
+					var now = Date.now();
+					var elapsed = now - self.timestamp;
+
+					//get delta movement since the last track
+					var dX = self.prevX - self.frame[0];
+					var dY = self.prevY - self.frame[1];
+					self.frame[0] = self.prevX;
+					self.frame[1] = self.prevY;
+
+					var delta = Math.sqrt(dX * dX + dY * dY);
+
+					//get speed as average of prev and current (prevent div by zero)
+					var v = Math.min(self.velocity * delta / (1 + elapsed), self.maxSpeed);
+					self.speed = 0.8 * v + 0.2 * self.speed;
+
+					//get new angle as a last diff
+					//NOTE: vector average isn’t the same as speed scalar average
+					self.angle = Math.atan2(dY, dX);
+
+					self.emit('track');
+
+					return self;
+				}, self.framerate);
+			}
+		}
+	},
+
+	threshold: {
+		before: function () {
+			var self = this;
+
+			//ignore threshold state, if threshold is none
+			if (isZeroArray(self.threshold)) {
+				self.state = 'drag';
+				return;
+			}
+
+			self.element.classList.add('draggy-threshold');
+
+			//emit drag evts on element
+			self.emit('threshold');
+			emit(self.element, 'threshold');
+
+			//listen to doc movement
+			on(doc, 'touchmove' + self._ns + ' mousemove' + self._ns, function (e) {
+				e.preventDefault();
+
+				//compare movement to the threshold
+				var clientX = getClientX(e, self.touchIdx);
+				var clientY = getClientY(e, self.touchIdx);
+				var difX = self.prevMouseX - clientX;
+				var difY = self.prevMouseY - clientY;
+
+				if (difX < self.threshold[0] || difX > self.threshold[2] || difY < self.threshold[1] || difY > self.threshold[3]) {
+					self.update(e);
+					self.state = 'drag';
+				}
+			});
+			on(doc, 'mouseup' + self._ns + ' touchend' + self._ns + '', function (e) {
+				e.preventDefault();
+
+				//forget touches
+				self.resetTouch();
+
+				self.state = 'idle';
+			});
+		},
+
+		after: function () {
+			var self = this;
+
+			self.element.classList.remove('draggy-threshold');
+
+			off(doc, self._ns);
+		}
+	},
+
+	drag: {
+		before: function () {
+			var self = this;
+
+			//reduce dragging clutter
+			selection.disable(root);
+
+			self.element.classList.add('draggy-drag');
+
+			//emit drag evts on element
+			self.emit('dragstart');
+			emit(self.element, 'dragstart', null, true);
+
+			//emit drag events on self
+			self.emit('drag');
+			emit(self.element, 'drag', null, true);
+
+			//stop drag on leave
+			on(doc, 'touchend' + self._ns + ' mouseup' + self._ns + ' mouseleave' + self._ns, function (e) {
+				e.preventDefault();
+
+				//forget touches - dragend is called once
+				self.resetTouch();
+
+				//manage release movement
+				if (self.speed > 1) {
+					self.state = 'release';
+				}
+
+				else {
+					self.state = 'idle';
+				}
+			});
+
+			//move via transform
+			on(doc, 'touchmove' + self._ns + ' mousemove' + self._ns, function (e) {
+				self.drag(e);
+			});
+		},
+
+		after: function () {
+			var self = this;
+
+			//enable document interactivity
+			selection.enable(root);
+
+			self.element.classList.remove('draggy-drag');
+
+			//emit dragend on element, this
+			self.emit('dragend');
+			emit(self.element, 'dragend', null, true);
+
+			//unbind drag events
+			off(doc, self._ns);
+
+			clearInterval(self._trackingInterval);
+		}
+	},
+
+	release: {
+		before: function () {
+			var self = this;
+
+			self.element.classList.add('draggy-release');
+
+			//enter animation mode
+			clearTimeout(self._animateTimeout);
+
+			//set proper transition
+			css(self.element, {
+				'transition': (self.releaseDuration) + 'ms ease-out ' + (self.css3 ? 'transform' : 'position')
+			});
+
+			//plan leaving anim mode
+			self._animateTimeout = setTimeout(function () {
+				self.state = 'idle';
+			}, self.releaseDuration);
+
+
+			//calc target point & animate to it
+			self.move(
+				self.prevX + self.speed * Math.cos(self.angle),
+				self.prevY + self.speed * Math.sin(self.angle)
+			);
+
+			self.speed = 0;
+			self.emit('track');
+		},
+
+		after: function () {
+			var self = this;
+
+			self.element.classList.remove('draggy-release');
+
+			css(this.element, {
+				'transition': null
+			});
+		}
+	},
+
+	destroy: function () {
+		var self = this;
+	},
+
+	reset: function () {
+		var self = this;
+
+		self.currentHandles.forEach(function (handle) {
+			off(handle, self._ns);
+		});
+
+		clearTimeout(self._animateTimeout);
+
+		off(doc, self._ns);
+		off(self.element, self._ns);
+
+		return '_';
+	}
+};
+
+
+/** Drag handler. Needed to provide drag movement emulation via API */
+proto.drag = function (e) {
+	var self = this;
+
+	e.preventDefault();
+
+	var mouseX = getClientX(e, self.touchIdx),
+		mouseY = getClientY(e, self.touchIdx);
+
+	//calc mouse movement diff
+	var diffMouseX = mouseX - self.prevMouseX,
+		diffMouseY = mouseY - self.prevMouseY;
+
+	//absolute mouse coordinate
+	var mouseAbsX = mouseX + win.pageXOffset,
+		mouseAbsY = mouseY + win.pageYOffset;
+
+	//calc sniper offset, if any
+	if (e.ctrlKey || e.metaKey) {
+		self.sniperOffsetX += diffMouseX * self.sniperSlowdown;
+		self.sniperOffsetY += diffMouseY * self.sniperSlowdown;
+	}
+
+	//save refs to the meta keys
+	self.ctrlKey = e.ctrlKey;
+	self.shiftKey = e.shiftKey;
+	self.metaKey = e.metaKey;
+	self.altKey = e.altKey;
+
+	//calc movement x and y
+	//take absolute placing as it is the only reliable way (2x proved)
+	var x = (mouseAbsX - self.initOffsetX) - self.innerOffsetX - self.sniperOffsetX,
+		y = (mouseAbsY - self.initOffsetY) - self.innerOffsetY - self.sniperOffsetY;
+
+	//move element
+	self.move(x, y);
+
+	//save prevClientXY for calculating diff
+	self.prevMouseX = mouseX;
+	self.prevMouseY = mouseY;
+
+	//emit drag
+	self.emit('drag');
+	emit(self.element, 'drag', null, true);
+};
+
+
+/** Current number of draggable touches */
+var touches = 0;
+
+
+/** Manage touches */
+proto.setTouch = function (e) {
+	if (!e.touches || this.isTouched()) return this;
+
+	//current touch index
+	this.touchIdx = touches;
+	touches++;
+
+	return this;
+};
+proto.resetTouch = function () {
+	touches = 0;
+	this.touchIdx = null;
+
+	return this;
+};
+proto.isTouched = function () {
+	return this.touchIdx !== null;
+};
+
+
+/** Index to fetch touch number from event */
+proto.touchIdx = null;
+
+
+/**
+ * Update movement limits.
+ * Refresh self.withinOffsets and self.limits.
+ */
+proto.update = function (e) {
+	var self = this;
+
+	//update handles
+	self.currentHandles.forEach(function (handle) {
+		off(handle, self._ns);
+	});
+
+	var cancelEls = q.all(self.cancel);
+
+	self.currentHandles = q.all(self.handle);
+
+	self.currentHandles.forEach(function (handle) {
+		on(handle, 'mousedown' + self._ns + ' touchstart' + self._ns, function (e) {
+			//mark event as belonging to the draggy
+			if (!e.draggies) {
+				e.draggies = [];
+			}
+			//ignore draggies containing other draggies
+			if (e.draggies.some(function (draggy) {
+				return self.element.contains(draggy.element);
+			})) {
+				return;
+			}
+			//ignore events happened within cancelEls
+			if (cancelEls.some(function (cancelEl) {
+				return cancelEl.contains(e.target);
+			})) {
+				return;
+			}
+
+			//register draggy
+			e.draggies.push(self);
+		});
+	});
+
+	//update limits
+	self.updateLimits();
+
+	//preset inner offsets
+	self.innerOffsetX = self.pin[0];
+	self.innerOffsetY = self.pin[1];
+
+	var selfClientRect = self.element.getBoundingClientRect();
+
+	//if event passed - update acc to event
+	if (e) {
+		//take last mouse position from the event
+		self.prevMouseX = getClientX(e, self.touchIdx);
+		self.prevMouseY = getClientY(e, self.touchIdx);
+
+		//if mouse is within the element - take offset normally as rel displacement
+		self.innerOffsetX = -selfClientRect.left + getClientX(e, self.touchIdx);
+		self.innerOffsetY = -selfClientRect.top + getClientY(e, self.touchIdx);
+	}
+	//if no event - suppose pin-centered event
+	else {
+		//take mouse position & inner offset as center of pin
+		var pinX = (self.pin[0] + self.pin[2] ) * 0.5;
+		var pinY = (self.pin[1] + self.pin[3] ) * 0.5;
+		self.prevMouseX = selfClientRect.left + pinX;
+		self.prevMouseY = selfClientRect.top + pinY;
+		self.innerOffsetX = pinX;
+		self.innerOffsetY = pinY;
+	}
+
+	//set initial kinetic props
+	self.speed = 0;
+	self.amplitude = 0;
+	self.angle = 0;
+	self.timestamp = +new Date();
+	self.frame = [self.prevX, self.prevY];
+
+	//set sniper offset
+	self.sniperOffsetX = 0;
+	self.sniperOffsetY = 0;
+};
+
+/**
+ * Update limits only from current position
+ */
+proto.updateLimits = function () {
+	var self = this;
+
+	//initial translation offsets
+	var initXY = self.getCoords();
+
+	//calc initial coords
+	self.prevX = initXY[0];
+	self.prevY = initXY[1];
+	self.initX = initXY[0];
+	self.initY = initXY[1];
+
+	//container rect might be outside the vp, so calc absolute offsets
+	//zero-position offsets, with translation(0,0)
+	var selfOffsets = offsets(self.element);
+	self.initOffsetX = selfOffsets.left - self.prevX;
+	self.initOffsetY = selfOffsets.top - self.prevY;
+	self.offsets = selfOffsets;
+
+	//handle parent case
+	var within = self.within;
+	if (self.within === 'parent') {
+		within = self.element.parentNode;
+	}
+	within = within || doc;
+
+	//absolute offsets of a container
+	var withinOffsets = offsets(within);
+	self.withinOffsets = withinOffsets;
+
+	//calculate movement limits - pin width might be wider than constraints
+	self.overflowX = self.pin.width - withinOffsets.width;
+	self.overflowY = self.pin.height - withinOffsets.height;
+	self.limits = {
+		left: withinOffsets.left - self.initOffsetX - self.pin[0] - (self.overflowX < 0 ? 0 : self.overflowX),
+		top: withinOffsets.top - self.initOffsetY - self.pin[1] - (self.overflowY < 0 ? 0 : self.overflowY),
+		right: self.overflowX > 0 ? 0 : withinOffsets.right - self.initOffsetX - self.pin[2],
+		bottom: self.overflowY > 0 ? 0 : withinOffsets.bottom - self.initOffsetY - self.pin[3]
+	};
+};
+
+
+/**
+ * Update info regarding of movement
+ */
+proto.updateInfo = function (x, y) {
+	var self = this;
+
+	//provide delta from prev state
+	self.deltaX = x - self.prevX;
+	self.deltaY = y - self.prevY;
+
+	//save prev coords to use as a start point next time
+	self.prevX = x;
+	self.prevY = y;
+
+	//provide movement delta from initial state
+	self.movementX = x - self.initX;
+	self.movementY = y - self.initY;
+
+}
+
+
+/**
+ * Way of placement:
+ * - position === false (slower but more precise and cross-browser)
+ * - translate3d === true (faster but may cause blurs on linux systems)
+ */
+proto.css3 = {
+	_: function () {
+		css(this.element, 'position', 'absolute');
+		this.getCoords = function () {
+			// return [this.element.offsetLeft, this.element.offsetTop];
+			return [parseCSSValue(css(this.element,'left')), parseCSSValue(css(this.element, 'top'))];
+		};
+
+		this.setCoords = function (x, y) {
+			if (x == null) x = this.prevX;
+			if (y == null) y = this.prevY;
+
+			x = round(x, this.precision);
+			y = round(y, this.precision);
+
+			css(this.element, {
+				left: x,
+				top: y
+			});
+
+			//update movement info
+			this.updateInfo(x, y);
+		};
+	},
+
+	//undefined placing is treated as translate3d
+	true: function () {
+		this.getCoords  = function () {
+			return getTranslate(this.element).slice(0, 2) || [0,0];
+		};
+
+		this.setCoords = function (x, y) {
+			if (x == null) x = this.prevX;
+			if (y == null) y = this.prevY;
+
+			x = round(x, this.precision);
+			y = round(y, this.precision);
+
+			css(this.element, 'transform', ['translate3d(', x, 'px,', y, 'px, 0)'].join(''));
+
+			this.updateInfo(x, y);
+		};
+	}
+};
+
+
+/**
+ * Restricting container
+ * @type {Element|object}
+ * @default doc.documentElement
+ */
+proto.within = doc;
+
+
+/** Handle to drag */
+proto.handle;
+
+
+Object.defineProperties(proto, {
+	/**
+	 * Which area of draggable should not be outside the restriction area.
+	 * @type {(Array|number)}
+	 * @default [0,0,this.element.offsetWidth, this.element.offsetHeight]
+	 */
+	pin: {
+		set: function (value) {
+			if (isArray(value)) {
+				if (value.length === 2) {
+					this._pin = [value[0], value[1], value[0], value[1]];
+				} else if (value.length === 4) {
+					this._pin = value;
+				}
+			}
+
+			else if (isNumber(value)) {
+				this._pin = [value, value, value, value];
+			}
+
+			else {
+				this._pin = value;
+			}
+
+			//calc pin params
+			this._pin.width = this._pin[2] - this._pin[0];
+			this._pin.height = this._pin[3] - this._pin[1];
+		},
+
+		get: function () {
+			if (this._pin) return this._pin;
+
+			//returning autocalculated pin, if private pin is none
+			var pin = [0,0, this.offsets.width, this.offsets.height];
+			pin.width = this.offsets.width;
+			pin.height = this.offsets.height;
+			return pin;
+		}
+	},
+
+	/** Avoid initial mousemove */
+	threshold: {
+		set: function (val) {
+			if (isNumber(val)) {
+				this._threshold = [-val*0.5, -val*0.5, val*0.5, val*0.5];
+			} else if (val.length === 2) {
+				//Array(w,h)
+				this._threshold = [-val[0]*0.5, -val[1]*0.5, val[0]*0.5, val[1]*0.5];
+			} else if (val.length === 4) {
+				//Array(x1,y1,x2,y2)
+				this._threshold = val;
+			} else if (isFn(val)) {
+				//custom val funciton
+				this._threshold = val();
+			} else {
+				this._threshold = [0,0,0,0];
+			}
+		},
+
+		get: function () {
+			return this._threshold || [0,0,0,0];
+		}
+	}
+});
+
+
+
+/**
+ * For how long to release movement
+ *
+ * @type {(number|false)}
+ * @default false
+ * @todo
+ */
+proto.release = false;
+proto.releaseDuration = 500;
+proto.velocity = 1000;
+proto.maxSpeed = 250;
+proto.framerate = 50;
+
+
+/** To what extent round position */
+proto.precision = 1;
+
+
+/** Droppable params */
+proto.droppable = null;
+proto.droppableTolerance = 0.5;
+proto.droppableClass = null;
+
+
+/** Slow down movement by pressing ctrl/cmd */
+proto.sniper = true;
+
+
+/** How much to slow sniper drag */
+proto.sniperSlowdown = .85;
+
+
+/**
+ * Restrict movement by axis
+ *
+ * @default undefined
+ * @enum {string}
+ */
+proto.axis = {
+	_: function () {
+		this.move = function (x, y) {
+			if (x == null) x = this.prevX;
+			if (y == null) y = this.prevY;
+
+			var limits = this.limits;
+
+			if (this.repeat) {
+				var w = (limits.right - limits.left);
+				var h = (limits.bottom - limits.top);
+				var oX = - this.initOffsetX + this.withinOffsets.left - this.pin[0] - Math.max(0, this.overflowX);
+				var oY = - this.initOffsetY + this.withinOffsets.top - this.pin[1] - Math.max(0, this.overflowY);
+				if (this.repeat === 'x') {
+					x = loop(x - oX, w) + oX;
+				}
+				else if (this.repeat === 'y') {
+					y = loop(y - oY, h) + oY;
+				}
+				else {
+					x = loop(x - oX, w) + oX;
+					y = loop(y - oY, h) + oY;
+				}
+			}
+
+			x = between(x, limits.left, limits.right);
+			y = between(y, limits.top, limits.bottom);
+
+			this.setCoords(x, y);
+		};
+	},
+	x: function () {
+		this.move = function (x, y) {
+			if (x == null) x = this.prevX;
+			if (y == null) y = this.prevY;
+
+			var limits = this.limits;
+
+			if (this.repeat) {
+				var w = (limits.right - limits.left);
+				var oX = - this.initOffsetX + this.withinOffsets.left - this.pin[0] - Math.max(0, this.overflowX);
+				x = loop(x - oX, w) + oX;
+			} else {
+				x = between(x, limits.left, limits.right);
+			}
+
+			this.setCoords(x);
+		};
+	},
+	y: function () {
+		this.move = function (x, y) {
+			if (x == null) x = this.prevX;
+			if (y == null) y = this.prevY;
+
+			var limits = this.limits;
+
+			if (this.repeat) {
+				var h = (limits.bottom - limits.top);
+				var oY = - this.initOffsetY + this.withinOffsets.top - this.pin[1] - Math.max(0, this.overflowY);
+				y = loop(y - oY, h) + oY;
+			} else {
+				y = between(y, limits.top, limits.bottom);
+			}
+
+			this.setCoords(null, y);
+		};
+	}
+};
+
+
+/** Repeat movement by one of axises */
+proto.repeat = false;
+
+
+/** Check whether arr is filled with zeros */
+function isZeroArray(arr) {
+	if (!arr[0] && !arr[1] && !arr[2] && !arr[3]) return true;
+}
+
+
+
+/** Clean all memory-related things */
+proto.destroy = function () {
+	var self = this;
+
+	self.currentHandles.forEach(function (handle) {
+		off(handle, self._ns);
+	});
+
+	self.state = 'destroy';
+
+	clearTimeout(self._animateTimeout);
+
+	off(doc, self._ns);
+	off(self.element, self._ns);
+
+
+	self.element = null;
+	self.within = null;
+};
+
+
+
+module.exports = Draggable;
+},{"define-state":31,"emmy/emit":34,"emmy/off":36,"emmy/on":37,"events":4,"get-client-xy":42,"get-uid":44,"intersects":51,"mucss/css":59,"mucss/offset":63,"mucss/parse-value":64,"mucss/selection":68,"mucss/translate":69,"mumath/clamp":70,"mumath/mod":73,"mumath/round":76,"mutype/is-array":80,"mutype/is-fn":82,"mutype/is-number":84,"mutype/is-string":86,"queried":93,"xtend/mutable":114}],33:[function(require,module,exports){
 module.exports = getSize
 
 function getSize(element) {
@@ -3783,7 +4945,454 @@ function parse(prop) {
   return parseFloat(prop) || 0
 }
 
-},{}],29:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
+/**
+ * @module emmy/emit
+ */
+var icicle = require('icicle');
+var slice = require('sliced');
+var isString = require('mutype/is-string');
+var isNode = require('mutype/is-node');
+var isEvent = require('mutype/is-event');
+var listeners = require('./listeners');
+
+
+/**
+ * A simple wrapper to handle stringy/plain events
+ */
+module.exports = function(target, evt){
+	if (!target) return;
+
+	var args = arguments;
+	if (isString(evt)) {
+		args = slice(arguments, 2);
+		evt.split(/\s+/).forEach(function(evt){
+			evt = evt.split('.')[0];
+
+			emit.apply(this, [target, evt].concat(args));
+		});
+	} else {
+		return emit.apply(this, args);
+	}
+};
+
+
+/** detect env */
+var $ = typeof jQuery === 'undefined' ? undefined : jQuery;
+var doc = typeof document === 'undefined' ? undefined : document;
+var win = typeof window === 'undefined' ? undefined : window;
+
+
+/**
+ * Emit an event, optionally with data or bubbling
+ * Accept only single elements/events
+ *
+ * @param {string} eventName An event name, e. g. 'click'
+ * @param {*} data Any data to pass to event.details (DOM) or event.data (elsewhere)
+ * @param {bool} bubbles Whether to trigger bubbling event (DOM)
+ *
+ *
+ * @return {target} a target
+ */
+function emit(target, eventName, data, bubbles){
+	var emitMethod, evt = eventName;
+
+	//Create proper event for DOM objects
+	if (isNode(target) || target === win) {
+		//NOTE: this doesnot bubble on off-DOM elements
+
+		if (isEvent(eventName)) {
+			evt = eventName;
+		} else {
+			//IE9-compliant constructor
+			evt = doc.createEvent('CustomEvent');
+			evt.initCustomEvent(eventName, bubbles, true, data);
+
+			//a modern constructor would be:
+			// var evt = new CustomEvent(eventName, { detail: data, bubbles: bubbles })
+		}
+
+		emitMethod = target.dispatchEvent;
+	}
+
+	//create event for jQuery object
+	else if ($ && target instanceof $) {
+		//TODO: decide how to pass data
+		evt = $.Event( eventName, data );
+		evt.detail = data;
+
+		//FIXME: reference case where triggerHandler needed (something with multiple calls)
+		emitMethod = bubbles ? targte.trigger : target.triggerHandler;
+	}
+
+	//detect target events
+	else {
+		//emit - default
+		//trigger - jquery
+		//dispatchEvent - DOM
+		//raise - node-state
+		//fire - ???
+		emitMethod = target['dispatchEvent'] || target['emit'] || target['trigger'] || target['fire'] || target['raise'];
+	}
+
+
+	var args = slice(arguments, 2);
+
+
+	//use locks to avoid self-recursion on objects wrapping this method
+	if (emitMethod) {
+		if (icicle.freeze(target, 'emit' + eventName)) {
+			//use target event system, if possible
+			emitMethod.apply(target, [evt].concat(args));
+			icicle.unfreeze(target, 'emit' + eventName);
+
+			return target;
+		}
+
+		//if event was frozen - probably it is emitter instance
+		//so perform normal callback
+	}
+
+
+	//fall back to default event system
+	var evtCallbacks = listeners(target, evt);
+
+	//copy callbacks to fire because list can be changed by some callback (like `off`)
+	var fireList = slice(evtCallbacks);
+	for (var i = 0; i < fireList.length; i++ ) {
+		fireList[i] && fireList[i].apply(target, args);
+	}
+
+	return target;
+}
+},{"./listeners":35,"icicle":48,"mutype/is-event":81,"mutype/is-node":83,"mutype/is-string":86,"sliced":106}],35:[function(require,module,exports){
+/**
+ * A storage of per-target callbacks.
+ * WeakMap is the most safe solution.
+ *
+ * @module emmy/listeners
+ */
+
+
+/**
+ * Property name to provide on targets.
+ *
+ * Can’t use global WeakMap -
+ * it is impossible to provide singleton global cache of callbacks for targets
+ * not polluting global scope. So it is better to pollute target scope than the global.
+ *
+ * Otherwise, each emmy instance will create it’s own cache, which leads to mess.
+ *
+ * Also can’t use `._events` property on targets, as it is done in `events` module,
+ * because it is incompatible. Emmy targets universal events wrapper, not the native implementation.
+ *
+ */
+//FIXME: new npm forces flat modules structure, so weakmaps are better providing that there’s the one emmy across the project.
+var cbPropName = '_callbacks';
+
+
+/**
+ * Get listeners for the target/evt (optionally).
+ *
+ * @param {object} target a target object
+ * @param {string}? evt an evt name, if undefined - return object with events
+ *
+ * @return {(object|array)} List/set of listeners
+ */
+function listeners(target, evt, tags){
+	var cbs = target[cbPropName];
+	var result;
+
+	if (!evt) {
+		result = cbs || {};
+
+		//filter cbs by tags
+		if (tags) {
+			var filteredResult = {};
+			for (var evt in result) {
+				filteredResult[evt] = result[evt].filter(function (cb) {
+					return hasTags(cb, tags);
+				});
+			}
+			result = filteredResult;
+		}
+
+		return result;
+	}
+
+	if (!cbs || !cbs[evt]) {
+		return [];
+	}
+
+	result = cbs[evt];
+
+	//if there are evt namespaces specified - filter callbacks
+	if (tags && tags.length) {
+		result = result.filter(function (cb) {
+			return hasTags(cb, tags);
+		});
+	}
+
+	return result;
+}
+
+
+/**
+ * Remove listener, if any
+ */
+listeners.remove = function(target, evt, cb, tags){
+	//get callbacks for the evt
+	var evtCallbacks = target[cbPropName];
+	if (!evtCallbacks || !evtCallbacks[evt]) return false;
+
+	var callbacks = evtCallbacks[evt];
+
+	//if tags are passed - make sure callback has some tags before removing
+	if (tags && tags.length && !hasTags(cb, tags)) return false;
+
+	//remove specific handler
+	for (var i = 0; i < callbacks.length; i++) {
+		//once method has original callback in .cb
+		if (callbacks[i] === cb || callbacks[i].fn === cb) {
+			callbacks.splice(i, 1);
+			break;
+		}
+	}
+};
+
+
+/**
+ * Add a new listener
+ */
+listeners.add = function(target, evt, cb, tags){
+	if (!cb) return;
+
+	var targetCallbacks = target[cbPropName];
+
+	//ensure set of callbacks for the target exists
+	if (!targetCallbacks) {
+		targetCallbacks = {};
+		Object.defineProperty(target, cbPropName, {
+			value: targetCallbacks
+		});
+	}
+
+	//save a new callback
+	(targetCallbacks[evt] = targetCallbacks[evt] || []).push(cb);
+
+	//save ns for a callback, if any
+	if (tags && tags.length) {
+		cb._ns = tags;
+	}
+};
+
+
+/** Detect whether an cb has at least one tag from the list */
+function hasTags(cb, tags){
+	if (cb._ns) {
+		//if cb is tagged with a ns and includes one of the ns passed - keep it
+		for (var i = tags.length; i--;){
+			if (cb._ns.indexOf(tags[i]) >= 0) return true;
+		}
+	}
+}
+
+
+module.exports = listeners;
+},{}],36:[function(require,module,exports){
+/**
+ * @module emmy/off
+ */
+module.exports = off;
+
+var icicle = require('icicle');
+var slice = require('sliced');
+var listeners = require('./listeners');
+var isArray = require('mutype/is-array');
+
+
+/**
+ * Remove listener[s] from the target
+ *
+ * @param {[type]} evt [description]
+ * @param {Function} fn [description]
+ *
+ * @return {[type]} [description]
+ */
+function off(target, evt, fn) {
+	if (!target) return target;
+
+	var callbacks, i;
+
+	//unbind all listeners if no fn specified
+	if (fn === undefined) {
+		var args = slice(arguments, 1);
+
+		//try to use target removeAll method, if any
+		var allOff = target['removeAll'] || target['removeAllListeners'];
+
+		//call target removeAll
+		if (allOff) {
+			allOff.apply(target, args);
+		}
+
+
+		//then forget own callbacks, if any
+
+		//unbind all evts
+		if (!evt) {
+			callbacks = listeners(target);
+			for (evt in callbacks) {
+				off(target, evt);
+			}
+		}
+		//unbind all callbacks for an evt
+		else {
+			evt = '' + evt;
+
+			//invoke method for each space-separated event from a list
+			evt.split(/\s+/).forEach(function (evt) {
+				var evtParts = evt.split('.');
+				evt = evtParts.shift();
+				callbacks = listeners(target, evt, evtParts);
+
+				//returned array of callbacks (as event is defined)
+				if (evt) {
+					var obj = {};
+					obj[evt] = callbacks;
+					callbacks = obj;
+				}
+
+				//for each group of callbacks - unbind all
+				for (var evtName in callbacks) {
+					slice(callbacks[evtName]).forEach(function (cb) {
+						off(target, evtName, cb);
+					});
+				}
+			});
+		}
+
+		return target;
+	}
+
+
+	//target events (string notation to advanced_optimizations)
+	var offMethod = target['removeEventListener'] || target['removeListener'] || target['detachEvent'] || target['off'];
+
+	//invoke method for each space-separated event from a list
+	evt.split(/\s+/).forEach(function (evt) {
+		var evtParts = evt.split('.');
+		evt = evtParts.shift();
+
+		//use target `off`, if possible
+		if (offMethod) {
+			//avoid self-recursion from the outside
+			if (icicle.freeze(target, 'off' + evt)) {
+				offMethod.call(target, evt, fn);
+				icicle.unfreeze(target, 'off' + evt);
+			}
+
+			//if it’s frozen - ignore call
+			else {
+				return target;
+			}
+		}
+
+		if (fn.closedCall) fn.closedCall = false;
+
+		//forget callback
+		listeners.remove(target, evt, fn, evtParts);
+	});
+
+
+	return target;
+}
+},{"./listeners":35,"icicle":48,"mutype/is-array":80,"sliced":106}],37:[function(require,module,exports){
+/**
+ * @module emmy/on
+ */
+
+
+var icicle = require('icicle');
+var listeners = require('./listeners');
+var isObject = require('mutype/is-object');
+
+module.exports = on;
+
+
+/**
+ * Bind fn to a target.
+ *
+ * @param {*} targte A single target to bind evt
+ * @param {string} evt An event name
+ * @param {Function} fn A callback
+ * @param {Function}? condition An optional filtering fn for a callback
+ *                              which accepts an event and returns callback
+ *
+ * @return {object} A target
+ */
+function on(target, evt, fn){
+	if (!target) return target;
+
+	//consider object of events
+	if (isObject(evt)) {
+		for(var evtName in evt) {
+			on(target, evtName, evt[evtName]);
+		}
+		return target;
+	}
+
+	//get target `on` method, if any
+	//prefer native-like method name
+	//user may occasionally expose `on` to the global, in case of browserify
+	//but it is unlikely one would replace native `addEventListener`
+	var onMethod =  target['addEventListener'] || target['addListener'] || target['attachEvent'] || target['on'];
+
+	var cb = fn;
+
+	evt = '' + evt;
+
+	//invoke method for each space-separated event from a list
+	evt.split(/\s+/).forEach(function(evt){
+		var evtParts = evt.split('.');
+		evt = evtParts.shift();
+
+		//use target event system, if possible
+		if (onMethod) {
+			//avoid self-recursions
+			//if it’s frozen - ignore call
+			if (icicle.freeze(target, 'on' + evt)){
+				onMethod.call(target, evt, cb);
+				icicle.unfreeze(target, 'on' + evt);
+			}
+			else {
+				return target;
+			}
+		}
+
+		//save the callback anyway
+		listeners.add(target, evt, cb, evtParts);
+	});
+
+	return target;
+}
+
+
+/**
+ * Wrap an fn with condition passing
+ */
+on.wrap = function(target, evt, fn, condition){
+	var cb = function() {
+		if (condition.apply(target, arguments)) {
+			return fn.apply(target, arguments);
+		}
+	};
+
+	cb.fn = fn;
+
+	return cb;
+};
+},{"./listeners":35,"icicle":48,"mutype/is-object":85}],38:[function(require,module,exports){
 module.exports = function flatten(list, depth) {
   depth = (typeof depth == 'number') ? depth : Infinity;
 
@@ -3808,7 +5417,7 @@ module.exports = function flatten(list, depth) {
   }
 };
 
-},{}],30:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 var isFunction = require('is-function')
 
 module.exports = forEach
@@ -3856,7 +5465,7 @@ function forEachObject(object, iterator, context) {
     }
 }
 
-},{"is-function":39}],31:[function(require,module,exports){
+},{"is-function":53}],40:[function(require,module,exports){
 /**
  * Real values fourier transform.
  *
@@ -4080,7 +5689,7 @@ function reverseBinPermute (N, dest, source) {
 
 	dest[nm1] = source[nm1];
 };
-},{}],32:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 module.exports = getCanvasContext
 function getCanvasContext (type, opts) {
   if (typeof type !== 'string') {
@@ -4118,14 +5727,81 @@ function getCanvasContext (type, opts) {
   return (gl || null) // ensure null on fail
 }
 
-},{}],33:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
+/**
+ * Get clientY/clientY from an event.
+ * If index is passed, treat it as index of global touches, not the targetTouches.
+ * Global touches include target touches.
+ *
+ * @module get-client-xy
+ *
+ * @param {Event} e Event raised, like mousemove
+ *
+ * @return {number} Coordinate relative to the screen
+ */
+function getClientY (e, idx) {
+	// touch event
+	if (e.touches) {
+		if (arguments.length > 1) {
+			return findTouch(e.touches, idx).clientY
+		}
+		else {
+			return e.targetTouches[0].clientY;
+		}
+	}
+
+	// mouse event
+	return e.clientY;
+}
+function getClientX (e, idx) {
+	// touch event
+	if (e.touches) {
+		if (arguments.length > idx) {
+			return findTouch(e.touches, idx).clientX;
+		}
+		else {
+			return e.targetTouches[0].clientX;
+		}
+	}
+
+	// mouse event
+	return e.clientX;
+}
+
+function getClientXY (e, idx) {
+	return [getClientX.apply(this, arguments), getClientY.apply(this, arguments)];
+}
+
+function findTouch (touchList, idx) {
+	for (var i = 0; i < touchList.length; i++) {
+		if (touchList[i].identifier === idx) {
+			return touchList[i];
+		}
+	}
+}
+
+
+getClientXY.x = getClientX;
+getClientXY.y = getClientY;
+getClientXY.findTouch = findTouch;
+
+module.exports = getClientXY;
+},{}],43:[function(require,module,exports){
+/**
+ * @module  get-doc
+ */
+
+var hasDom = require('has-dom');
+
+module.exports = hasDom() ? document : null;
+},{"has-dom":47}],44:[function(require,module,exports){
 /** generate unique id for selector */
 var counter = Date.now() % 1e9;
 
 module.exports = function getUid(){
 	return (Math.random() * 1e9 >>> 0) + (counter++);
 };
-},{}],34:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 /**
  * @module  gl-spectrum
  */
@@ -4696,7 +6372,7 @@ Component.prototype.createProgram = function (vSrc, fSrc) {
 	return program;
 }
 
-},{"canvas-fit":17,"events":4,"get-canvas-context":32,"inherits":36,"is-browser":38,"mutype/is-object":49,"raf-loop":53,"xtend/mutable":63}],35:[function(require,module,exports){
+},{"canvas-fit":20,"events":4,"get-canvas-context":41,"inherits":49,"is-browser":52,"mutype/is-object":85,"raf-loop":102,"xtend/mutable":114}],46:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
     module.exports = window;
@@ -4707,7 +6383,87 @@ if (typeof window !== "undefined") {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],36:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
+'use strict';
+module.exports = function () {
+	return typeof window !== 'undefined'
+		&& typeof document !== 'undefined'
+		&& typeof document.createElement === 'function';
+};
+
+},{}],48:[function(require,module,exports){
+/**
+ * @module Icicle
+ */
+module.exports = {
+	freeze: lock,
+	unfreeze: unlock,
+	isFrozen: isLocked
+};
+
+
+/** Set of targets  */
+var lockCache = new WeakMap;
+
+
+/**
+ * Set flag on target with the name passed
+ *
+ * @return {bool} Whether lock succeeded
+ */
+function lock(target, name){
+	var locks = lockCache.get(target);
+	if (locks && locks[name]) return false;
+
+	//create lock set for a target, if none
+	if (!locks) {
+		locks = {};
+		lockCache.set(target, locks);
+	}
+
+	//set a new lock
+	locks[name] = true;
+
+	//return success
+	return true;
+}
+
+
+/**
+ * Unset flag on the target with the name passed.
+ *
+ * Note that if to return new value from the lock/unlock,
+ * then unlock will always return false and lock will always return true,
+ * which is useless for the user, though maybe intuitive.
+ *
+ * @param {*} target Any object
+ * @param {string} name A flag name
+ *
+ * @return {bool} Whether unlock failed.
+ */
+function unlock(target, name){
+	var locks = lockCache.get(target);
+	if (!locks || !locks[name]) return false;
+
+	locks[name] = null;
+
+	return true;
+}
+
+
+/**
+ * Return whether flag is set
+ *
+ * @param {*} target Any object to associate lock with
+ * @param {string} name A flag name
+ *
+ * @return {Boolean} Whether locked or not
+ */
+function isLocked(target, name){
+	var locks = lockCache.get(target);
+	return (locks && locks[name]);
+}
+},{}],49:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -4732,7 +6488,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],37:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -4756,9 +6512,51 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],38:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
+/** @module  intersects */
+module.exports = intersects;
+
+
+var min = Math.min, max = Math.max;
+
+
+/**
+ * Main intersection detector.
+ *
+ * @param {Rectangle} a Target
+ * @param {Rectangle} b Container
+ *
+ * @return {bool} Whether target is within the container
+ */
+function intersects (a, b, tolerance){
+	//ignore definite disintersection
+	if (a.right < b.left || a.left > b.right) return false;
+	if (a.bottom < b.top || a.top > b.bottom) return false;
+
+	//intersection values
+	var iX = min(a.right - max(b.left, a.left), b.right - max(a.left, b.left));
+	var iY = min(a.bottom - max(b.top, a.top), b.bottom - max(a.top, b.top));
+	var iSquare = iX * iY;
+
+	var bSquare = (b.bottom - b.top) * (b.right - b.left);
+	var aSquare = (a.bottom - a.top) * (a.right - a.left);
+
+	//measure square overlap relative to the min square
+	var targetSquare = min(aSquare, bSquare);
+
+
+	//minimal overlap ratio
+	tolerance = tolerance !== undefined ? tolerance : 0.5;
+
+	if (iSquare / targetSquare > tolerance) {
+		return true;
+	}
+
+	return false;
+}
+},{}],52:[function(require,module,exports){
 module.exports = true;
-},{}],39:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 module.exports = isFunction
 
 var toString = Object.prototype.toString
@@ -4775,7 +6573,7 @@ function isFunction (fn) {
       fn === window.prompt))
 };
 
-},{}],40:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 module.exports = isMobile;
 
 function isMobile (ua) {
@@ -4789,7 +6587,46 @@ function isMobile (ua) {
 }
 
 
-},{}],41:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
+/*!
+ * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
+ *
+ * Copyright (c) 2014-2015, Jon Schlinkert.
+ * Licensed under the MIT License.
+ */
+
+'use strict';
+
+var isObject = require('isobject');
+
+function isObjectObject(o) {
+  return isObject(o) === true
+    && Object.prototype.toString.call(o) === '[object Object]';
+}
+
+module.exports = function isPlainObject(o) {
+  var ctor,prot;
+  
+  if (isObjectObject(o) === false) return false;
+  
+  // If has modified constructor
+  ctor = o.constructor;
+  if (typeof ctor !== 'function') return false;
+  
+  // If has modified prototype
+  prot = ctor.prototype;
+  if (isObjectObject(prot) === false) return false;
+  
+  // If constructor does not have an Object-specific method
+  if (prot.hasOwnProperty('isPrototypeOf') === false) {
+    return false;
+  }
+  
+  // Most likely a plain Object
+  return true;
+};
+
+},{"isobject":57}],56:[function(require,module,exports){
 
 /**
  * Expose `isUrl`.
@@ -4814,7 +6651,22 @@ function isUrl(string){
   return matcher.test(string);
 }
 
-},{}],42:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
+/*!
+ * isobject <https://github.com/jonschlinkert/isobject>
+ *
+ * Copyright (c) 2014-2015, Jon Schlinkert.
+ * Licensed under the MIT License.
+ */
+
+'use strict';
+
+module.exports = function isObject(val) {
+  return val != null && typeof val === 'object'
+    && !Array.isArray(val);
+};
+
+},{}],58:[function(require,module,exports){
 'use strict';
 module.exports = leftPad;
 
@@ -4853,7 +6705,351 @@ function leftPad (str, len, ch) {
   return pad + str;
 }
 
-},{}],43:[function(require,module,exports){
+},{}],59:[function(require,module,exports){
+/**
+ * Get or set element’s style, prefix-agnostic.
+ *
+ * @module  mucss/css
+ */
+var fakeStyle = require('./fake-element').style;
+var prefix = require('./prefix').lowercase;
+
+
+/**
+ * Apply styles to an element.
+ *
+ * @param    {Element}   el   An element to apply styles.
+ * @param    {Object|string}   obj   Set of style rules or string to get style rule.
+ */
+module.exports = function(el, obj){
+	if (!el || !obj) return;
+
+	var name, value;
+
+	//return value, if string passed
+	if (typeof obj === 'string') {
+		name = obj;
+
+		//return value, if no value passed
+		if (arguments.length < 3) {
+			return el.style[prefixize(name)];
+		}
+
+		//set style, if value passed
+		value = arguments[2] || '';
+		obj = {};
+		obj[name] = value;
+	}
+
+	for (name in obj){
+		//convert numbers to px
+		if (typeof obj[name] === 'number' && /left|right|bottom|top|width|height/i.test(name)) obj[name] += 'px';
+
+		value = obj[name] || '';
+
+		el.style[prefixize(name)] = value;
+	}
+};
+
+
+/**
+ * Return prefixized prop name, if needed.
+ *
+ * @param    {string}   name   A property name.
+ * @return   {string}   Prefixed property name.
+ */
+function prefixize(name){
+	var uName = name[0].toUpperCase() + name.slice(1);
+	if (fakeStyle[name] !== undefined) return name;
+	if (fakeStyle[prefix + uName] !== undefined) return prefix + uName;
+	return '';
+}
+
+},{"./fake-element":60,"./prefix":65}],60:[function(require,module,exports){
+/** Just a fake element to test styles
+ * @module mucss/fake-element
+ */
+
+module.exports = document.createElement('div');
+},{}],61:[function(require,module,exports){
+/**
+ * Window scrollbar detector.
+ *
+ * @module mucss/has-scroll
+ */
+
+//TODO: detect any element scroll, not only the window
+exports.x = function () {
+	return window.innerHeight > document.documentElement.clientHeight;
+};
+exports.y = function () {
+	return window.innerWidth > document.documentElement.clientWidth;
+};
+},{}],62:[function(require,module,exports){
+/**
+ * Detect whether element is placed to fixed container or is fixed itself.
+ *
+ * @module mucss/is-fixed
+ *
+ * @param {(Element|Object)} el Element to detect fixedness.
+ *
+ * @return {boolean} Whether element is nested.
+ */
+module.exports = function (el) {
+	var parentEl = el;
+
+	//window is fixed, btw
+	if (el === window) return true;
+
+	//unlike the doc
+	if (el === document) return false;
+
+	while (parentEl) {
+		if (getComputedStyle(parentEl).position === 'fixed') return true;
+		parentEl = parentEl.offsetParent;
+	}
+	return false;
+};
+},{}],63:[function(require,module,exports){
+/**
+ * Calculate absolute offsets of an element, relative to the document.
+ *
+ * @module mucss/offsets
+ *
+ */
+var win = window;
+var doc = document;
+var Rect = require('./rect');
+var hasScroll = require('./has-scroll');
+var scrollbar = require('./scrollbar');
+var isFixedEl = require('./is-fixed');
+var getTranslate = require('./translate');
+
+
+/**
+ * Return absolute offsets of any target passed
+ *
+ * @param    {Element|window}   el   A target. Pass window to calculate viewport offsets
+ * @return   {Object}   Offsets object with trbl.
+ */
+module.exports = offsets;
+
+function offsets (el) {
+	if (!el) throw Error('Bad argument');
+
+	//calc client rect
+	var cRect, result;
+
+	//return vp offsets
+	if (el === win) {
+		result = Rect(
+			win.pageXOffset,
+			win.pageYOffset
+		);
+
+		result.width = win.innerWidth - (hasScroll.y() ? scrollbar : 0),
+		result.height = win.innerHeight - (hasScroll.x() ? scrollbar : 0)
+		result.right = result.left + result.width;
+		result.bottom = result.top + result.height;
+
+		return result;
+	}
+
+	//return absolute offsets if document requested
+	else if (el === doc) {
+		var res = offsets(doc.documentElement);
+		res.bottom = Math.max(window.innerHeight, res.bottom);
+		res.right = Math.max(window.innerWidth, res.right);
+		if (hasScroll.y(doc.documentElement)) res.right -= scrollbar;
+		if (hasScroll.x(doc.documentElement)) res.bottom -= scrollbar;
+		return res;
+	}
+
+	//FIXME: why not every element has getBoundingClientRect method?
+	try {
+		cRect = el.getBoundingClientRect();
+	} catch (e) {
+		cRect = Rect(
+			el.clientLeft,
+			el.clientTop
+		);
+	}
+
+	//whether element is or is in fixed
+	var isFixed = isFixedEl(el);
+	var xOffset = isFixed ? 0 : win.pageXOffset;
+	var yOffset = isFixed ? 0 : win.pageYOffset;
+
+	result = Rect(
+		cRect.left + xOffset,
+		cRect.top + yOffset,
+		cRect.left + xOffset + el.offsetWidth,
+		cRect.top + yOffset + el.offsetHeight
+	);
+
+	return result;
+};
+},{"./has-scroll":61,"./is-fixed":62,"./rect":66,"./scrollbar":67,"./translate":69}],64:[function(require,module,exports){
+/**
+ * Returns parsed css value.
+ *
+ * @module mucss/parse-value
+ *
+ * @param {string} str A string containing css units value
+ *
+ * @return {number} Parsed number value
+ */
+module.exports = function (str){
+	str += '';
+	return parseFloat(str.slice(0,-2)) || 0;
+};
+
+//FIXME: add parsing units
+},{}],65:[function(require,module,exports){
+/**
+ * Vendor prefixes
+ * Method of http://davidwalsh.name/vendor-prefix
+ * @module mucss/prefix
+ */
+
+var styles = getComputedStyle(document.documentElement, '');
+
+if (!styles) {
+	module.exports = {
+		dom: '', lowercase: '', css: '', js: ''
+	};
+}
+
+else {
+	var pre = (Array.prototype.slice.call(styles)
+		.join('')
+		.match(/-(moz|webkit|ms)-/) || (styles.OLink === '' && ['', 'o'])
+	)[1];
+
+	var dom = ('WebKit|Moz|MS|O').match(new RegExp('(' + pre + ')', 'i'))[1];
+
+	module.exports = {
+		dom: dom,
+		lowercase: pre,
+		css: '-' + pre + '-',
+		js: pre[0].toUpperCase() + pre.substr(1)
+	};
+}
+
+},{}],66:[function(require,module,exports){
+/**
+ * Simple rect constructor.
+ * It is just faster and smaller than constructing an object.
+ *
+ * @module mucss/rect
+ *
+ * @param {number} l left
+ * @param {number} t top
+ * @param {number} r right
+ * @param {number} b bottom
+ *
+ * @return {Rect} A rectangle object
+ */
+module.exports = function Rect (l,t,r,b) {
+	if (!(this instanceof Rect)) return new Rect(l,t,r,b);
+
+	this.left=l||0;
+	this.top=t||0;
+	this.right=r||0;
+	this.bottom=b||0;
+	this.width=Math.abs(this.right - this.left);
+	this.height=Math.abs(this.bottom - this.top);
+};
+},{}],67:[function(require,module,exports){
+/**
+ * Calculate scrollbar width.
+ *
+ * @module mucss/scrollbar
+ */
+
+// Create the measurement node
+var scrollDiv = document.createElement("div");
+
+var style = scrollDiv.style;
+
+style.width = '100px';
+style.height = '100px';
+style.overflow = 'scroll';
+style.position = 'absolute';
+style.top = '-9999px';
+
+document.documentElement.appendChild(scrollDiv);
+
+// the scrollbar width
+module.exports = scrollDiv.offsetWidth - scrollDiv.clientWidth;
+
+// Delete fake DIV
+document.documentElement.removeChild(scrollDiv);
+},{}],68:[function(require,module,exports){
+/**
+ * Enable/disable selectability of an element
+ * @module mucss/selection
+ */
+var css = require('./css');
+
+
+/**
+ * Disable or Enable any selection possibilities for an element.
+ *
+ * @param    {Element}   el   Target to make unselectable.
+ */
+exports.disable = function(el){
+	css(el, {
+		'user-select': 'none',
+		'user-drag': 'none',
+		'touch-callout': 'none'
+	});
+	el.setAttribute('unselectable', 'on');
+	el.addEventListener('selectstart', pd);
+};
+exports.enable = function(el){
+	css(el, {
+		'user-select': null,
+		'user-drag': null,
+		'touch-callout': null
+	});
+	el.removeAttribute('unselectable');
+	el.removeEventListener('selectstart', pd);
+};
+
+
+/** Prevent you know what. */
+function pd(e){
+	e.preventDefault();
+}
+},{"./css":59}],69:[function(require,module,exports){
+/**
+ * Parse translate3d
+ *
+ * @module mucss/translate
+ */
+
+var css = require('./css');
+var parseValue = require('./parse-value');
+
+module.exports = function (el) {
+	var translateStr = css(el, 'transform');
+
+	//find translate token, retrieve comma-enclosed values
+	//translate3d(1px, 2px, 2) → 1px, 2px, 2
+	//FIXME: handle nested calcs
+	var match = /translate(?:3d)?\s*\(([^\)]*)\)/.exec(translateStr);
+
+	if (!match) return [0, 0];
+	var values = match[1].split(/\s*,\s*/);
+
+	//parse values
+	//FIXME: nested values are not necessarily pixels
+	return values.map(function (value) {
+		return parseValue(value);
+	});
+};
+},{"./css":59,"./parse-value":64}],70:[function(require,module,exports){
 /**
  * Clamp value.
  * Detects proper clamp min/max.
@@ -4868,7 +7064,7 @@ function leftPad (str, len, ch) {
 module.exports = require('./wrap')(function(a, min, max){
 	return max > min ? Math.max(Math.min(a,max),min) : Math.max(Math.min(a,min),max);
 });
-},{"./wrap":48}],44:[function(require,module,exports){
+},{"./wrap":78}],71:[function(require,module,exports){
 /**
  * @module  mumath/closest
  */
@@ -4885,7 +7081,7 @@ module.exports = function closest (num, arr) {
 	}
 	return curr;
 }
-},{}],45:[function(require,module,exports){
+},{}],72:[function(require,module,exports){
 /**
  * Base 10 logarithm
  *
@@ -4894,7 +7090,38 @@ module.exports = function closest (num, arr) {
 module.exports = require('./wrap')(function (a) {
 	return Math.log(a) / Math.log(10);
 });
-},{"./wrap":48}],46:[function(require,module,exports){
+},{"./wrap":78}],73:[function(require,module,exports){
+/**
+ * Looping function for any framesize.
+ * Like fmod.
+ *
+ * @module  mumath/loop
+ *
+ */
+
+module.exports = require('./wrap')(function (value, left, right) {
+	//detect single-arg case, like mod-loop or fmod
+	if (right === undefined) {
+		right = left;
+		left = 0;
+	}
+
+	//swap frame order
+	if (left > right) {
+		var tmp = right;
+		right = left;
+		left = tmp;
+	}
+
+	var frame = right - left;
+
+	value = ((value + left) % frame) - left;
+	if (value < left) value += frame;
+	if (value > right) value -= frame;
+
+	return value;
+});
+},{"./wrap":78}],74:[function(require,module,exports){
 /**
  * @module mumath/order
  */
@@ -4903,7 +7130,50 @@ module.exports = require('./wrap')(function (n) {
 	var order = Math.floor(Math.log(n) / Math.LN10 + 0.000000001);
 	return Math.pow(10,order);
 });
-},{"./wrap":48}],47:[function(require,module,exports){
+},{"./wrap":78}],75:[function(require,module,exports){
+/**
+ * @module  mumath/precision
+ *
+ * Get precision from float:
+ *
+ * @example
+ * 1.1 → 1, 1234 → 0, .1234 → 4
+ *
+ * @param {number} n
+ *
+ * @return {number} decimap places
+ */
+
+module.exports = require('./wrap')(function(n){
+	var s = n + '',
+		d = s.indexOf('.') + 1;
+
+	return !d ? 0 : s.length - d;
+});
+},{"./wrap":78}],76:[function(require,module,exports){
+/**
+ * Precision round
+ *
+ * @param {number} value
+ * @param {number} step Minimal discrete to round
+ *
+ * @return {number}
+ *
+ * @example
+ * toPrecision(213.34, 1) == 213
+ * toPrecision(213.34, .1) == 213.3
+ * toPrecision(213.34, 10) == 210
+ */
+var precision = require('./precision');
+
+module.exports = require('./wrap')(function(value, step) {
+	if (step === 0) return value;
+	if (!step) return Math.round(value);
+	step = parseFloat(step);
+	value = Math.round(value / step) * step;
+	return parseFloat(value.toFixed(precision(step)));
+});
+},{"./precision":75,"./wrap":78}],77:[function(require,module,exports){
 /**
  * Whether element is between left & right including
  *
@@ -4922,7 +7192,7 @@ module.exports = require('./wrap')(function(a, left, right){
 	if (a <= right && a >= left) return true;
 	return false;
 });
-},{"./wrap":48}],48:[function(require,module,exports){
+},{"./wrap":78}],78:[function(require,module,exports){
 /**
  * Get fn wrapped with array/object attrs recognition
  *
@@ -4964,7 +7234,36 @@ module.exports = function(fn){
 		}
 	};
 };
-},{}],49:[function(require,module,exports){
+},{}],79:[function(require,module,exports){
+var isString = require('./is-string');
+var isArray = require('./is-array');
+var isFn = require('./is-fn');
+
+//FIXME: add tests from http://jsfiddle.net/ku9LS/1/
+module.exports = function (a){
+	return isArray(a) || (a && !isString(a) && !a.nodeType && (typeof window != 'undefined' ? a != window : true) && !isFn(a) && typeof a.length === 'number');
+}
+},{"./is-array":80,"./is-fn":82,"./is-string":86}],80:[function(require,module,exports){
+module.exports = function(a){
+	return a instanceof Array;
+}
+},{}],81:[function(require,module,exports){
+module.exports = function(target){
+	return typeof Event !== 'undefined' && target instanceof Event;
+};
+},{}],82:[function(require,module,exports){
+module.exports = function(a){
+	return !!(a && a.apply);
+}
+},{}],83:[function(require,module,exports){
+module.exports = function(target){
+	return typeof document !== 'undefined' && target instanceof Node;
+};
+},{}],84:[function(require,module,exports){
+module.exports = function(a){
+	return typeof a === 'number' || a instanceof Number;
+}
+},{}],85:[function(require,module,exports){
 /**
  * @module mutype/is-object
  */
@@ -4977,7 +7276,102 @@ module.exports = function(o){
 	return !!o && typeof o === 'object' && o.constructor === Object;
 };
 
-},{}],50:[function(require,module,exports){
+},{}],86:[function(require,module,exports){
+module.exports = function(a){
+	return typeof a === 'string' || a instanceof String;
+}
+},{}],87:[function(require,module,exports){
+/**
+ * @module parenthesis
+ */
+
+var parse = require('./parse');
+var stringify = require('./stringify');
+parse.parse = parse;
+parse.stringify = stringify;
+
+module.exports = parse;
+},{"./parse":88,"./stringify":89}],88:[function(require,module,exports){
+/**
+ * @module  parenthesis/parse
+ *
+ * Parse a string with parenthesis.
+ *
+ * @param {string} str A string with parenthesis
+ *
+ * @return {Array} A list with parsed parens, where 0 is initial string.
+ */
+
+//TODO: implement sequential parser of this algorithm, compare performance.
+module.exports = function(str, bracket){
+	//pretend non-string parsed per-se
+	if (typeof str !== 'string') return [str];
+
+	var res = [], prevStr;
+
+	bracket = bracket || '()';
+
+	//create parenthesis regex
+	var pRE = new RegExp(['\\', bracket[0], '[^\\', bracket[0], '\\', bracket[1], ']*\\', bracket[1]].join(''));
+
+	function replaceToken(token, idx, str){
+		//save token to res
+		var refId = res.push(token.slice(1,-1));
+
+		return '\\' + refId;
+	}
+
+	//replace paren tokens till there’s none
+	while (str != prevStr) {
+		prevStr = str;
+		str = str.replace(pRE, replaceToken);
+	}
+
+	//save resulting str
+	res.unshift(str);
+
+	return res;
+};
+},{}],89:[function(require,module,exports){
+/**
+ * @module parenthesis/stringify
+ *
+ * Stringify an array/object with parenthesis references
+ *
+ * @param {Array|Object} arr An array or object where 0 is initial string
+ *                           and every other key/value is reference id/value to replace
+ *
+ * @return {string} A string with inserted regex references
+ */
+
+//FIXME: circular references cause recursions here
+//TODO: there’s possible a recursive version of this algorithm, so test it & compare
+module.exports = function (str, refs, bracket){
+	var prevStr;
+
+	//pretend bad string stringified with no parentheses
+	if (!str) return '';
+
+	if (typeof str !== 'string') {
+		bracket = refs;
+		refs = str;
+		str = refs[0];
+	}
+
+	bracket = bracket || '()';
+
+	function replaceRef(token, idx, str){
+		return bracket[0] + refs[token.slice(1)] + bracket[1];
+	}
+
+	while (str != prevStr) {
+		prevStr = str;
+		str = str.replace(/\\[0-9]+/, replaceRef);
+	}
+
+	return str;
+};
+},{}],90:[function(require,module,exports){
 var trim = require('trim')
   , forEach = require('for-each')
   , isArray = function(arg) {
@@ -5009,7 +7403,7 @@ module.exports = function (headers) {
 
   return result
 }
-},{"for-each":30,"trim":61}],51:[function(require,module,exports){
+},{"for-each":39,"trim":112}],91:[function(require,module,exports){
 (function (process){
 // Generated by CoffeeScript 1.7.1
 (function() {
@@ -5045,7 +7439,7 @@ module.exports = function (headers) {
 }).call(this);
 
 }).call(this,require('_process'))
-},{"_process":6}],52:[function(require,module,exports){
+},{"_process":6}],92:[function(require,module,exports){
 /**
  * @module  plot-grid
  */
@@ -5363,7 +7757,365 @@ Grid.prototype.update = function (options) {
 
 	return this;
 };
-},{"events":4,"get-uid":33,"inherits":36,"insert-css":37,"is-browser":38,"mumath/closest":44,"mumath/lg":45,"mumath/order":46,"mumath/within":47,"xtend":62}],53:[function(require,module,exports){
+},{"events":4,"get-uid":44,"inherits":49,"insert-css":50,"is-browser":52,"mumath/closest":71,"mumath/lg":72,"mumath/order":74,"mumath/within":77,"xtend":113}],93:[function(require,module,exports){
+/**
+ * @module  queried
+ */
+
+
+var doc = require('get-doc');
+var q = require('./lib/');
+
+
+/**
+ * Detect unsupported css4 features, polyfill them
+ */
+
+//detect `:scope`
+try {
+	doc.querySelector(':scope');
+}
+catch (e) {
+	q.registerFilter('scope', require('./lib/pseudos/scope'));
+}
+
+
+//detect `:has`
+try {
+	doc.querySelector(':has');
+}
+catch (e) {
+	q.registerFilter('has', require('./lib/pseudos/has'));
+
+	//polyfilled :has requires artificial :not to make `:not(:has(...))`.
+	q.registerFilter('not', require('./lib/pseudos/not'));
+}
+
+
+//detect `:root`
+try {
+	doc.querySelector(':root');
+}
+catch (e) {
+	q.registerFilter('root', require('./lib/pseudos/root'));
+}
+
+
+//detect `:matches`
+try {
+	doc.querySelector(':matches');
+}
+catch (e) {
+	q.registerFilter('matches', require('./lib/pseudos/matches'));
+}
+
+
+/** Helper methods */
+q.matches = require('./lib/pseudos/matches');
+
+
+module.exports = q;
+},{"./lib/":94,"./lib/pseudos/has":95,"./lib/pseudos/matches":96,"./lib/pseudos/not":97,"./lib/pseudos/root":98,"./lib/pseudos/scope":99,"get-doc":43}],94:[function(require,module,exports){
+/**
+ * @module queried/lib/index
+ */
+
+
+var slice = require('sliced');
+var unique = require('array-unique');
+var getUid = require('get-uid');
+var paren = require('parenthesis');
+var isString = require('mutype/is-string');
+var isArray = require('mutype/is-array');
+var isArrayLike = require('mutype/is-array-like');
+var arrayify = require('arrayify-compact');
+var doc = require('get-doc');
+
+
+/**
+ * Query wrapper - main method to query elements.
+ */
+function queryMultiple(selector, el) {
+	//ignore bad selector
+	if (!selector) return [];
+
+	//return elements passed as a selector unchanged (cover params case)
+	if (!isString(selector)) {
+		if (isArray(selector)) {
+			return unique(arrayify(selector.map(function (sel) {
+				return queryMultiple(sel, el);
+			})));
+		} else {
+			return [selector];
+		}
+	}
+
+	//catch polyfillable first `:scope` selector - just erase it, works just fine
+	if (pseudos.scope) {
+		selector = selector.replace(/^\s*:scope/, '');
+	}
+
+	//ignore non-queryable containers
+	if (!el) {
+		el = [querySingle.document];
+	}
+
+	//treat passed list
+	else if (isArrayLike(el)) {
+		el = arrayify(el);
+	}
+
+	//if element isn’t a node - make it q.document
+	else if (!el.querySelector) {
+		el = [querySingle.document];
+	}
+
+	//make any ok element a list
+	else {
+		el = [el];
+	}
+
+	return qPseudos(el, selector);
+}
+
+
+/** Query single element - no way better than return first of multiple selector */
+function querySingle(selector, el){
+	return queryMultiple(selector, el)[0];
+}
+
+
+/**
+ * Return query result based off target list.
+ * Parse and apply polyfilled pseudos
+ */
+function qPseudos(list, selector) {
+	//ignore empty selector
+	selector = selector.trim();
+	if (!selector) return list;
+
+	// console.group(selector);
+
+	//scopify immediate children selector
+	if (selector[0] === '>') {
+		if (!pseudos.scope) {
+			//scope as the first element in selector scopifies current element just ok
+			selector = ':scope' + selector;
+		}
+		else {
+			var id = getUid();
+			list.forEach(function(el){el.setAttribute('__scoped', id);});
+			selector = '[__scoped="' + id + '"]' + selector;
+		}
+	}
+
+	var pseudo, pseudoFn, pseudoParam, pseudoParamId;
+
+	//catch pseudo
+	var parts = paren.parse(selector);
+	var match = parts[0].match(pseudoRE);
+
+	//if pseudo found
+	if (match) {
+		//grab pseudo details
+		pseudo = match[1];
+		pseudoParamId = match[2];
+
+		if (pseudoParamId) {
+			pseudoParam = paren.stringify(parts[pseudoParamId.slice(1)], parts);
+		}
+
+		//pre-select elements before pseudo
+		var preSelector = paren.stringify(parts[0].slice(0, match.index), parts);
+
+		//fix for query-relative
+		if (!preSelector && !mappers[pseudo]) preSelector = '*';
+		if (preSelector) list = qList(list, preSelector);
+
+
+		//apply pseudo filter/mapper on the list
+		pseudoFn = function(el) {return pseudos[pseudo](el, pseudoParam); };
+		if (filters[pseudo]) {
+			list = list.filter(pseudoFn);
+		}
+		else if (mappers[pseudo]) {
+			list = unique(arrayify(list.map(pseudoFn)));
+		}
+
+		//shorten selector
+		selector = parts[0].slice(match.index + match[0].length);
+
+		// console.groupEnd();
+
+		//query once again
+		return qPseudos(list, paren.stringify(selector, parts));
+	}
+
+	//just query list
+	else {
+		// console.groupEnd();
+		return qList(list, selector);
+	}
+}
+
+
+/** Apply selector on a list of elements, no polyfilled pseudos */
+function qList(list, selector){
+	return unique(arrayify(list.map(function(el){
+		return slice(el.querySelectorAll(selector));
+	})));
+}
+
+
+/** Registered pseudos */
+var pseudos = {};
+var filters = {};
+var mappers = {};
+
+
+/** Regexp to grab pseudos with params */
+var pseudoRE;
+
+
+/**
+ * Append a new filtering (classic) pseudo
+ *
+ * @param {string} name Pseudo name
+ * @param {Function} filter A filtering function
+ */
+function registerFilter(name, filter, incSelf){
+	if (pseudos[name]) return;
+
+	//save pseudo filter
+	pseudos[name] = filter;
+	pseudos[name].includeSelf = incSelf;
+	filters[name] = true;
+
+	regenerateRegExp();
+}
+
+
+/**
+ * Append a new mapping (relative-like) pseudo
+ *
+ * @param {string} name pseudo name
+ * @param {Function} mapper map function
+ */
+function registerMapper(name, mapper, incSelf){
+	if (pseudos[name]) return;
+
+	pseudos[name] = mapper;
+	pseudos[name].includeSelf = incSelf;
+	mappers[name] = true;
+
+	regenerateRegExp();
+}
+
+
+/** Update regexp catching pseudos */
+function regenerateRegExp(){
+	pseudoRE = new RegExp('::?(' + Object.keys(pseudos).join('|') + ')(\\\\[0-9]+)?');
+}
+
+
+
+/** Exports */
+querySingle.all = queryMultiple;
+querySingle.registerFilter = registerFilter;
+querySingle.registerMapper = registerMapper;
+
+/** Default document representative to use for DOM */
+querySingle.document = doc;
+
+
+module.exports = querySingle;
+},{"array-unique":16,"arrayify-compact":17,"get-doc":43,"get-uid":44,"mutype/is-array":80,"mutype/is-array-like":79,"mutype/is-string":86,"parenthesis":87,"sliced":100}],95:[function(require,module,exports){
+var q = require('..');
+
+function has(el, subSelector){
+	return !!q(subSelector, el);
+}
+
+module.exports = has;
+},{"..":94}],96:[function(require,module,exports){
+/** :matches pseudo */
+
+var q = require('..');
+
+function matches(el, selector){
+	if (!el.parentNode) {
+		var fragment = q.document.createDocumentFragment();
+		fragment.appendChild(el);
+	}
+
+	return q.all(selector, el.parentNode).indexOf(el) > -1;
+}
+
+module.exports = matches;
+},{"..":94}],97:[function(require,module,exports){
+var matches = require('./matches');
+
+function not(el, selector){
+	return !matches(el, selector);
+}
+
+module.exports = not;
+},{"./matches":96}],98:[function(require,module,exports){
+var q = require('..');
+
+module.exports = function root(el){
+	return el === q.document.documentElement;
+};
+},{"..":94}],99:[function(require,module,exports){
+/**
+ * :scope pseudo
+ * Return element if it has `scoped` attribute.
+ *
+ * @link http://dev.w3.org/csswg/selectors-4/#the-scope-pseudo
+ */
+
+module.exports = function scope(el){
+	return el.hasAttribute('scoped');
+};
+},{}],100:[function(require,module,exports){
+module.exports = exports = require('./lib/sliced');
+
+},{"./lib/sliced":101}],101:[function(require,module,exports){
+
+/**
+ * An Array.prototype.slice.call(arguments) alternative
+ *
+ * @param {Object} args something with a length
+ * @param {Number} slice
+ * @param {Number} sliceEnd
+ * @api public
+ */
+
+module.exports = function (args, slice, sliceEnd) {
+  var ret = [];
+  var len = args.length;
+
+  if (0 === len) return ret;
+
+  var start = slice < 0
+    ? Math.max(0, slice + len)
+    : slice || 0;
+
+  if (sliceEnd !== undefined) {
+    len = sliceEnd < 0
+      ? sliceEnd + len
+      : sliceEnd
+  }
+
+  while (len-- > start) {
+    ret[len - start] = args[len];
+  }
+
+  return ret;
+}
+
+
+},{}],102:[function(require,module,exports){
 var inherits = require('inherits')
 var EventEmitter = require('events').EventEmitter
 var now = require('right-now')
@@ -5408,7 +8160,7 @@ Engine.prototype.tick = function() {
     this.emit('tick', dt)
     this.last = time
 }
-},{"events":4,"inherits":36,"raf":54,"right-now":55}],54:[function(require,module,exports){
+},{"events":4,"inherits":49,"raf":103,"right-now":104}],103:[function(require,module,exports){
 (function (global){
 var now = require('performance-now')
   , root = typeof window === 'undefined' ? global : window
@@ -5484,7 +8236,7 @@ module.exports.polyfill = function() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"performance-now":51}],55:[function(require,module,exports){
+},{"performance-now":91}],104:[function(require,module,exports){
 (function (global){
 module.exports =
   global.performance &&
@@ -5495,7 +8247,7 @@ module.exports =
   }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],56:[function(require,module,exports){
+},{}],105:[function(require,module,exports){
 'use strict'
 
 function blackmanHarris (i,N) {
@@ -5510,7 +8262,190 @@ function blackmanHarris (i,N) {
 
 module.exports = blackmanHarris
 
-},{}],57:[function(require,module,exports){
+},{}],106:[function(require,module,exports){
+arguments[4][101][0].apply(exports,arguments)
+},{"dup":101}],107:[function(require,module,exports){
+/**
+ * @module  st8
+ *
+ * Micro state machine.
+ */
+
+
+var Emitter = require('events');
+var isObject = require('is-plain-object');
+
+
+/** Defaults */
+
+State.options = {
+	leaveCallback: 'after',
+	enterCallback: 'before',
+	changeCallback: 'change',
+	remainderState: '_'
+};
+
+
+/**
+ * Create a new state controller based on states passed
+ *
+ * @constructor
+ *
+ * @param {object} settings Initial states
+ */
+
+function State(states, context){
+	//ignore existing state
+	if (states instanceof State) return states;
+
+	//ensure new state instance is created
+	if (!(this instanceof State)) return new State(states);
+
+	//save states object
+	this.states = states || {};
+
+	//save context
+	this.context = context || this;
+
+	//initedFlag
+	this.isInit = false;
+}
+
+
+/** Inherit State from Emitter */
+
+var proto = State.prototype = Object.create(Emitter.prototype);
+
+
+/**
+ * Go to a state
+ *
+ * @param {*} value Any new state to enter
+ */
+
+proto.set = function (value) {
+	var oldValue = this.state, states = this.states;
+	// console.group('set', value, oldValue);
+
+	//leave old state
+	var oldStateName = states[oldValue] !== undefined ? oldValue : State.options.remainderState;
+	var oldState = states[oldStateName];
+
+	var leaveResult, leaveFlag = State.options.leaveCallback + oldStateName;
+
+	if (this.isInit) {
+		if (isObject(oldState)) {
+			if (!this[leaveFlag]) {
+				this[leaveFlag] = true;
+
+				//if oldstate has after method - call it
+				leaveResult = getValue(oldState, State.options.leaveCallback, this.context);
+
+				//ignore changing if leave result is falsy
+				if (leaveResult === false) {
+					this[leaveFlag] = false;
+					// console.groupEnd();
+					return false;
+				}
+
+				//redirect, if returned anything
+				else if (leaveResult !== undefined && leaveResult !== value) {
+					this.set(leaveResult);
+					this[leaveFlag] = false;
+					// console.groupEnd();
+					return false;
+				}
+
+				this[leaveFlag] = false;
+
+				//ignore redirect
+				if (this.state !== oldValue) {
+					return;
+				}
+			}
+
+		}
+
+		//ignore not changed value
+		if (value === oldValue) return false;
+	}
+	else {
+		this.isInit = true;
+	}
+
+
+	//set current value
+	this.state = value;
+
+
+	//try to enter new state
+	var newStateName = states[value] !== undefined ? value : State.options.remainderState;
+	var newState = states[newStateName];
+	var enterFlag = State.options.enterCallback + newStateName;
+	var enterResult;
+
+	if (!this[enterFlag]) {
+		this[enterFlag] = true;
+
+		if (isObject(newState)) {
+			enterResult = getValue(newState, State.options.enterCallback, this.context);
+		} else {
+			enterResult = getValue(states, newStateName, this.context);
+		}
+
+		//ignore entering falsy state
+		if (enterResult === false) {
+			this.set(oldValue);
+			this[enterFlag] = false;
+			// console.groupEnd();
+			return false;
+		}
+
+		//redirect if returned anything but current state
+		else if (enterResult !== undefined && enterResult !== value) {
+			this.set(enterResult);
+			this[enterFlag] = false;
+			// console.groupEnd();
+			return false;
+		}
+
+		this[enterFlag] = false;
+	}
+
+
+
+	//notify change
+	if (value !== oldValue)	{
+		this.emit(State.options.changeCallback, value, oldValue);
+	}
+
+
+	// console.groupEnd();
+
+	//return context to chain calls
+	return this.context;
+};
+
+
+/** Get current state */
+
+proto.get = function(){
+	return this.state;
+};
+
+
+/** Return value or fn result */
+function getValue(holder, meth, ctx){
+	if (typeof holder[meth] === 'function') {
+		return holder[meth].call(ctx);
+	}
+
+	return holder[meth];
+}
+
+
+module.exports = State;
+},{"events":4,"is-plain-object":55}],108:[function(require,module,exports){
 /**
  * @module audio-demo
  */
@@ -5518,7 +8453,7 @@ var Emitter = require('events').EventEmitter;
 var inherits = require('inherits');
 var extend = require('xtend/mutable');
 var sf = 0;
-var className = ((require('insert-css')("._a3cacb3c {\r\n\tmin-height: 100vh;\r\n\tmargin: 0;\r\n\tfont-family: sans-serif;\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._a3cacb3c * {\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._a3cacb3c a {\r\n\tcolor: inherit;\r\n}\r\n\r\n._a3cacb3c [hidden] {\r\n\tdisplay: none!important;\r\n}\r\n\r\n._a3cacb3c:after {\r\n\tcontent: '';\r\n}\r\n._a3cacb3c.dragover:after {\r\n\tcontent: '⎗';\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tmargin: auto;\r\n\twidth: 20vh;\r\n\theight: 20vh;\r\n\tz-index: 2;\r\n\tfont-size: 20vh;\r\n\ttext-align: center;\r\n\tline-height: 20vh;\r\n\tdisplay: block;\r\n}\r\n\r\n._a3cacb3c.dragover:before {\r\n\tcontent: '';\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tbottom: 0;\r\n\tmargin: 0;\r\n\tborder: .2rem dashed;\r\n\tz-index: 1;\r\n\tdisplay: block;\r\n}\r\n\r\n._a3cacb3c.dragover .source {\r\n}\r\n\r\n._a3cacb3c.dragover .audio-stop,._a3cacb3c.dragover .audio-playback {\r\n\tdisplay: none;\r\n}\r\n\r\n._a3cacb3c .source {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tposition: absolute;\r\n\ttop: .75rem;\r\n\tleft: .75rem;\r\n\tdisplay: block;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\toutline: none;\r\n\tfill: currentColor;\r\n\tz-index: 999;\r\n}\r\n._a3cacb3c .source-input {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tborder: 0;\r\n\tdisplay: inline;\r\n\tvertical-align: baseline;\r\n\tline-height: 1rem;\r\n\theight: 1rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\tfont-weight: bolder;\r\n\toutline: none;\r\n\tbackground: none;\r\n\t-webkit-appearance: none;\r\n\tappearance: none;\r\n\tborder-radius: 0;\r\n\tbox-shadow: 0 2px;\r\n\tcolor: inherit;\r\n}\r\n._a3cacb3c .source-input:focus{\r\n\toutline: none;\r\n}\r\n._a3cacb3c .source-input-file {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\topacity: 0;\r\n\tborder: none;\r\n\tcursor: pointer;\r\n}\r\n._a3cacb3c .source-input-url {\r\n\tfont-family: sans-serif;\r\n\tfont-weight: bold;\r\n\tmin-width: 40vw;\r\n}\r\n._a3cacb3c .source-input-url:focus {\r\n}\r\n._a3cacb3c input[type=file],\r\n._a3cacb3c input[type=file]::-webkit-file-upload-button {\r\n\tcursor: pointer;\r\n}\r\n._a3cacb3c i {\r\n\tfill: currentColor;\r\n}\r\n._a3cacb3c .source i {\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tdisplay: inline-block;\r\n\tposition: relative;\r\n}\r\n._a3cacb3c .source i svg {\r\n\tmargin-bottom: -.52rem;\r\n}\r\n._a3cacb3c i svg {\r\n\tmax-width: 100%;\r\n\tmax-height: 100%;\r\n}\r\n._a3cacb3c .source-link {\r\n\tposition: relative;\r\n\tfont-weight: bold;\r\n\ttext-decoration: none;\r\n\tbox-shadow: 0px 2px;\r\n\twhite-space: nowrap;\r\n\tcursor: pointer;\r\n}\r\n\r\n._a3cacb3c .text-length-limiter {\r\n\tdisplay: inline-block;\r\n\tmax-width: 40vw;\r\n\tvertical-align: top;\r\n\twhite-space: nowrap;\r\n\ttext-overflow: ellipsis;\r\n\toverflow: hidden;\r\n}\r\n._a3cacb3c .source-title {\r\n\tdisplay: inline;\r\n}\r\n\r\n._a3cacb3c .fps {\r\n\tposition: fixed;\r\n\ttop: .75rem;\r\n\tright: .75rem;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tz-index: 999;\r\n}\r\n\r\n\r\n._a3cacb3c .fps-canvas {\r\n\theight: 1rem;\r\n\twidth: 2rem;\r\n\tdisplay: inline-block;\r\n\tvertical-align: baseline;\r\n\tmargin-right: .15rem;\r\n\tmargin-bottom: -.15rem;\r\n}\r\n\r\n._a3cacb3c .fps-text {\r\n}\r\n\r\n._a3cacb3c .fps-value {\r\n}\r\n\r\n._a3cacb3c .audio-playback {\r\n\r\n}\r\n\r\n._a3cacb3c .progress {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\theight: .2rem;\r\n\tbackground: currentColor;\r\n\ttransition: .1s linear width;\r\n\tz-index: 999;\r\n}\r\n\r\n@media (max-width: 640px) {\r\n\t._a3cacb3c .text-length-limiter {\r\n\t\tmax-width: 30%;\r\n\t}\r\n\t._a3cacb3c .source {\r\n\t\tright: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n\t._a3cacb3c .fps {\r\n\t\ttop: auto;\r\n\t\tbottom: .75rem;\r\n\t\tright: .75rem;\r\n\t\tleft: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n}") || true) && "_a3cacb3c");
+var className = ((require('insert-css')("._689c2b37 {\r\n\tmin-height: 100vh;\r\n\tmargin: 0;\r\n\tfont-family: sans-serif;\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._689c2b37 * {\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._689c2b37 a {\r\n\tcolor: inherit;\r\n}\r\n\r\n._689c2b37 [hidden] {\r\n\tdisplay: none!important;\r\n}\r\n\r\n._689c2b37:after {\r\n\tcontent: '';\r\n}\r\n._689c2b37.dragover:after {\r\n\tcontent: '⎗';\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tmargin: auto;\r\n\twidth: 20vh;\r\n\theight: 20vh;\r\n\tz-index: 2;\r\n\tfont-size: 20vh;\r\n\ttext-align: center;\r\n\tline-height: 20vh;\r\n\tdisplay: block;\r\n}\r\n\r\n._689c2b37.dragover:before {\r\n\tcontent: '';\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tbottom: 0;\r\n\tmargin: 0;\r\n\tborder: .2rem dashed;\r\n\tz-index: 1;\r\n\tdisplay: block;\r\n}\r\n\r\n._689c2b37.dragover .source {\r\n}\r\n\r\n._689c2b37.dragover .audio-stop,._689c2b37.dragover .audio-playback {\r\n\tdisplay: none;\r\n}\r\n\r\n._689c2b37 .source, ._689c2b37 .status {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tposition: fixed;\r\n\ttop: .75rem;\r\n\tleft: .75rem;\r\n\tdisplay: block;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\toutline: none;\r\n\tfill: currentColor;\r\n\tz-index: 999;\r\n}\r\n._689c2b37 .source-input {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tborder: 0;\r\n\tdisplay: inline;\r\n\tvertical-align: baseline;\r\n\tline-height: 1rem;\r\n\theight: 1rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\tfont-weight: bolder;\r\n\toutline: none;\r\n\tbackground: none;\r\n\t-webkit-appearance: none;\r\n\tappearance: none;\r\n\tborder-radius: 0;\r\n\tbox-shadow: 0 2px;\r\n\tcolor: inherit;\r\n}\r\n._689c2b37 .source-input:focus{\r\n\toutline: none;\r\n}\r\n._689c2b37 .source-input-file {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\topacity: 0;\r\n\tborder: none;\r\n\tcursor: pointer;\r\n}\r\n._689c2b37 .source-input-url {\r\n\tfont-family: sans-serif;\r\n\tfont-weight: bold;\r\n\tmin-width: 40vw;\r\n}\r\n._689c2b37 .source-input-url:focus {\r\n}\r\n._689c2b37 input[type=file],\r\n._689c2b37 input[type=file]::-webkit-file-upload-button {\r\n\tcursor: pointer;\r\n}\r\n._689c2b37 i {\r\n\tfill: currentColor;\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tposition: relative;\r\n\tdisplay: inline-block;\r\n\tfont-style: normal;\r\n\tvertical-align: top;\r\n}\r\n._689c2b37 .source i {\r\n}\r\n._689c2b37 .source i svg {\r\n\tmargin-bottom: -.52rem;\r\n}\r\n._689c2b37 i svg {\r\n\tmax-width: 100%;\r\n\tmax-height: 100%;\r\n}\r\n._689c2b37 .source-link {\r\n\tposition: relative;\r\n\tfont-weight: bold;\r\n\ttext-decoration: none;\r\n\tbox-shadow: 0px 2px;\r\n\twhite-space: nowrap;\r\n\tcursor: pointer;\r\n}\r\n\r\n._689c2b37 .text-length-limiter {\r\n\tdisplay: inline-block;\r\n\tmax-width: 40vw;\r\n\tvertical-align: top;\r\n\twhite-space: nowrap;\r\n\ttext-overflow: ellipsis;\r\n\toverflow: hidden;\r\n}\r\n._689c2b37 .source-title {\r\n\tdisplay: inline;\r\n}\r\n\r\n._689c2b37 .status {\r\n\tleft: auto;\r\n\tright: .75rem;\r\n}\r\n\r\n._689c2b37 .fps {\r\n\tdisplay: inline-block;\r\n}\r\n\r\n\r\n._689c2b37 .fps-canvas {\r\n\theight: 1rem;\r\n\twidth: 2rem;\r\n\tdisplay: inline-block;\r\n\tmargin-right: .15rem;\r\n\tmargin-bottom: -.15rem;\r\n}\r\n\r\n._689c2b37 .fps-text {\r\n}\r\n\r\n._689c2b37 .fps-value {\r\n}\r\n\r\n._689c2b37 .params-button {\r\n    position: relative;\r\n    display: inline-block;\r\n    margin-left: .5rem;\r\n}\r\n\r\n\r\n._689c2b37 .audio-playback, ._689c2b37 .audio-stop {\r\n\tdisplay: inline-block;\r\n}\r\n\r\n._689c2b37 .progress {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\theight: .2rem;\r\n\tbackground: currentColor;\r\n\ttransition: .1s linear width;\r\n\tz-index: 999;\r\n}\r\n\r\n@media (max-width: 640px) {\r\n\t._689c2b37 .text-length-limiter {\r\n\t\tmax-width: 30%;\r\n\t}\r\n\t._689c2b37 .source {\r\n\t\tright: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n\t._689c2b37 .status {\r\n\t\ttop: auto;\r\n\t\tbottom: .75rem;\r\n\t\tright: .75rem;\r\n\t\tleft: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n}\r\n\r\n\r\n._689c2b37 .params {\r\n\tbackground: linear-gradient(to bottom, rgba(255,255,255,.75), white);\r\n\tposition: fixed;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tmargin: auto;\r\n\tpadding: 1rem 2.25rem .5rem 1.25rem;\r\n\tline-height: 1.5;\r\n\tmax-height: 82vh;\r\n\tmax-width: 100%;\r\n\tz-index: 999;\r\n}\r\n._689c2b37 .params-close {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tright: 0;\r\n\theight: 2rem;\r\n\twidth: 2rem;\r\n\ttext-align: center;\r\n\tline-height: 2rem;\r\n\tfont-size: 1rem;\r\n}\r\n\r\n._689c2b37 .param {\r\n\theight: 2rem;\r\n\twidth: 13rem;\r\n\tmargin-right: 5rem;\r\n\tfloat: left;\r\n}\r\n\r\n@media (max-width: 42rem) {\r\n\t._689c2b37 .param {\r\n\t\twidth: 100%;\r\n\t\tfloat: none;\r\n\t\tmargin-bottom: .5rem;\r\n\t}\r\n}\r\n\r\n._689c2b37 .param-label {\r\n\tfont-size: .75rem;\r\n\tdisplay: inline-block;\r\n\twidth: 33.3%;\r\n\tline-height: 2rem;\r\n\theight: 2rem;\r\n\tvertical-align: top;\r\n}\r\n._689c2b37 .param-input {\r\n\twidth: 66.6%;\r\n\theight: 2rem;\r\n\tcolor: inherit;\r\n\tborder: 0;\r\n\tpadding: 0 0;\r\n\tmargin: 0;\r\n\tfont-size: 1rem;\r\n\tbackground: none;\r\n\t/*border-radius: 0;*/\r\n\t/*appearance: none;*/\r\n\t/*-webkit-appearance: none;*/\r\n}\r\n._689c2b37 .param-range::-webkit-slider-thumb,\r\n._689c2b37 .param-range::-moz-range-thumb {\r\n\twidth: 2rem;\r\n\theight: 2rem;\r\n}\r\n._689c2b37 .param-checkbox {\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tmargin-top: .25rem;\r\n}\r\n@media (max-width: 42rem) {\r\n\t._689c2b37 .param-checkbox {\r\n\t\tborder: 1px solid;\r\n\t}\r\n}\r\n\r\n._689c2b37 .param-select {\r\n}\r\n\r\n._689c2b37 .param-range {\r\n}") || true) && "_689c2b37");
 
 var raf = require('raf');
 var now = require('right-now');
@@ -5529,6 +8464,8 @@ var isMobile = require('is-mobile')();
 var xhr = require('xhr');
 var isUrl = require('is-url');
 var ctx = require('audio-context');
+var Draggable = require('draggy');
+var isPlainObject = require('mutype/is-object');
 
 module.exports = StartApp;
 
@@ -5559,6 +8496,7 @@ function StartApp (opts, cb) {
 	this.styleEl = document.createElement('style');
 	(document.head || document.documentElement).appendChild(this.styleEl);
 
+	if (!this.color) this.color = getComputedStyle(this.container).color;
 	this.setColor(this.color);
 
 	//add mobile metas
@@ -5672,6 +8610,7 @@ function StartApp (opts, cb) {
 
 			self.emit('ready', self.micNode);
 			self.emit('source', streamUrl);
+			self.emit('play');
 		}
 		function errMic (err) {
 			self.hideInput();
@@ -5725,6 +8664,11 @@ function StartApp (opts, cb) {
 	}, 500)
 
 
+	//technical element for fps, params, info etc
+	this.statusEl = document.createElement('div');
+	this.statusEl.classList.add('status');
+	this.container.appendChild(this.statusEl);
+
 	//init fps
 	this.fpsEl = document.createElement('div');
 	this.fpsEl.classList.add('fps');
@@ -5732,7 +8676,7 @@ function StartApp (opts, cb) {
 	this.fpsEl.innerHTML = "\n\t\t<canvas class=\"fps-canvas\"></canvas>\n\t\t<span class=\"fps-text\">\n\t\t\tfps <span class=\"fps-value\">60.0</span>\n\t\t</span>\n\t";
 	this.fpsCanvas = this.fpsEl.querySelector('.fps-canvas');
 	var fpsValue = this.fpsValue = this.fpsEl.querySelector('.fps-value');
-	this.container.appendChild(this.fpsEl);
+	this.statusEl.appendChild(this.fpsEl);
 
 	var w = this.fpsCanvas.width = parseInt(getComputedStyle(this.fpsCanvas).width) || 1;
 	var h = this.fpsCanvas.height = parseInt(getComputedStyle(this.fpsCanvas).height) || 1;
@@ -5745,6 +8689,61 @@ function StartApp (opts, cb) {
 	var updatePeriod = 1000;
 	var maxFPS = 100;
 	var that = this;
+
+
+	//create params template
+	if (isPlainObject(this.params)) {
+		var params = [];
+		for (var name in this.params) {
+			this.params[name].name = name;
+			params.push(this.params[name]);
+		}
+		this.params = true;
+		this.paramsCollection = params;
+	}
+	else if (Array.isArray(this.params)){
+		this.paramsCollection = this.params;
+		this.params = true;
+	}
+	else {
+		this.paramsCollection = [];
+	}
+	this.paramsEl = document.createElement('div');
+	this.paramsEl.classList.add('params');
+	this.paramsEl.setAttribute('hidden', true);
+	this.paramsEl.innerHTML = "<a class=\"params-close\" href=\"#close-params\"><i class=\"icon-close\">✕</i></a>";
+	this.paramsCollection.forEach(function (opts) { return this$1.addParam(opts); });
+	this.container.appendChild(this.paramsEl);
+
+	//params button
+	this.paramsBtn = document.createElement('a');
+	this.paramsBtn.classList.add('params-button');
+	this.paramsBtn.href = '#params';
+	this.paramsBtn.innerHTML = "<i>" + (this.icons.settings) + "</i>";
+	this.paramsBtn.setAttribute('hidden', true);
+	this.statusEl.appendChild(this.paramsBtn);
+
+	this.paramsBtn.addEventListener('click', function () {
+		if (this$1.paramsEl.hasAttribute('hidden')) {
+			this$1.paramsEl.removeAttribute('hidden');
+		}
+		else {
+			this$1.paramsEl.setAttribute('hidden', true);
+		}
+	});
+	this.paramsEl.querySelector('.params-close').addEventListener('click', function () {
+		if (this$1.paramsEl.hasAttribute('hidden')) {
+			this$1.paramsEl.removeAttribute('hidden');
+		}
+		else {
+			this$1.paramsEl.setAttribute('hidden', true);
+		}
+	});
+
+	if (!isMobile) {
+		this.draggable = Draggable(this.paramsEl);
+	}
+
 
 	//enable update routine
 	raf(function measure () {
@@ -5844,11 +8843,15 @@ StartApp.prototype.icons = {
 	play: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M236.256 289.447c0-26.093 21.148-47.248 47.241-47.248 8.109 0 13.243 2.118 22.273 5.714l331.371 192.797c15.414 9.136 22.545 23.813 25.295 40.725v4.748c-2.758 16.904-9.891 31.585-25.295 40.725l-331.363 192.789c-9.045 3.604-14.179 5.706-22.273 5.706-26.093 0-47.241-21.155-47.241-47.248v-388.723z\"></path>\n</svg>\n",
 	pause: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M186.54 304.268c0-25.055 20.319-45.372 45.387-45.372h95.385c25.055 0 45.387 20.319 45.387 45.372v360.448c0 25.060-20.319 45.38-45.387 45.38h-95.385c-25.055 0-45.387-20.319-45.387-45.38v-360.448z\"></path>\n<path d=\"M446.44 304.268c0-25.055 20.319-45.372 45.359-45.372h95.387c25.055 0 45.364 20.319 45.364 45.372v360.448c0 25.060-20.312 45.38-45.364 45.38h-95.387c-25.050 0-45.364-20.319-45.364-45.38v-360.448z\"></path>\n</svg>\n",
 	stop: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M183.954 319.128c0-28.864 23.393-52.253 52.261-52.253h346.679c28.864 0 52.261 23.393 52.261 52.253v346.687c0 28.864-23.393 52.261-52.261 52.261h-346.679c-28.864 0-52.261-23.394-52.261-52.261v-346.687z\"></path>\n</svg>\n",
-	eject: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M631.487 257.578l-311.033 199.782c-8.736 5.828-12.814 14.564-12.814 23.879s4.078 18.053 12.814 23.879l311.612 200.361c18.642 12.235 43.68-1.166 43.68-23.879v-400.142c-0.579-22.718-25.050-36.114-44.27-23.879z\"></path>\n<path d=\"M249.975 252.331h-40.772c-31.457 0-57.083 25.629-57.083 57.083v343.648c0 31.457 25.629 57.083 57.083 57.083h40.772c31.457 0 57.083-25.629 57.083-57.083v-343.648c0-31.457-25.629-57.083-57.083-57.083z\"></path>\n</svg>\n"
+	eject: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M631.487 257.578l-311.033 199.782c-8.736 5.828-12.814 14.564-12.814 23.879s4.078 18.053 12.814 23.879l311.612 200.361c18.642 12.235 43.68-1.166 43.68-23.879v-400.142c-0.579-22.718-25.050-36.114-44.27-23.879z\"></path>\n<path d=\"M249.975 252.331h-40.772c-31.457 0-57.083 25.629-57.083 57.083v343.648c0 31.457 25.629 57.083 57.083 57.083h40.772c31.457 0 57.083-25.629 57.083-57.083v-343.648c0-31.457-25.629-57.083-57.083-57.083z\"></path>\n</svg>\n",
+	settings: "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Generated by IcoMoon.io -->\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"819\" height=\"1024\" viewBox=\"0 0 819 1024\">\n<g id=\"icomoon-ignore\">\n</g>\n<path d=\"M195.945 202.371h452.727c35.966 0 64.683 28.663 64.683 64.104 0 35.449-28.717 63.734-64.683 63.734h-452.727c-35.587 0-64.683-28.285-64.683-63.734s29.082-64.104 64.683-64.104v0z\"></path>\n<path d=\"M197.089 415.455h452.727c35.587 0 64.683 28.286 64.683 63.726 0 35.449-29.088 64.129-64.683 64.129h-452.727c-35.968 0-64.675-28.67-64.675-64.129 0-35.449 28.705-63.726 64.675-63.726v0z\"></path>\n<path d=\"M196.324 628.158h452.727c35.966 0 64.683 28.663 64.683 64.1 0 35.068-28.717 63.754-64.683 63.754h-452.727c-35.968 0-64.675-28.682-64.675-63.754 0-35.439 28.705-64.1 64.675-64.1v0z\"></path>\n</svg>\n"
 };
 
 //do mobile routines like meta, splashscreen etc
 StartApp.prototype.mobile = true;
+
+//show params button
+StartApp.prototype.params = true;
 
 
 /**
@@ -5948,6 +8951,12 @@ StartApp.prototype.update = function (opts) {
 		this.sourceIcon.setAttribute('hidden', true);
 	}
 
+	if (this.params) {
+		this.paramsBtn.removeAttribute('hidden');
+	} else {
+		this.paramsBtn.setAttribute('hidden', true);
+	}
+
 	return this;
 };
 
@@ -5965,12 +8974,19 @@ StartApp.prototype.setColor = function (color) {
 		var values = parsed.values;
 	}
 	this.colorValues = values;
+
+	var yiq = (values[0] * 299 + values[1] * 587 + values[2] * 114) / (1000);
+	var isDark = yiq < 128;
+
+	var inverseValues = values.map(function (v) { return 255 - v; }).map(function (v) { return v * ( !isDark ? .2 : 1.8); }).map(function (v) { return Math.max(Math.min(v, 255), 0); }).map(function (v) { return !isDark ? v*.2 : 255*.8+v*.2; });
 	this.color = "rgba(" + (values.join(', ')) + ", " + (parsed.alpha) + ")";
-	this.inverseColor = "rgba(" + (values.map(function (v) { return 255 - v; }).join(', ')) + ", " + (parsed.alpha) + ")";
+	this.inverseColor = "rgba(" + (inverseValues.map(function ( v ) { return v.toFixed(0); }).join(', ')) + ", " + (parsed.alpha) + ")";
 	this.transparentColor = "rgba(" + (values.join(', ')) + ", 0.1)";
 	this.semiTransparentColor = "rgba(" + (values.join(', ')) + ", 0.25)";
 
-	this.styleEl.innerHTML = "\n\t\t." + className + " {\n\t\t\tcolor: " + (this.color) + ";\n\t\t}\n\t\t." + className + " .source-input,\n\t\t." + className + " .source-link\n\t\t{\n\t\t\tbox-shadow: 0 2px " + (this.semiTransparentColor) + ";\n\t\t}\n\t\t." + className + " .source-input:focus,\n\t\t." + className + " .source-link:hover\n\t\t{\n\t\t\tbox-shadow: 0 2px " + (this.color) + ";\n\t\t}\n\n\t\t::selection{\n\t\t\tbackground: " + (this.semiTransparentColor) + ";\n\t\t\tcolor: " + (this.inverseColor) + ";\n\t\t}\n\t\t::-moz-selection{\n\t\t\tbackground: " + (this.semiTransparentColor) + ";\n\t\t\tcolor: " + (this.inverseColor) + ";\n\t\t}\n\n\t\t." + className + " .fps-canvas { background:" + (this.transparentColor) + "; }\n\n\t\t::-moz-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\tinput:-moz-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\t:-ms-input-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\t::-webkit-input-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t";
+	var semiTransparentInverseColor = "rgba(" + (inverseValues.map(function ( v ) { return v.toFixed(0); }).join(', ')) + ", .75)";
+
+	this.styleEl.innerHTML = "\n\t\t." + className + " {\n\t\t\tcolor: " + (this.color) + ";\n\t\t}\n\t\t." + className + " .source-input,\n\t\t." + className + " .source-link\n\t\t{\n\t\t\tbox-shadow: 0 2px " + (this.semiTransparentColor) + ";\n\t\t}\n\t\t." + className + " .source-input:focus,\n\t\t." + className + " .source-link:hover\n\t\t{\n\t\t\tbox-shadow: 0 2px " + (this.color) + ";\n\t\t}\n\n\t\t." + className + " .params {\n\t\t\tbackground: linear-gradient(to bottom, rgba(" + (inverseValues.map(function ( v ) { return v.toFixed(0); }).join(', ')) + ", .5), rgba(" + (inverseValues.map(function ( v ) { return v.toFixed(0); }).join(', ')) + ", .75));\n\t\t}\n\n\t\t." + className + " .params-button {\n\t\t\tcolor: " + (this.color) + "\n\t\t}\n\n\t\t::selection{\n\t\t\tbackground: " + (this.semiTransparentColor) + ";\n\t\t\tcolor: " + (this.inverseColor) + ";\n\t\t}\n\t\t::-moz-selection{\n\t\t\tbackground: " + (this.semiTransparentColor) + ";\n\t\t\tcolor: " + (this.inverseColor) + ";\n\t\t}\n\n\t\t." + className + " .fps-canvas { background:" + (this.transparentColor) + "; }\n\n\t\t::-moz-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\tinput:-moz-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\t:-ms-input-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t\t::-webkit-input-placeholder { color:" + (this.semiTransparentColor) + "; }\n\t";
 
 	return this;
 };
@@ -6235,7 +9251,138 @@ StartApp.prototype.reset = function () {
 StartApp.prototype.getTime = function (time) {
 	return pad((time / 60)|0, 2, 0) + ':' + pad((time % 60)|0, 2, 0);
 }
-},{"audio-context":16,"color-parse":20,"color-space/hsl":21,"events":4,"inherits":36,"insert-css":37,"is-mobile":40,"is-url":41,"left-pad":42,"raf":54,"right-now":55,"xhr":60,"xtend/mutable":63}],58:[function(require,module,exports){
+
+
+/** Create param based off options */
+StartApp.prototype.addParam = function (name, opts, cb) {
+	if (isPlainObject(name)) {
+		cb = opts;
+		opts = name;
+		name = opts.name;
+	}
+	if (opts instanceof Function) {
+		cb = opts;
+		opts = {};
+	}
+
+	if (!isPlainObject(opts)) {
+		opts = {value: opts}
+	}
+
+	if (typeof name === 'string') {
+		opts.name = name;
+	}
+
+	var type = opts.type || 'text';
+	cb = cb || opts.change || opts.cb;
+
+	var el = document.createElement('div');
+	el.classList.add('param');
+	var title = opts.name.slice(0,1).toUpperCase() + opts.name.slice(1);
+	var name = opts.name.toLowerCase();
+	name = name.replace(/\s/g, '-');
+	el.innerHTML = "<label for=\"" + name + "\" class=\"param-label\">" + title + "</label>";
+
+	if (!opts.type) {
+		if (opts.values) {
+			opts.type = 'select';
+		}
+		else if (opts.min || opts.max || opts.step || typeof opts.value === 'number') {
+			opts.type = 'range';
+		}
+		else if (typeof opts.value === 'boolean') {
+			opts.type = 'checkbox';
+		}
+	}
+
+	switch (opts.type) {
+		case 'select':
+			opts = extend({
+				values: {},
+				name: 'noname-select'
+			}, opts);
+			var html = "<select\n\t\t\t\tid=\"" + name + "\" class=\"param-input param-select\" title=\"" + (opts.value) + "\">";
+			if (Array.isArray(opts.values)) {
+				for (var i = 0; i < opts.values.length; i++) {
+					html += "<option value=\"" + (opts.values[i]) + "\" " + (opts.values[i] === opts.value ? 'selected' : '') + ">" + (opts.values[i]) + "</option>"
+				}
+			}
+			else {
+				for (var name in opts.values) {
+					html += "<option value=\"" + (opts.values[name]) + "\" " + (opts.values[name] === opts.value ? 'selected' : '') + ">" + name + "</option>"
+				}
+			}
+			html += "</select>";
+
+			el.innerHTML +=	html;
+			break;
+
+		case 'range':
+			opts = extend({
+				min: 0,
+				max: 1,
+				step: 0.01,
+				value: .5,
+				name: 'noname-range'
+			}, opts);
+			el.innerHTML += "<input\n\t\t\t\tid=\"" + (opts.name) + "\" type=\"range\" class=\"param-input param-range\" value=\"" + (opts.value) + "\" min=\"" + (opts.min) + "\" max=\"" + (opts.max) + "\" step=\"" + (opts.step) + "\" title=\"" + (opts.value) + "\"/>\n\t\t\t";
+			break;
+
+
+		case 'checkbox':
+			opts = extend({
+				value: false,
+				name: 'noname-checkbox'
+			}, opts);
+			el.innerHTML += "<input\n\t\t\t\tid=\"" + (opts.name) + "\" type=\"checkbox\" class=\"param-input param-checkbox\" title=\"" + (opts.value) + "\" " + (opts.value ? 'checked' : '') + "/>\n\t\t\t";
+			break;
+
+		case 'number':
+			opts = extend({
+				min: 0,
+				max: 1,
+				step: 0.01,
+				value: .5,
+				name: 'noname-number'
+			}, opts);
+			el.innerHTML += "<input\n\t\t\t\tid=\"" + (opts.name) + "\" type=\"number\" class=\"param-input param-number\" value=\"" + (opts.value) + "\" min=\"" + (opts.min) + "\" max=\"" + (opts.max) + "\" step=\"" + (opts.step) + "\" title=\"" + (opts.value) + "\"/>\n\t\t\t";
+			break;
+
+		default:
+			opts = extend({
+				name: 'noname-text',
+				value: ''
+			}, opts);
+			el.innerHTML += "<input placeholder=\"value...\" id=\"" + (opts.name) + "\" class=\"param-input param-text\" value=\"" + (opts.value) + "\" title=\"" + (opts.value) + "\"/>\n\t\t\t";
+			break;
+
+	}
+
+	opts.element = el;
+
+	var self = this;
+	el.querySelector('input, select').addEventListener('input', change);
+	el.querySelector('input, select').addEventListener('change', change);
+
+	function change () {
+		var v = this.type === 'checkbox' ? this.checked : this.value;
+		this.title = v;
+		cb && cb(v);
+		self.emit('change', opts.name, v, opts);
+	};
+
+	this.paramsEl.appendChild(el);
+
+	return el;
+};
+
+//return value of defined param
+StartApp.prototype.getParamValue = function (name) {
+	var el = this.paramsEl.querySelector('#' + name.toLowerCase());
+
+	return el && el.type === 'checkbox' ? el.checked : el && el.value;
+}
+},{"audio-context":19,"color-parse":23,"color-space/hsl":24,"draggy":32,"events":4,"inherits":49,"insert-css":50,"is-mobile":54,"is-url":56,"left-pad":58,"mutype/is-object":85,"raf":103,"right-now":104,"xhr":111,"xtend/mutable":114}],109:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
     module.exports = window;
@@ -6248,7 +9395,7 @@ if (typeof window !== "undefined") {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],59:[function(require,module,exports){
+},{}],110:[function(require,module,exports){
 module.exports = once
 
 once.proto = once(function () {
@@ -6269,7 +9416,7 @@ function once (fn) {
   }
 }
 
-},{}],60:[function(require,module,exports){
+},{}],111:[function(require,module,exports){
 "use strict";
 var window = require("global/window")
 var once = require("once")
@@ -6490,7 +9637,7 @@ function _createXHR(options) {
 
 function noop() {}
 
-},{"global/window":58,"is-function":39,"once":59,"parse-headers":50,"xtend":62}],61:[function(require,module,exports){
+},{"global/window":109,"is-function":53,"once":110,"parse-headers":90,"xtend":113}],112:[function(require,module,exports){
 
 exports = module.exports = trim;
 
@@ -6506,7 +9653,7 @@ exports.right = function(str){
   return str.replace(/\s*$/, '');
 };
 
-},{}],62:[function(require,module,exports){
+},{}],113:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -6529,7 +9676,7 @@ function extend() {
     return target
 }
 
-},{}],63:[function(require,module,exports){
+},{}],114:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -6550,7 +9697,7 @@ function extend(target) {
     return target
 }
 
-},{}],64:[function(require,module,exports){
+},{}],115:[function(require,module,exports){
 // var test = require('tst');
 // var Formant = require('audio-formant');
 // var Speaker = require('audio-speaker');
@@ -6576,6 +9723,7 @@ var app = startApp({
 	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	source: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	params: true
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// source: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// source: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
@@ -6618,10 +9766,14 @@ for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 // .map((v, i) => v*blackman(i, noise.length))
 // .map((v) => db.fromGain(v));
 
+var colormaps = [];
+for (var name in colorScales) colormaps.push(name);
+var colormap = colormaps[(Math.random() * colormaps.length) | 0];
+
 var spectrum = new Spectrum({
 	// autostart: false,
 	// frequencies: frequencies,
-	fill: 'inferno',
+	fill: colormap,
 	grid: true,
 	minFrequency: 40,
 	maxFrequency: 20000,
@@ -6686,139 +9838,94 @@ createColormapSelector(spectrum);
 
 
 function createColormapSelector (spectrum) {
-	var container = document.createElement('div');
-	container.style.position = 'fixed';
-	container.style.bottom = '0';
-	container.style.left = '0';
-	container.style.right = '0';
-	container.style.padding = '.5rem .75rem';
-	container.style.border = '0';
-	container.style.zIndex = 999;
-	container.style.lineHeight = '1.5rem';
-	container.style.fontSize = '.8rem';
-	document.body.appendChild(container);
-
-	//append style switcher
-	var switcher = document.createElement('select');
-	switcher.classList.add('colormap');
-	switcher.style.width = '4rem';
-	switcher.style.color = 'inherit';
-	switcher.style.fontSize = '.8rem';
-	switcher.style.border = '0';
-	switcher.style.background = 'none';
-	switcher.title = 'Colormap';
-	var html = '';
-	for (var name in colorScales ) {
-		if (name === 'alpha') continue;
-		html += "<option value=\"" + name + "\"" + ((name === 'inferno') ? 'selected' : '') + ">" + name + "</option>"
-	}
-	switcher.innerHTML = html;
-	switcher.addEventListener('input', function () {
-		spectrum.setFill(switcher.value, inverseCheckbox.checked);
-		updateView();
+	app.addParam('colormap', {
+		values: colormaps,
+		value: colormap,
+		change: function (value, state) {
+			spectrum.setFill(value, app.getParamValue('inversed'));
+			updateView();
+		}
 	});
-	container.appendChild(switcher);
 
 
 	//inversed colormap checkbox
-	var inverseSwitch = createSwitch('inversed', function () {
-		spectrum.setFill(switcher.value, this.checked);
-		updateView();
+	app.addParam('inversed', {
+		value: !!spectrum.inversed,
+		change: function (value) {
+			spectrum.setFill(app.getParamValue('colormap'), value);
+			updateView();
+		}
 	});
-	var inverseCheckbox = inverseSwitch.querySelector('input');
-	container.appendChild(inverseSwitch);
 
 
 	//weighting switcher
-	var weightingEl = document.createElement('select');
-	weightingEl.classList.add('weighting');
-	weightingEl.style.width = '4rem';
-	weightingEl.style.border = '0';
-	weightingEl.style.color = 'inherit';
-	weightingEl.style.marginRight = '1rem';
-	weightingEl.style.fontSize = '.8rem';
-	weightingEl.style.background = 'none';
-	weightingEl.title = 'Noise weighting';
-	weightingEl.innerHTML = "\n\t\t<option value=\"a\">A</option>\n\t\t<option value=\"b\">B</option>\n\t\t<option value=\"c\">C</option>\n\t\t<option value=\"d\">D</option>\n\t\t<option value=\"itu\" selected>ITU</option>\n\t\t<option value=\"z\">Z (none)</option>\n\t";
-	weightingEl.addEventListener('input', function () {
-		spectrum.weighting = weightingEl.value;
-
-		updateView();
+	app.addParam('weighting', {
+		values: {
+			A: 'a',
+			B: 'b',
+			C: 'c',
+			D: 'd',
+			ITU: 'itu',
+			Z: 'z'
+		},
+		value: spectrum.weighting,
+		change: function (value) {
+			spectrum.weighting = value;
+			updateView();
+		}
 	});
-	container.appendChild(weightingEl);
 
 
 	//logarithmic
-	var logSwitch = createSwitch('log', function () {
-		spectrum.logarithmic = this.checked;
-		updateView();
+	app.addParam('log', {
+		value: spectrum.logarithmic,
+		change: function (v) {
+			spectrum.logarithmic = v;
+			updateView();
+		}
 	});
-	var logCheckbox = logSwitch.querySelector('input');
-	logCheckbox.checked = true;
-	container.appendChild(logSwitch);
 
-
-	//align slider
-	var alignEl = createSlider('align', function (v) {
+	app.addParam('align', spectrum.align, function (v) {
 		spectrum.align = v;
 		updateView();
 	});
-	container.appendChild(alignEl);
 
-
-	//grid colormap checkbox
-	var gridSwitch = createSwitch('grid', function () {
-		spectrum.grid = this.checked;
+	app.addParam('grid', spectrum.grid, function (v) {
+		spectrum.grid = v;
 		updateView();
 	});
-	var gridCheckbox = gridSwitch.querySelector('input');
-	gridCheckbox.checked = spectrum.grid;
-	container.appendChild(gridSwitch);
 
-
-	//mask checkbox
-	var maskSwitch = createSwitch('mask', function () {
-		spectrum.setMask(this.checked ? createMask(10, 10) : null);
+	app.addParam('mask', !!spectrum.mask, function (v) {
+		spectrum.setMask(v ? createMask(10, 10) : null);
 		updateView();
 	});
-	var maskCb = maskSwitch.querySelector('input');
-	maskCb.checked = true;
-	container.appendChild(
-		maskSwitch
-	);
 
-	//group size
-	var groupEl = createSlider({name: 'group', min: 0, max: 50, step: 1, value: spectrum.group}, function (v) {
+	app.addParam('group', {
+		min: 0,
+		max: 50,
+		step: 1,
+		value: spectrum.group
+	}, function (v) {
 		spectrum.group = v;
 		updateView();
 	});
-	container.appendChild(groupEl);
 
-
-	//trail slider
-	var trailEl = createSlider({
+	app.addParam('trail', {
 		min: 0,
 		max: 50,
-		value: spectrum.trail,
-		name: 'trail'
+		step: 1,
+		value: spectrum.trail
 	}, function (v) {
 		spectrum.trail = v;
 		updateView();
 	});
-	container.appendChild(trailEl);
 
-
-	//smoothing slider
-	var smoothingEl = createSlider({
-		min: 0,
-		max: 1,
-		value: spectrum.smoothing,
-		name: 'smoothing'
-	}, function (v) {
-		spectrum.smoothing = v;
-		updateView();
+	app.addParam('smoothing',
+		spectrum.smoothing,
+		function (v) {
+			spectrum.smoothing = v;
+			updateView();
 	});
-	container.appendChild(smoothingEl);
 
 
 	updateView();
@@ -6831,59 +9938,6 @@ function createColormapSelector (spectrum) {
 	}
 }
 
-
-
-function createSwitch (name, cb) {
-	var switcher = document.createElement('label');
-	switcher.innerHTML = "\n\t\t<input type=\"checkbox\" id=\"" + name + "\"/>\n\t\t" + name + "\n\t";
-	checkbox = switcher.querySelector('input');
-	checkbox.setAttribute('type', 'checkbox');
-	checkbox.style.width = '1rem';
-	checkbox.style.height = '1rem';
-	checkbox.style.verticalAlign = 'middle';
-	checkbox.style.fontSize = '.8rem';
-
-	switcher.style.fontSize = '.8rem';
-	switcher.style.verticalAlign = 'middle';
-	switcher.style.height = '1rem';
-	switcher.classList.add(name + '-switcher');
-	switcher.style.margin = '0 .5rem 0 0';
-	switcher.style.border = '0';
-	switcher.style.background = 'none';
-	switcher.style.color = 'inherit';
-	switcher.title = name;
-	checkbox.addEventListener('click', cb);
-
-	return switcher;
-}
-
-
-function createSlider (opts, cb) {
-	opts = (typeof opts === 'string') ? {name: opts} : opts ? opts : {};
-	var sliderEl = document.createElement('input');
-	var title = opts.name.slice(0,1).toUpperCase() + opts.name.slice(1);
-	sliderEl.type = 'range';
-	sliderEl.min = opts.min || 0;
-	sliderEl.max = opts.max || 1;
-	sliderEl.step = opts.step || 0.01;
-	sliderEl.value = opts.value || 0.5;
-	sliderEl.classList.add(opts.name);
-	sliderEl.style.width = '5rem';
-	sliderEl.style.height = '1rem';
-	sliderEl.style.border = '0';
-	sliderEl.style.color = 'inherit';
-	sliderEl.style.fontSize = '.8rem';
-	sliderEl.style.margin = '0 1rem 0 0';
-	sliderEl.style.verticalAlign = 'middle';
-	sliderEl.style.background = 'none';
-	sliderEl.title = title + ': ' + sliderEl.value;
-	sliderEl.addEventListener('input', function () {
-		var v = parseFloat(sliderEl.value);
-		sliderEl.title = title + ': ' + v;
-		cb(v);
-	});
-	return sliderEl;
-}
 
 
 //create mask
@@ -6915,4 +9969,4 @@ function createMask (w, h) {
 	return canvas;
 }
 
-},{"./":7,"audio-context":16,"colormap/colorScales":23,"decibels":26,"fourier-transform":31,"is-browser":38,"scijs-window-functions/blackman-harris":56,"start-app":57}]},{},[64]);
+},{"./":7,"audio-context":19,"colormap/colorScales":26,"decibels":29,"fourier-transform":40,"is-browser":52,"scijs-window-functions/blackman-harris":105,"start-app":108}]},{},[115]);
