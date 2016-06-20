@@ -20,22 +20,20 @@ var spectrum = new Spectrum({
 	//decibels data, -100...0
 	frequencies: frequenciesData,
 
-	//magnitude range to show
+	//audio settings
 	maxDecibels: -30,
 	minDecibels: -100,
-
-	//frequency range
 	maxFrequency: 20000,
 	minFrequency: 20,
 	sampleRate: 44100,
+
+	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
+	weighting: 'itu',
 
 	//draw frequency/decibels grid
 	grid: true,
 	axes: false,
 	logarithmic: true,
-
-	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
-	weighting: 'itu',
 
 	//rendering settings
 	smoothing: 0.5,

@@ -23,6 +23,7 @@ var app = startApp({
 	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	source: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	params: true
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// source: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// source: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
@@ -65,10 +66,14 @@ for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 // .map((v, i) => v*blackman(i, noise.length))
 // .map((v) => db.fromGain(v));
 
+var colormaps = [];
+for (var name in colorScales) colormaps.push(name);
+var colormap = colormaps[(Math.random() * colormaps.length) | 0];
+
 var spectrum = new Spectrum({
 	// autostart: false,
 	// frequencies: frequencies,
-	fill: 'inferno',
+	fill: colormap,
 	grid: true,
 	minFrequency: 40,
 	maxFrequency: 20000,
@@ -133,146 +138,94 @@ createColormapSelector(spectrum);
 
 
 function createColormapSelector (spectrum) {
-	var container = document.createElement('div');
-	container.style.position = 'fixed';
-	container.style.bottom = '0';
-	container.style.left = '0';
-	container.style.right = '0';
-	container.style.padding = '.5rem .75rem';
-	container.style.border = '0';
-	container.style.zIndex = 999;
-	container.style.lineHeight = '1.5rem';
-	container.style.fontSize = '.8rem';
-	document.body.appendChild(container);
-
-	//append style switcher
-	var switcher = document.createElement('select');
-	switcher.classList.add('colormap');
-	switcher.style.width = '4rem';
-	switcher.style.color = 'inherit';
-	switcher.style.fontSize = '.8rem';
-	switcher.style.border = '0';
-	switcher.style.background = 'none';
-	switcher.title = 'Colormap';
-	var html = '';
-	for (var name in colorScales ) {
-		if (name === 'alpha') continue;
-		html += `<option value="${name}"${(name === 'inferno') ? 'selected' : ''}>${name}</option>`
-	}
-	switcher.innerHTML = html;
-	switcher.addEventListener('input', function () {
-		spectrum.setFill(switcher.value, inverseCheckbox.checked);
-		updateView();
+	app.addParam('colormap', {
+		values: colormaps,
+		value: colormap,
+		change: (value, state) => {
+			spectrum.setFill(value, app.getParamValue('inversed'));
+			updateView();
+		}
 	});
-	container.appendChild(switcher);
 
 
 	//inversed colormap checkbox
-	var inverseSwitch = createSwitch('inversed', function () {
-		spectrum.setFill(switcher.value, this.checked);
-		updateView();
+	app.addParam('inversed', {
+		value: !!spectrum.inversed,
+		change: (value) => {
+			spectrum.setFill(app.getParamValue('colormap'), value);
+			updateView();
+		}
 	});
-	var inverseCheckbox = inverseSwitch.querySelector('input');
-	container.appendChild(inverseSwitch);
 
 
 	//weighting switcher
-	var weightingEl = document.createElement('select');
-	weightingEl.classList.add('weighting');
-	weightingEl.style.width = '4rem';
-	weightingEl.style.border = '0';
-	weightingEl.style.color = 'inherit';
-	weightingEl.style.marginRight = '1rem';
-	weightingEl.style.fontSize = '.8rem';
-	weightingEl.style.background = 'none';
-	weightingEl.title = 'Noise weighting';
-	weightingEl.innerHTML = `
-		<option value="a">A</option>
-		<option value="b">B</option>
-		<option value="c">C</option>
-		<option value="d">D</option>
-		<option value="itu" selected>ITU</option>
-		<option value="z">Z (none)</option>
-	`;
-	weightingEl.addEventListener('input', function () {
-		spectrum.weighting = weightingEl.value;
-
-		updateView();
+	app.addParam('weighting', {
+		values: {
+			A: 'a',
+			B: 'b',
+			C: 'c',
+			D: 'd',
+			ITU: 'itu',
+			Z: 'z'
+		},
+		value: spectrum.weighting,
+		change: (value) => {
+			spectrum.weighting = value;
+			updateView();
+		}
 	});
-	container.appendChild(weightingEl);
 
 
 	//logarithmic
-	var logSwitch = createSwitch('log', function () {
-		spectrum.logarithmic = this.checked;
-		updateView();
+	app.addParam('log', {
+		value: spectrum.logarithmic,
+		change: (v) => {
+			spectrum.logarithmic = v;
+			updateView();
+		}
 	});
-	var logCheckbox = logSwitch.querySelector('input');
-	logCheckbox.checked = true;
-	container.appendChild(logSwitch);
 
-
-	//align slider
-	var alignEl = createSlider('align', function (v) {
+	app.addParam('align', spectrum.align, (v) => {
 		spectrum.align = v;
 		updateView();
 	});
-	container.appendChild(alignEl);
 
-
-	//grid colormap checkbox
-	var gridSwitch = createSwitch('grid', function () {
-		spectrum.grid = this.checked;
+	app.addParam('grid', spectrum.grid, (v) => {
+		spectrum.grid = v;
 		updateView();
 	});
-	var gridCheckbox = gridSwitch.querySelector('input');
-	gridCheckbox.checked = spectrum.grid;
-	container.appendChild(gridSwitch);
 
-
-	//mask checkbox
-	var maskSwitch = createSwitch('mask', function () {
-		spectrum.setMask(this.checked ? createMask(10, 10) : null);
+	app.addParam('mask', !!spectrum.mask, (v) => {
+		spectrum.setMask(v ? createMask(10, 10) : null);
 		updateView();
 	});
-	var maskCb = maskSwitch.querySelector('input');
-	maskCb.checked = true;
-	container.appendChild(
-		maskSwitch
-	);
 
-	//group size
-	var groupEl = createSlider({name: 'group', min: 0, max: 50, step: 1, value: spectrum.group}, function (v) {
+	app.addParam('group', {
+		min: 0,
+		max: 50,
+		step: 1,
+		value: spectrum.group
+	}, (v) => {
 		spectrum.group = v;
 		updateView();
 	});
-	container.appendChild(groupEl);
 
-
-	//trail slider
-	var trailEl = createSlider({
+	app.addParam('trail', {
 		min: 0,
 		max: 50,
-		value: spectrum.trail,
-		name: 'trail'
-	}, function (v) {
+		step: 1,
+		value: spectrum.trail
+	}, (v) => {
 		spectrum.trail = v;
 		updateView();
 	});
-	container.appendChild(trailEl);
 
-
-	//smoothing slider
-	var smoothingEl = createSlider({
-		min: 0,
-		max: 1,
-		value: spectrum.smoothing,
-		name: 'smoothing'
-	}, function (v) {
-		spectrum.smoothing = v;
-		updateView();
+	app.addParam('smoothing',
+		spectrum.smoothing,
+		(v) => {
+			spectrum.smoothing = v;
+			updateView();
 	});
-	container.appendChild(smoothingEl);
 
 
 	updateView();
@@ -285,62 +238,6 @@ function createColormapSelector (spectrum) {
 	}
 }
 
-
-
-function createSwitch (name, cb) {
-	var switcher = document.createElement('label');
-	switcher.innerHTML = `
-		<input type="checkbox" id="${name}"/>
-		${name}
-	`;
-	checkbox = switcher.querySelector('input');
-	checkbox.setAttribute('type', 'checkbox');
-	checkbox.style.width = '1rem';
-	checkbox.style.height = '1rem';
-	checkbox.style.verticalAlign = 'middle';
-	checkbox.style.fontSize = '.8rem';
-
-	switcher.style.fontSize = '.8rem';
-	switcher.style.verticalAlign = 'middle';
-	switcher.style.height = '1rem';
-	switcher.classList.add(name + '-switcher');
-	switcher.style.margin = '0 .5rem 0 0';
-	switcher.style.border = '0';
-	switcher.style.background = 'none';
-	switcher.style.color = 'inherit';
-	switcher.title = name;
-	checkbox.addEventListener('click', cb);
-
-	return switcher;
-}
-
-
-function createSlider (opts, cb) {
-	opts = (typeof opts === 'string') ? {name: opts} : opts ? opts : {};
-	var sliderEl = document.createElement('input');
-	var title = opts.name.slice(0,1).toUpperCase() + opts.name.slice(1);
-	sliderEl.type = 'range';
-	sliderEl.min = opts.min || 0;
-	sliderEl.max = opts.max || 1;
-	sliderEl.step = opts.step || 0.01;
-	sliderEl.value = opts.value || 0.5;
-	sliderEl.classList.add(opts.name);
-	sliderEl.style.width = '5rem';
-	sliderEl.style.height = '1rem';
-	sliderEl.style.border = '0';
-	sliderEl.style.color = 'inherit';
-	sliderEl.style.fontSize = '.8rem';
-	sliderEl.style.margin = '0 1rem 0 0';
-	sliderEl.style.verticalAlign = 'middle';
-	sliderEl.style.background = 'none';
-	sliderEl.title = title + ': ' + sliderEl.value;
-	sliderEl.addEventListener('input', function () {
-		var v = parseFloat(sliderEl.value);
-		sliderEl.title = title + ': ' + v;
-		cb(v);
-	});
-	return sliderEl;
-}
 
 
 //create mask
