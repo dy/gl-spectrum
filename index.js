@@ -2464,6 +2464,23 @@ Spectrum.prototype.update = function () {
 
 	var gl = this.gl;
 
+	//fix values
+	if (typeof this.trail === 'string') {
+		this.trail = parseInt(this.trail);
+	}
+
+	if (typeof this.smoothing === 'string') {
+		this.smoothing = parseFloat(this.smoothing);
+	}
+
+	if (typeof this.align === 'string') {
+		this.align = parseFloat(this.align);
+	}
+
+	if (typeof this.group === 'string') {
+		this.group = parseInt(this.group);
+	}
+
 	//create grid, if not created yet
 	if (this.grid) {
 		if (!this.freqGridComponent) {
@@ -2588,7 +2605,9 @@ Spectrum.prototype.update = function () {
 	}
 
 	//preset trail buffer
-	if (this.trail === true) this.trail = Spectrum.prototype.trail;
+	if (this.trail === true) {
+		this.trail = Spectrum.prototype.trail;
+	}
 
 	//update verteces
 	this.recalc();
@@ -9916,7 +9935,7 @@ function createColormapSelector (spectrum) {
 		step: 1,
 		value: spectrum.trail
 	}, function (v) {
-		spectrum.trail = v;
+		spectrum.trail = parseFloat(v);
 		updateView();
 	});
 
