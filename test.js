@@ -216,7 +216,7 @@ function createColormapSelector (spectrum) {
 		step: 1,
 		value: spectrum.trail
 	}, (v) => {
-		spectrum.trail = v;
+		spectrum.trail = parseFloat(v);
 		updateView();
 	});
 
