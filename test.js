@@ -11,6 +11,7 @@ var db = require('decibels');
 var colorScales = require('colormap/colorScales');
 var startApp = require('start-app');
 var ctx = require('audio-context');
+var isMobile = require('is-mobile')();
 // var createAudioContext = require('ios-safe-audio-context')
 
 
@@ -18,12 +19,12 @@ var app = startApp({
 	context: ctx,
 	color: '#E86F56',
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
-	autoplay: true,
 	// source: './Liwei.mp3',
 	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
-	source: 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
-	params: true
+	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	params: true,
+	github: 'audio-lab/gl-spectrum'
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// source: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// source: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
@@ -36,7 +37,7 @@ analyser.frequencyBinCount = 2048;
 analyser.smoothingTimeConstant = .1;
 analyser.connect(ctx.destination);
 
-app.on('ready', function (node) {
+app.on('source', function (node) {
 	source = node;
 	source.connect(analyser);
 });
@@ -150,7 +151,7 @@ function createColormapSelector (spectrum) {
 
 	//inversed colormap checkbox
 	app.addParam('inversed', {
-		value: !!spectrum.inversed,
+		value: false,
 		change: (value) => {
 			spectrum.setFill(app.getParamValue('colormap'), value);
 			updateView();
