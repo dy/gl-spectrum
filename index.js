@@ -6051,7 +6051,7 @@ var Emitter = require('events').EventEmitter;
 var inherits = require('inherits');
 var extend = require('xtend/mutable');
 var sf = 0;
-var className = ((require('insert-css')("._3571ef9f {\r\n\tmin-height: 100vh;\r\n\tmargin: 0;\r\n\tfont-family: sans-serif;\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._3571ef9f * {\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._3571ef9f a {\r\n\tcolor: inherit;\r\n}\r\n\r\n._3571ef9f [hidden] {\r\n\tdisplay: none!important;\r\n}\r\n\r\n._3571ef9f:after {\r\n\tcontent: '';\r\n}\r\n._3571ef9f.dragover:after {\r\n\tcontent: '⎗';\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tmargin: auto;\r\n\twidth: 20vh;\r\n\theight: 20vh;\r\n\tz-index: 2;\r\n\tfont-size: 20vh;\r\n\ttext-align: center;\r\n\tline-height: 20vh;\r\n\tdisplay: block;\r\n}\r\n\r\n._3571ef9f.dragover:before {\r\n\tcontent: '';\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tbottom: 0;\r\n\tmargin: 0;\r\n\tborder: .2rem dashed;\r\n\tz-index: 1;\r\n\tdisplay: block;\r\n}\r\n\r\n._3571ef9f.dragover .source {\r\n}\r\n\r\n._3571ef9f.dragover .audio-stop,._3571ef9f.dragover .audio-playback {\r\n\tdisplay: none;\r\n}\r\n\r\n._3571ef9f .source, ._3571ef9f .status {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tposition: fixed;\r\n\ttop: .75rem;\r\n\tleft: .75rem;\r\n\tdisplay: block;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\toutline: none;\r\n\tfill: currentColor;\r\n\tz-index: 999;\r\n}\r\n._3571ef9f .source-input {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tborder: 0;\r\n\tdisplay: inline;\r\n\tvertical-align: baseline;\r\n\tline-height: 1rem;\r\n\theight: 1rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\twidth: 82%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\tfont-weight: bolder;\r\n\toutline: none;\r\n\tbackground: none;\r\n\t-webkit-appearance: none;\r\n\tappearance: none;\r\n\tborder-radius: 0;\r\n\tbox-shadow: 0 2px;\r\n\tcolor: inherit;\r\n}\r\n._3571ef9f .source-input:focus{\r\n\toutline: none;\r\n}\r\n._3571ef9f .source-input-file {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\topacity: 0;\r\n\tborder: none;\r\n\tcursor: pointer;\r\n}\r\n._3571ef9f .source-input-url {\r\n\tfont-family: sans-serif;\r\n\tfont-weight: bold;\r\n\tmin-width: 40vw;\r\n}\r\n._3571ef9f .source-input-url:focus {\r\n}\r\n._3571ef9f input[type=file],\r\n._3571ef9f input[type=file]::-webkit-file-upload-button {\r\n\tcursor: pointer;\r\n}\r\n._3571ef9f i {\r\n\tfill: currentColor;\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tposition: relative;\r\n\tdisplay: inline-block;\r\n\tfont-style: normal;\r\n\tvertical-align: top;\r\n}\r\n._3571ef9f .source i {\r\n}\r\n._3571ef9f .source i svg {\r\n\tmargin-bottom: -.52rem;\r\n}\r\n._3571ef9f i svg {\r\n\tmax-width: 100%;\r\n\tmax-height: 100%;\r\n}\r\n._3571ef9f .source-link {\r\n\tposition: relative;\r\n\tfont-weight: bold;\r\n\ttext-decoration: none;\r\n\tbox-shadow: 0px 2px;\r\n\twhite-space: nowrap;\r\n\tcursor: pointer;\r\n}\r\n\r\n._3571ef9f .text-length-limiter {\r\n\tdisplay: inline-block;\r\n\tmax-width: 40vw;\r\n\tvertical-align: top;\r\n\twhite-space: nowrap;\r\n\ttext-overflow: ellipsis;\r\n\toverflow: hidden;\r\n}\r\n._3571ef9f .source-title {\r\n\tdisplay: inline;\r\n\tword-break: break-all;\r\n}\r\n\r\n._3571ef9f .status {\r\n\tleft: auto;\r\n\tright: .75rem;\r\n}\r\n\r\n._3571ef9f .fps {\r\n\tdisplay: inline-block;\r\n}\r\n\r\n._3571ef9f .fps-canvas {\r\n\theight: 1rem;\r\n\twidth: 2rem;\r\n\tdisplay: inline-block;\r\n\tmargin-right: .15rem;\r\n\tmargin-bottom: -.15rem;\r\n}\r\n\r\n._3571ef9f .fps-text {\r\n}\r\n\r\n._3571ef9f .fps-value {\r\n}\r\n\r\n._3571ef9f .params-button {\r\n    position: relative;\r\n    display: inline-block;\r\n    margin-left: .5rem;\r\n}\r\n._3571ef9f .github-link {\r\n\tz-index: 999;\r\n    position: fixed;\r\n    bottom: .75rem;\r\n    right: .75rem;\r\n    width: 1.5rem;\r\n    height: 1.5rem;\r\n    line-height: 1.5rem;\r\n}\r\n\r\n._3571ef9f .audio-playback, ._3571ef9f .audio-stop {\r\n\tdisplay: inline-block;\r\n}\r\n\r\n._3571ef9f .progress {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\theight: .2rem;\r\n\tbackground: currentColor;\r\n\ttransition: .1s linear width;\r\n\tz-index: 999;\r\n}\r\n\r\n@media (max-width: 42rem) {\r\n\t._3571ef9f .text-length-limiter {\r\n\t\tmax-width: 30%;\r\n\t}\r\n\t._3571ef9f .source {\r\n\t\tright: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n\t._3571ef9f .status {\r\n\t\ttop: auto;\r\n\t\tbottom: .75rem;\r\n\t\tright: .75rem;\r\n\t\tleft: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n}\r\n\r\n\r\n._3571ef9f .params {\r\n\tbackground: linear-gradient(to bottom, rgba(255,255,255,.75), white);\r\n\tposition: fixed;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tmargin: auto;\r\n\tpadding: .5rem 0 .5rem .75rem;\r\n\tline-height: 1.5;\r\n\tmax-height: 82vh;\r\n\tmax-width: 100%;\r\n\tz-index: 999;\r\n}\r\n._3571ef9f .params-close {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tright: 0;\r\n\theight: 2rem;\r\n\twidth: 2rem;\r\n\ttext-align: center;\r\n\tline-height: 2rem;\r\n\tfont-size: 1rem;\r\n}\r\n\r\n._3571ef9f .param {\r\n\theight: 2rem;\r\n\twidth: 15rem;\r\n\tmargin-right: 2.25rem;\r\n\tfloat: left;\r\n}\r\n\r\n@media (max-width: 42rem) {\r\n\t._3571ef9f .params {\r\n\t\tbottom: 2.5rem;\r\n\t\tpadding-right: 2.25rem;\r\n\t}\r\n\t._3571ef9f .param {\r\n\t\tmargin-right: 0;\r\n\t\twidth: 100%;\r\n\t\tfloat: none;\r\n\t}\r\n}\r\n\r\n._3571ef9f .param-label {\r\n\tfont-size: .75rem;\r\n\tdisplay: inline-block;\r\n\twidth: 33.3%;\r\n\tline-height: 2rem;\r\n\theight: 2rem;\r\n\tvertical-align: top;\r\n\ttext-align: right;\r\n\tpadding-right: 1rem;\r\n}\r\n._3571ef9f .param-input {\r\n\twidth: 66.6%;\r\n\theight: 2rem;\r\n\tcolor: inherit;\r\n\tborder: 0;\r\n\tpadding: 0 0;\r\n\tmargin: 0;\r\n\tfont-size: 1rem;\r\n\tbackground: none;\r\n\t/*border-radius: 0;*/\r\n\t/*appearance: none;*/\r\n\t/*-webkit-appearance: none;*/\r\n}\r\n._3571ef9f .param-range::-webkit-slider-thumb,\r\n._3571ef9f .param-range::-moz-range-thumb {\r\n\twidth: 2rem;\r\n\theight: 2rem;\r\n}\r\n._3571ef9f .param-checkbox {\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tmargin-top: .25rem;\r\n}\r\n@media (max-width: 42rem) {\r\n\t._3571ef9f .param-checkbox {\r\n\t\tborder: 1px solid;\r\n\t}\r\n}\r\n\r\n._3571ef9f .param-select {\r\n}\r\n\r\n._3571ef9f .param-range {\r\n}") || true) && "_3571ef9f");
+var className = ((require('insert-css')("._7996bfe6 {\r\n\tmin-height: 100vh;\r\n\tmargin: 0;\r\n\tfont-family: sans-serif;\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._7996bfe6 * {\r\n\tbox-sizing: border-box;\r\n}\r\n\r\n._7996bfe6 a {\r\n\tcolor: inherit;\r\n}\r\n\r\n._7996bfe6 [hidden] {\r\n\tdisplay: none!important;\r\n}\r\n\r\n._7996bfe6:after {\r\n\tcontent: '';\r\n}\r\n._7996bfe6.dragover:after {\r\n\tcontent: '⎗';\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tbottom: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tmargin: auto;\r\n\twidth: 20vh;\r\n\theight: 20vh;\r\n\tz-index: 2;\r\n\tfont-size: 20vh;\r\n\ttext-align: center;\r\n\tline-height: 20vh;\r\n\tdisplay: block;\r\n}\r\n\r\n._7996bfe6.dragover:before {\r\n\tcontent: '';\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tright: 0;\r\n\tbottom: 0;\r\n\tmargin: 0;\r\n\tborder: .2rem dashed;\r\n\tz-index: 1;\r\n\tdisplay: block;\r\n}\r\n\r\n._7996bfe6.dragover .source {\r\n}\r\n\r\n._7996bfe6.dragover .audio-stop,._7996bfe6.dragover .audio-playback {\r\n\tdisplay: none;\r\n}\r\n\r\n._7996bfe6 .source, ._7996bfe6 .status {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tposition: fixed;\r\n\ttop: .75rem;\r\n\tleft: .75rem;\r\n\tdisplay: block;\r\n\tline-height: 1.5rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\toutline: none;\r\n\tfill: currentColor;\r\n\tz-index: 999;\r\n}\r\n._7996bfe6 .source-input {\r\n\tmargin: 0;\r\n\tpadding: 0;\r\n\tborder: 0;\r\n\tdisplay: inline;\r\n\tvertical-align: baseline;\r\n\tline-height: 1rem;\r\n\theight: 1rem;\r\n\tfont-size: .9rem;\r\n\tmax-width: 100%;\r\n\twidth: 82%;\r\n\tborder: none;\r\n\tbox-shadow: none;\r\n\tfont-weight: bolder;\r\n\toutline: none;\r\n\tbackground: none;\r\n\t-webkit-appearance: none;\r\n\tappearance: none;\r\n\tborder-radius: 0;\r\n\tbox-shadow: 0 2px;\r\n\tcolor: inherit;\r\n}\r\n._7996bfe6 .source-input:focus{\r\n\toutline: none;\r\n}\r\n._7996bfe6 .source-input-file {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\topacity: 0;\r\n\tborder: none;\r\n\tcursor: pointer;\r\n}\r\n._7996bfe6 .source-input-url {\r\n\tfont-family: sans-serif;\r\n\tfont-weight: bold;\r\n\tmin-width: 40vw;\r\n}\r\n._7996bfe6 .source-input-url:focus {\r\n}\r\n._7996bfe6 input[type=file],\r\n._7996bfe6 input[type=file]::-webkit-file-upload-button {\r\n\tcursor: pointer;\r\n}\r\n._7996bfe6 i {\r\n\tfill: currentColor;\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tposition: relative;\r\n\tdisplay: inline-block;\r\n\tfont-style: normal;\r\n\tvertical-align: top;\r\n}\r\n._7996bfe6 .source i {\r\n}\r\n._7996bfe6 .source i svg {\r\n\tmargin-bottom: -.52rem;\r\n}\r\n._7996bfe6 i svg {\r\n\tmax-width: 100%;\r\n\tmax-height: 100%;\r\n}\r\n._7996bfe6 .source-link {\r\n\tposition: relative;\r\n\tfont-weight: bold;\r\n\ttext-decoration: none;\r\n\tbox-shadow: 0px 2px;\r\n\twhite-space: nowrap;\r\n\tcursor: pointer;\r\n}\r\n\r\n._7996bfe6 .text-length-limiter {\r\n\tdisplay: inline-block;\r\n\tmax-width: 40vw;\r\n\tvertical-align: top;\r\n\twhite-space: nowrap;\r\n\ttext-overflow: ellipsis;\r\n\toverflow: hidden;\r\n}\r\n._7996bfe6 .source-title {\r\n\tdisplay: inline;\r\n\tword-break: break-all;\r\n}\r\n\r\n._7996bfe6 .status {\r\n\tleft: auto;\r\n\tright: .75rem;\r\n}\r\n\r\n._7996bfe6 .fps {\r\n\tdisplay: inline-block;\r\n}\r\n\r\n._7996bfe6 .fps-canvas {\r\n\theight: 1rem;\r\n\twidth: 2rem;\r\n\tdisplay: inline-block;\r\n\tmargin-right: .15rem;\r\n\tmargin-bottom: -.15rem;\r\n}\r\n\r\n._7996bfe6 .fps-text {\r\n}\r\n\r\n._7996bfe6 .fps-value {\r\n}\r\n\r\n._7996bfe6 .params-button {\r\n    position: relative;\r\n    display: inline-block;\r\n    margin-left: .5rem;\r\n}\r\n._7996bfe6 .github-link {\r\n\tz-index: 998;\r\n    position: fixed;\r\n    bottom: .75rem;\r\n    right: .75rem;\r\n    width: 1.5rem;\r\n    height: 1.5rem;\r\n    line-height: 1.5rem;\r\n}\r\n\r\n._7996bfe6 .audio-playback, ._7996bfe6 .audio-stop {\r\n\tdisplay: inline-block;\r\n}\r\n\r\n._7996bfe6 .progress {\r\n\tposition: fixed;\r\n\ttop: 0;\r\n\tleft: 0;\r\n\theight: .2rem;\r\n\tbackground: currentColor;\r\n\ttransition: .1s linear width;\r\n\tz-index: 999;\r\n}\r\n\r\n@media (max-width: 42rem) {\r\n\t._7996bfe6 .text-length-limiter {\r\n\t\tmax-width: 30%;\r\n\t}\r\n\t._7996bfe6 .source {\r\n\t\tright: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n\t._7996bfe6 .status {\r\n\t\ttop: auto;\r\n\t\tbottom: .75rem;\r\n\t\tright: .75rem;\r\n\t\tleft: .75rem;\r\n\t\ttext-align: center;\r\n\t}\r\n}\r\n\r\n\r\n._7996bfe6 .params {\r\n\tbackground: linear-gradient(to bottom, rgba(255,255,255,.85), white);\r\n\tposition: fixed;\r\n\tbottom: 0;\r\n\tright: 0;\r\n\tleft: 0;\r\n\tmargin: auto;\r\n\tpadding: .5rem 0 .5rem .75rem;\r\n\tline-height: 1.5;\r\n\tmax-height: 100vh;\r\n\tmax-width: 100%;\r\n\tz-index: 999;\r\n\toverflow: auto;\r\n}\r\n._7996bfe6 .params-close {\r\n\tposition: absolute;\r\n\ttop: 0;\r\n\tright: 0;\r\n\theight: 2rem;\r\n\twidth: 2rem;\r\n\ttext-align: center;\r\n\tline-height: 2rem;\r\n\tfont-size: 1rem;\r\n}\r\n\r\n._7996bfe6 .param {\r\n\theight: 2rem;\r\n\twidth: 15rem;\r\n\tmargin-right: 2.25rem;\r\n\tfloat: left;\r\n}\r\n\r\n@media (max-width: 42rem) {\r\n\t._7996bfe6 .params {\r\n\t\t/*bottom: 2.5rem;*/\r\n\t\tpadding-right: 2.25rem;\r\n\t}\r\n\t._7996bfe6 .param {\r\n\t\tmargin-right: 0;\r\n\t\twidth: 100%;\r\n\t\tfloat: none;\r\n\t}\r\n}\r\n\r\n._7996bfe6 .param-label {\r\n\tfont-size: .75rem;\r\n\tdisplay: inline-block;\r\n\twidth: 33.3%;\r\n\tline-height: 2rem;\r\n\theight: 2rem;\r\n\tvertical-align: top;\r\n\ttext-align: right;\r\n\tpadding-right: 1rem;\r\n}\r\n._7996bfe6 .param-input {\r\n\twidth: 66.6%;\r\n\theight: 2rem;\r\n\tcolor: inherit;\r\n\tborder: 0;\r\n\tpadding: 0 0;\r\n\tmargin: 0;\r\n\tfont-size: 1rem;\r\n\tbackground: none;\r\n\t/*border-radius: 0;*/\r\n\t/*appearance: none;*/\r\n\t/*-webkit-appearance: none;*/\r\n}\r\n._7996bfe6 .param-range::-webkit-slider-thumb,\r\n._7996bfe6 .param-range::-moz-range-thumb {\r\n\twidth: 2rem;\r\n\theight: 2rem;\r\n}\r\n._7996bfe6 .param-checkbox {\r\n\twidth: 1.5rem;\r\n\theight: 1.5rem;\r\n\tmargin-top: .25rem;\r\n}\r\n@media (max-width: 42rem) {\r\n\t._7996bfe6 .param-checkbox {\r\n\t\tborder: 1px solid;\r\n\t}\r\n}\r\n\r\n._7996bfe6 .param-select {\r\n}\r\n\r\n._7996bfe6 .param-range {\r\n}") || true) && "_7996bfe6");
 
 var raf = require('raf');
 var now = require('right-now');
@@ -6288,30 +6288,13 @@ function StartApp (opts, cb) {
 
 
 	//create params template
-	if (isPlainObject(this.params)) {
-		var params = [];
-		for (var name in this.params) {
-			if (!isPlainObject(this.params[name])) {
-				this.params[name] = {value: this.params[name]};
-			}
-			this.params[name].name = name;
-			params.push(this.params[name]);
-		}
-		this.params = true;
-		this.paramsCollection = params;
-	}
-	else if (Array.isArray(this.params)){
-		this.paramsCollection = this.params;
-		this.params = true;
-	}
-	else {
-		this.paramsCollection = [];
-	}
 	this.paramsEl = document.createElement('div');
 	this.paramsEl.classList.add('params');
 	this.paramsEl.setAttribute('hidden', true);
 	this.paramsEl.innerHTML = "<a class=\"params-close\" href=\"#close-params\"><i class=\"icon-close\">✕</i></a>";
-	this.paramsCollection.forEach(function (opts) { return this$1.addParam(opts); });
+
+	this.addParams(this.params);
+
 	this.container.appendChild(this.paramsEl);
 
 	//params button
@@ -6908,7 +6891,36 @@ StartApp.prototype.getTime = function (time) {
 }
 
 
+
+
 /** Create param based off options */
+StartApp.prototype.addParams = function (list) {
+	var this$1 = this;
+
+	if (isPlainObject(list)) {
+		var params = [];
+		for (var name in list) {
+			if (!isPlainObject(list[name])) {
+				list[name] = {value: list[name]};
+			}
+			list[name].name = name;
+			params.push(list[name]);
+		}
+		this.params = true;
+	}
+	else if (Array.isArray(list)){
+		params = list;
+		this.params = true;
+	}
+	else {
+		params = [];
+	}
+
+	params.forEach(function (opts) { return this$1.addParam(opts); });
+
+	return this;
+}
+
 StartApp.prototype.addParam = function (name, opts, cb) {
 	if (isPlainObject(name)) {
 		cb = opts;
@@ -6933,7 +6945,8 @@ StartApp.prototype.addParam = function (name, opts, cb) {
 
 	var el = document.createElement('div');
 	el.classList.add('param');
-	var title = opts.name.slice(0,1).toUpperCase() + opts.name.slice(1);
+
+	var title = opts.label || opts.name.slice(0,1).toUpperCase() + opts.name.slice(1);
 	var name = opts.name.toLowerCase();
 	name = name.replace(/\s/g, '-');
 	el.innerHTML = "<label for=\"" + name + "\" class=\"param-label\">" + title + "</label>";
@@ -7036,6 +7049,19 @@ StartApp.prototype.getParamValue = function (name) {
 	var el = this.paramsEl.querySelector('#' + name.toLowerCase());
 
 	return el && el.type === 'checkbox' ? el.checked : el && el.value;
+}
+
+StartApp.prototype.setParamValue = function (name, value) {
+	var el = this.paramsEl.querySelector('#' + name.toLowerCase());
+	if (el.type === 'checkbox') {
+		el.checked = !!value;
+	}
+	else if (el.tagName === 'SELECT') {
+		el.value = value;
+	}
+	else {
+		el.value = value;
+	}
 }
 },{"audio-context":16,"color-parse":22,"color-space/hsl":23,"events":3,"get-float-time-domain-data":35,"inherits":39,"insert-css":40,"is-mobile":44,"is-url":45,"left-pad":46,"mutype/is-object":53,"raf":59,"right-now":60,"web-audio-player":68,"xhr":66,"xtend/mutable":81}],64:[function(require,module,exports){
 (function (global){
