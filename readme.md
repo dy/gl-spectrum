@@ -48,9 +48,6 @@ var spectrum = new Spectrum({
 	//A trail spectrum - max within the last N snapshots, rendered as a line. 0 - no trail.
 	trail: 0,
 
-	//snap magnitude to a number.
-	snap: false,
-
 	//the width of a bar. Affects the mask.
 	group: 0,
 

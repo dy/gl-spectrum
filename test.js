@@ -22,7 +22,8 @@ var app = startApp({
 	// source: './Liwei.mp3',
 	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
-	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/crossingsofficial/podcast-023-sam-pauli',
 	params: true,
 	github: 'audio-lab/gl-spectrum'
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
