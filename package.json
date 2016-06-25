@@ -4,11 +4,7 @@
   "description": "Display spectrum data with webgl",
   "main": "index.js",
   "dependencies": {
-    "a-weighting": "^1.0.0",
-    "canvas-fit": "^1.5.0",
-    "colormap": "^2.1.2",
-    "flatten": "^1.0.2",
-    "gl-component": "^1.0.1",
+    "gl-spectrogram": "^1.1.1",
     "inherits": "^2.0.1",
     "is-browser": "^2.0.1",
     "mumath": "^2.0.0",

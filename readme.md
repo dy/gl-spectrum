@@ -45,7 +45,7 @@ var spectrum = new Spectrum({
 	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
 	align: 0,
 
-	//A trail spectrum - max within the last N snapshots, rendered as a line. 0 - no trail.
+	//Display max within the last N snapshots. 0 - no trail.
 	trail: 0,
 
 	//the width of a bar. Affects the mask.
@@ -64,7 +64,6 @@ var spectrum = new Spectrum({
 //pass db frequencies in -100...0 range
 spectrum.setFrequencies(frequencies);
 spectrum.setFill(colors, inverse?);
-spectrum.setMask(mask);
 spectrum.setBackground(image);
 
 //update state according to the params

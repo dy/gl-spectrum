@@ -69,7 +69,14 @@ for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 // .map((v) => db.fromGain(v));
 
 var colormaps = [];
-for (var name in colorScales) colormaps.push(name);
+for (var name in colorScales) {
+	if (name === 'alpha') continue;
+	if (name === 'hsv') continue;
+	if (name === 'rainbow') continue;
+	if (name === 'rainbow-soft') continue;
+	if (name === 'phase') continue;
+	colormaps.push(name);
+}
 var colormap = colormaps[(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
@@ -234,8 +241,8 @@ function createColormapSelector (spectrum) {
 
 	function updateView () {
 		spectrum.update();
-		if (Array.isArray(spectrum.fill)) {
-			app.setColor('rgb(' + spectrum.fill.slice(-4, -1).map((v) => v*255).join(', ') + ')');
+		if (Array.isArray(spectrum.fillData)) {
+			app.setColor('rgb(' + spectrum.fillData.slice(-4, -1).join(', ') + ')');
 		}
 	}
 }

@@ -28,13 +28,17 @@ Spectrum.prototype.init = function () {
 	this.setTexture({
 		frequencies: {
 			filter: gl.LINEAR,
+			type: gl.UNSIGNED_BYTE,
 			wrap: gl.CLAMP_TO_EDGE,
 			format: gl.ALPHA
 		},
 		fill: {
+			format: gl.RGBA,
+			type: gl.UNSIGNED_BYTE,
+			// filter: gl.LINEAR,
+			// wrap: gl.CLAMP_TO_EDGE,
 			filter: gl.LINEAR,
 			wrap: gl.CLAMP_TO_EDGE,
-			format: gl.RGBA
 		},
 		mask: {
 			type: gl.FLOAT,
@@ -230,7 +234,8 @@ Spectrum.prototype.frag = `
 		float maskLevel = texture2D(mask, maskCoord).x;
 
 		gl_FragColor = vec4(vec3(1), 1);
-		vec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity) + trail * (mag * .5 / peak + .15 )));
+		vec4 fillColor = texture2D(fill, vec2(max(0., intensity) + trail * (mag * .5 / peak + .15 ), coord.x));
+		fillColor.a = 1.;
 		fillColor.a *= maskLevel;
 		fillColor.a += trail * texture2D(mask, vec2(maskX, .5)).x;
 		gl_FragColor = fillColor;
@@ -322,7 +327,7 @@ Spectrum.prototype.draw = function () {
 	if (this.trail) {
 		//TODO: fix this - do not update freqs each draw call
 		gl.uniform1f(this.trailLocation, 1);
-		this.setTexture('frequencies', this.trailData[0]);
+		this.setTexture('frequencies', this.trailFrequencies);
 		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
 		gl.uniform1f(this.trailLocation, 0);
 	}
