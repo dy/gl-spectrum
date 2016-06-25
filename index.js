@@ -3,6 +3,7 @@
  */
 
 const Spectrum = require('./lib/core');
+const clamp = require('mumath/clamp');
 
 module.exports = Spectrum;
 
@@ -47,6 +48,15 @@ Spectrum.prototype.init = function () {
 		}
 	});
 
+	this.on('push', (magnitudes, peak) => {
+		//map mags to 0..255 range limiting by db subrange
+		magnitudes = magnitudes.map((value) => clamp(255 * (1 + value / 100), 0, 255));
+
+		this.gl.uniform1f(this.peakLocation, peak * .01 + 1);
+
+		this.setTexture('frequencies', magnitudes);
+	});
+
 	this.on('resize', () => {
 		this.recalc();
 	});
@@ -75,12 +85,8 @@ Spectrum.prototype.alpha = true;
 Spectrum.prototype.float = true;
 
 
-Spectrum.prototype.snap = null;
-
 //colors to map spectrum against
-Spectrum.prototype.fill = 'greys';
 Spectrum.prototype.balance = .65;
-Spectrum.prototype.background = undefined;
 
 //mask defines style of bars, dots or line
 Spectrum.prototype.mask = null;
@@ -327,7 +333,7 @@ Spectrum.prototype.draw = function () {
 	if (this.trail) {
 		//TODO: fix this - do not update freqs each draw call
 		gl.uniform1f(this.trailLocation, 1);
-		this.setTexture('frequencies', this.trailFrequencies);
+		this.setTexture('frequencies', this.trailFrequencies.map(v => clamp(255 * (v * .01 + 1), 0, 255) ));
 		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
 		gl.uniform1f(this.trailLocation, 0);
 	}
