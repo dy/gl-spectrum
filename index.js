@@ -28,23 +28,24 @@ Spectrum.prototype.init = function () {
 
 	this.setTexture({
 		frequencies: {
-			filter: gl.LINEAR,
 			type: gl.UNSIGNED_BYTE,
+			filter: gl.LINEAR,
 			wrap: gl.CLAMP_TO_EDGE,
 			format: gl.ALPHA
 		},
 		fill: {
-			format: gl.RGBA,
 			type: gl.UNSIGNED_BYTE,
+			format: gl.RGBA,
 			// filter: gl.LINEAR,
 			// wrap: gl.CLAMP_TO_EDGE,
 			filter: gl.LINEAR,
 			wrap: gl.CLAMP_TO_EDGE,
 		},
 		mask: {
-			type: gl.FLOAT,
+			type: gl.UNSIGNED_BYTE,
 			format: gl.LUMINOCITY,
-			wrap: gl.CLAMP_TO_EDGE
+			wrap: gl.CLAMP_TO_EDGE,
+			filter: gl.NEAREST
 		}
 	});
 
@@ -82,7 +83,7 @@ Spectrum.prototype.init = function () {
 Spectrum.prototype.antialias = false;
 Spectrum.prototype.premultipliedAlpha = true;
 Spectrum.prototype.alpha = true;
-Spectrum.prototype.float = true;
+Spectrum.prototype.float = false;
 
 
 //colors to map spectrum against
@@ -253,7 +254,7 @@ Spectrum.prototype.frag = `
  * Set named or array mask
  */
 Spectrum.prototype.setMask = function (mask) {
-	this.mask = mask || [1,1,1,1];
+	this.mask = mask || [255,255,255,255];
 
 	this.setTexture('mask', this.mask);
 

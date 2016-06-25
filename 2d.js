@@ -5,6 +5,9 @@
 var Spectrum = require('./lib/core');
 
 
+module.exports = Spectrum;
+
+
 //rendering style: line, bar, fill
 Spectrum.prototype.type = 'bar'
 
@@ -16,9 +19,7 @@ Spectrum.prototype.draw = function () {
 		height = this.viewport[3];
 	var data = this.frequencies;
 
-	if (!this.bgValues) {
-		return;
-	}
+	ctx.clearRect.apply(ctx,this.viewport);
 
 	var prevX = 0;
 	for (var i = 0; i < data.length; i++) {
