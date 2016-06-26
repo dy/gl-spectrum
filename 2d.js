@@ -10,11 +10,6 @@ module.exports = Spectrum;
 
 Spectrum.prototype.context = '2d';
 
-//TODO: trail
-//TODO: channels
-//TODO: various viewport
-//TODO: responsive axis labels
-
 
 //return color based on current palette
 Spectrum.prototype.getColor = function (ratio) {
