@@ -17,8 +17,8 @@ var spectrum = new Spectrum({
 	canvas: canvas,
 	context: 'webgl',
 
-	//decibels data, -100...0
-	frequencies: frequenciesData,
+	//initial decibels data, -100...0
+	magnitudes: frequenciesData,
 
 	//audio settings
 	maxDecibels: -30,
@@ -34,9 +34,9 @@ var spectrum = new Spectrum({
 	grid: true,
 	axes: false,
 	logarithmic: true,
-	smoothing: 0.5,
 
-	//hits FPS twice, so performance is over aesthetics
+	//rendering settings
+	smoothing: 0.5,
 	antialias: false,
 
 	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
@@ -55,13 +55,7 @@ var spectrum = new Spectrum({
 	fill: 'greys',
 
 	//A color tuple, imageData, imageElement, canvas or url. Default is 0-level of the fill
-	background: null,
-
-	//the width of a bar. Affects the mask.
-	group: 0,
-
-	//defines mask image for a bar. Image, imageData or canvasElement.
-	mask: null
+	background: null
 });
 
 //pass db frequencies in -100...0 range

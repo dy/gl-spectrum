@@ -10,6 +10,11 @@ module.exports = Spectrum;
 
 Spectrum.prototype.context = '2d';
 
+//TODO: trail
+//TODO: channels
+//TODO: various viewport
+//TODO: responsive axis labels
+
 
 //convert normal f to relative f
 Spectrum.prototype.f = function (ratio) {
@@ -82,7 +87,7 @@ Spectrum.prototype.draw = function () {
 		relativeAmp = this.peak / amp;
 		amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
 
-		gradient.addColorStop(nf, `rgba(${this.getColor( amp*.333+relativeAmp*.666 )})`);
+		gradient.addColorStop(nf, `rgba(${this.getColor( amp*.25+relativeAmp*.75 )})`);
 		ctx.lineTo(x, (height*(1 - this.align) - amp*height*(1 - this.align) ));
 	}
 

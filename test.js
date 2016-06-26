@@ -3,7 +3,7 @@
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./2d');
+var Spectrum = require('./');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -91,7 +91,6 @@ var spectrum = new Spectrum({
 	// smoothing: .7,
 	details: 1,
 	maxDecibels: 0,
-	mask: createMask(10, 10),
 	align: .5,
 	trail: 38,
 	// autostart: false,
@@ -99,7 +98,6 @@ var spectrum = new Spectrum({
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	group: 6,
 	type: 'line',
 	width: 2,
 	// background: [27/255,0/255,37/255, 1],
@@ -115,7 +113,7 @@ var spectrum = new Spectrum({
 	spectrum.setFrequencyData(frequencies);
 });
 
-spectrum.render();
+// spectrum.render();
 
 createColormapSelector(spectrum);
 
@@ -218,11 +216,6 @@ function createColormapSelector (spectrum) {
 		updateView();
 	});
 
-	app.addParam('mask', !!spectrum.mask, (v) => {
-		spectrum.setMask(v ? createMask(10, 10) : null);
-		updateView();
-	});
-
 	app.addParam('group', {
 		min: 0,
 		max: 50,
@@ -259,35 +252,4 @@ function createColormapSelector (spectrum) {
 			app.setColor('rgb(' + spectrum.fillData.slice(-4, -1).join(', ') + ')');
 		}
 	}
-}
-
-
-
-//create mask
-function createMask (w, h) {
-	w = w || 10;
-	h = h || 10;
-	var rect = [w, h];
-	var radius = w/1.5;
-	var canvas = document.createElement('canvas');
-	canvas.width = rect[0] + 2;
-	canvas.height = rect[1] + 2;
-	var ctx = canvas.getContext('2d');
-	ctx.clearRect(0, 0, rect[0] + 2, rect[1] + 2);
-	ctx.fillStyle = 'rgb(0,0,0)';
-	ctx.fillRect(0, 0, rect[0] + 2, rect[1] + 2);
-	ctx.strokeStyle = 'rgb(255,255,255)';
-	ctx.fillStyle = 'rgb(255,255,255)';
-	ctx.lineJoin = 'round';
-	ctx.lineWidth = radius;
-	ctx.strokeRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
-	ctx.fillRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
-
-	// document.body.appendChild(canvas);
-	// canvas.style.zIndex = 999;
-	// canvas.style.position = 'absolute';
-	// canvas.style.top = '0px';
-	// canvas.style.left = '0px';
-
-	return canvas;
 }
