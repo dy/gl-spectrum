@@ -125,21 +125,36 @@ Spectrum.prototype.vert = `
 		return ratio;
 	}
 
+	float unf (float ratio) {
+		float halfRate = sampleRate * .5;
+		float leftF = minFrequency / halfRate;
+		float rightF = maxFrequency / halfRate;
+
+		ratio = (ratio - leftF) / (rightF - leftF);
+
+		float logRatio = ratio * (maxFrequency - minFrequency) + minFrequency;
+
+		logRatio = (lg(logRatio) - lg(minFrequency)) / (lg(maxFrequency) - lg(minFrequency));
+
+		ratio = decide(ratio, logRatio, logarithmic);
+
+		return clamp(ratio, 0., 1.);
+	}
+
 	void main () {
 		vec2 coord = position;
 
-		float _size = size / 10.;
 		float c = .01 / size;
 
 		//the bar’s left coord x
-		float leftX = floor( (coord.x + c) * _size)/_size;
-		float nextLeftX = ceil( (coord.x + c) * _size)/_size;
+		float leftX = floor( (coord.x + c) * size)/size;
+		float nextLeftX = ceil( (coord.x + c) * size)/size;
 
 		float isRight = step( .25 / size, coord.x - leftX);
 
-		coord.x = decide(leftX - .5 * width / viewport.z, leftX + .5 * width / viewport.z, isRight);
+		coord.x = decide(unf(leftX) - .5 * width / viewport.z, unf(leftX) + .5 * width / viewport.z, isRight);
 
-		float mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;
+		float mag = texture2D(frequencies, vec2(leftX, 0.5)).w;
 		mag = clamp(mag, 0., 1.);
 
 		vMag = mag;
