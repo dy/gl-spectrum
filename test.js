@@ -101,7 +101,7 @@ var spectrum = new Spectrum({
 	// fill: './images/stretch.png',
 	group: 6,
 	type: 'bar',
-	width: 3,
+	width: 2,
 	// background: [27/255,0/255,37/255, 1],
 	//background: [1,0,0,1]//'./images/bg-small.jpg'
 	// viewport: function (w, h) {

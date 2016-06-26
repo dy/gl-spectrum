@@ -57,11 +57,14 @@ Spectrum.prototype.draw = function () {
 	ctx.strokeStyle = `rgba(${this.getColor(1)})`;
 	ctx.lineWidth = this.width;
 
-	var prevX = -1, prevOffset = -1, nf, f, x, offset, amp;
+	var prevX = -1, prevOffset = -1, nf, f, x, offset, amp, relativeAmp;
+
+	var gradient = ctx.createLinearGradient(this.viewport[0],0,width,0);
 
 	//build shape
 	ctx.beginPath();
-	ctx.moveTo(0, height * (1 - this.align));
+	ctx.moveTo(-10, height * (1 - this.align));
+	gradient.addColorStop(0, `rgba(${this.getColor(0)})`);
 	for (var i = 0; i < data.length; i++) {
 		nf = i / data.length;
 		f = this.f(nf);
@@ -73,13 +76,15 @@ Spectrum.prototype.draw = function () {
 		prevOffset = offset;
 
 		amp = data[offset];
+		relativeAmp = this.peak / amp;
 		amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
 
+		gradient.addColorStop(x/width, `rgba(${this.getColor( amp*.5+relativeAmp*.5 )})`);
 		ctx.lineTo(x, (height*(1 - this.align) - amp*height*(1 - this.align) ));
 	}
 
 	prevOffset = -1;
-	ctx.lineTo(width, height * (1 - this.align));
+	ctx.lineTo(width+10, height * (1 - this.align));
 	for (var i = data.length; i>0; i--) {
 		nf = i / data.length;
 		f = this.f(nf);
@@ -95,9 +100,11 @@ Spectrum.prototype.draw = function () {
 
 		ctx.lineTo(x, (height*(1 - this.align) + amp*height*(this.align) ));
 	}
-	ctx.lineTo(0, height * (1 - this.align));
+	ctx.lineTo(-10, height * (1 - this.align));
 	ctx.closePath();
 
+	ctx.strokeStyle = gradient;
+	ctx.fillStyle = gradient;
 	(isLine || isFill) && ctx.stroke();
 	isFill && ctx.fill();
 
