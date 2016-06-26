@@ -21,8 +21,9 @@ Spectrum.prototype.init = function () {
 	this.logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
 	this.sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
 	this.trailLocation = gl.getUniformLocation(this.program, 'trail');
-	this.balanceLocation = gl.getUniformLocation(this.program, 'balance');
 	this.peakLocation = gl.getUniformLocation(this.program, 'peak');
+	this.widthLocation = gl.getUniformLocation(this.program, 'width');
+	this.sizeLocation = gl.getUniformLocation(this.program, 'size');
 
 	this.setTexture({
 		frequencies: {
@@ -65,7 +66,8 @@ Spectrum.prototype.init = function () {
 		this.gl.uniform1f(this.maxFrequencyLocation, this.maxFrequency);
 		this.gl.uniform1f(this.logarithmicLocation, this.logarithmic ? 1 : 0);
 		this.gl.uniform1f(this.sampleRateLocation, this.sampleRate);
-		this.gl.uniform1f(this.balanceLocation, this.balance || 0);
+		this.gl.uniform1f(this.widthLocation, this.width);
+		this.gl.uniform1f(this.sizeLocation, this.magnitudes.length);
 	})
 }
 
@@ -74,12 +76,6 @@ Spectrum.prototype.antialias = true;
 Spectrum.prototype.premultipliedAlpha = true;
 Spectrum.prototype.alpha = true;
 Spectrum.prototype.float = false;
-
-
-//colors to map spectrum against
-Spectrum.prototype.balance = .65;
-
-Spectrum.prototype.type = 'bar';
 
 
 //scale verteces to frequencies values and apply alignment
@@ -96,10 +92,11 @@ Spectrum.prototype.vert = `
 	uniform float sampleRate;
 	uniform vec4 viewport;
 	uniform float peak;
+	uniform float width;
+	uniform float size;
 
 	varying float vDist;
 	varying float vMag;
-	varying float vLeft;
 
 	const float log10 = ${Math.log(10)};
 
@@ -131,11 +128,21 @@ Spectrum.prototype.vert = `
 	void main () {
 		vec2 coord = position;
 
-		float mag = texture2D(frequencies, vec2(f(coord.x), 0.5)).w;
+		float _size = size / 10.;
+		float c = .01 / size;
+
+		//the bar’s left coord x
+		float leftX = floor( (coord.x + c) * _size)/_size;
+		float nextLeftX = ceil( (coord.x + c) * _size)/_size;
+
+		float isRight = step( .25 / size, coord.x - leftX);
+
+		coord.x = decide(leftX - .5 * width / viewport.z, leftX + .5 * width / viewport.z, isRight);
+
+		float mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;
 		mag = clamp(mag, 0., 1.);
 
 		vMag = mag;
-		vLeft = coord.x;
 
 		//map y-coord to alignment
 		coord.y = coord.y * mag - mag * align + align;
@@ -143,6 +150,7 @@ Spectrum.prototype.vert = `
 		//save distance from the align
 		vDist = (coord.y - align) * (1. / max(align, 1. - align));
 
+		// gl_Position = vec4(position, 0, 1);
 		gl_Position = vec4(coord*2. - 1., 0, 1);
 	}
 `;
@@ -155,11 +163,11 @@ Spectrum.prototype.frag = `
 	uniform float align;
 	uniform float trail;
 	uniform float peak;
-	uniform float balance;
+
+	const float balance = .65;
 
 	varying float vDist;
 	varying float vMag;
-	varying float vLeft;
 
 	vec2 coord;
 
@@ -192,13 +200,16 @@ Spectrum.prototype.frag = `
  * Recalculate number of verteces
  */
 Spectrum.prototype.recalc = function () {
-	var data = [], w = this.viewport[2] * this.details;
+	var data = [], l = this.magnitudes.length;
 
-	//no-grouping is simply connected points
-	if (!this.group || this.group <= .5) {
-		for (var i = 0; i < w; i++) {
-			var curr = i/w;
-			var next = (i+1)/w;
+	var type = ''+this.type;
+	var isBar = /bar/.test(type);
+
+	//stripe
+	if (!isBar) {
+		for (var i = 0; i < l; i++) {
+			var curr = i/l;
+			var next = (i+1)/l;
 			data.push(curr);
 			data.push(1);
 			data.push(next);
@@ -209,13 +220,12 @@ Spectrum.prototype.recalc = function () {
 			data.push(0);
 		}
 	}
-	//grouping renders bars
+
+	//bars
 	else {
-		var size = this.group === true ? 1 : this.group;
-		var w = w / size;
-		for (var i = 0; i < w; i++) {
-			var curr = i/(w);
-			var next = (i+.5)/(w);
+		for (var i = 0; i < l; i++) {
+			var curr = i/l;
+			var next = (i+.5)/l;
 			data.push(curr);
 			data.push(1);
 			data.push(curr);

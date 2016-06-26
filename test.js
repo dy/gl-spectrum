@@ -3,7 +3,7 @@
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./');
+var Spectrum = require('./2d');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -45,7 +45,7 @@ app.on('source', function (node) {
 
 
 //generate input sine
-var N = 2048;
+var N = 512;
 var sine = new Float32Array(N);
 var saw = new Float32Array(N);
 var noise = new Float32Array(N);
@@ -58,16 +58,16 @@ for (var i = 0; i < N; i++) {
 }
 
 // var frequencies = ft(sine);
-// var frequencies = new Float32Array(1024).fill(0.5);
 // var frequencies = ft(noise);
+// var frequencies = new Float32Array(1024).fill(0.5);
 //NOTE: ios does not allow setting too big this value
 analyser.fftSize = 1024;
 var frequencies = new Float32Array(analyser.frequencyBinCount);
 // for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
-frequencies = frequencies
-.map((v, i) => v*blackman(i, N))
-.map((v) => db.fromGain(v));
+// frequencies = frequencies
+// .map((v, i) => v*blackman(i, N))
+// .map((v) => db.fromGain(v));
 
 var colormaps = [];
 for (var name in colorScales) {
@@ -82,14 +82,13 @@ var colormap = colormaps[(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
 	// autostart: false,
-	// magnitudes: frequencies,
+	magnitudes: frequencies,
 	fill: colormap,
 	grid: true,
 	minFrequency: 40,
 	maxFrequency: 20000,
 	logarithmic: true,
 	// smoothing: .7,
-	details: 1,
 	maxDecibels: 0,
 	align: .5,
 	trail: 38,
@@ -98,8 +97,9 @@ var spectrum = new Spectrum({
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	type: 'line',
+	type: 'bar',
 	width: 2,
+	// weighting: 'z',
 	// background: [27/255,0/255,37/255, 1],
 	//background: [1,0,0,1]//'./images/bg-small.jpg'
 	// viewport: function (w, h) {
@@ -113,7 +113,7 @@ var spectrum = new Spectrum({
 	spectrum.setFrequencyData(frequencies);
 });
 
-// spectrum.render();
+spectrum.render();
 
 createColormapSelector(spectrum);
 

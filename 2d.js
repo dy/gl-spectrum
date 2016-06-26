@@ -16,22 +16,6 @@ Spectrum.prototype.context = '2d';
 //TODO: responsive axis labels
 
 
-//convert normal f to relative f
-Spectrum.prototype.f = function (ratio) {
-	var halfRate = this.sampleRate * .5;
-	if (this.logarithmic) {
-		var logF = Math.pow(10., Math.log10(this.minFrequency) + ratio * (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency)) );
-		ratio = (logF - this.minFrequency) / (this.maxFrequency - this.minFrequency);
-	}
-
-	var leftF = this.minFrequency / halfRate;
-	var rightF = this.maxFrequency / halfRate;
-
-	ratio = leftF + ratio * (rightF - leftF);
-
-	return ratio;
-}
-
 //return color based on current palette
 Spectrum.prototype.getColor = function (ratio) {
 	var cm = this.fillData;
@@ -42,6 +26,7 @@ Spectrum.prototype.getColor = function (ratio) {
 	var values = left.map((v,i) => (v * (1 - amt) + right[i] * amt)|0 );
 	return values;
 }
+
 
 
 //
@@ -73,10 +58,10 @@ Spectrum.prototype.draw = function () {
 	gradient.addColorStop(0, `rgba(${this.getColor(0)})`);
 	for (var i = 0; i < data.length; i++) {
 		nf = i / data.length;
-		f = this.f(nf);
+		f = this.unf(nf);
 
-		x = nf * width;
-		offset = f * data.length;
+		x = f * width;
+		offset = nf * data.length;
 
 		if (Math.round(x) === prevX) continue;
 		prevX = Math.round(x);
@@ -87,7 +72,7 @@ Spectrum.prototype.draw = function () {
 		relativeAmp = this.peak / amp;
 		amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
 
-		gradient.addColorStop(nf, `rgba(${this.getColor( amp*.25+relativeAmp*.75 )})`);
+		gradient.addColorStop(f, `rgba(${this.getColor( amp*.75+relativeAmp*.25 )})`);
 		ctx.lineTo(x, (height*(1 - this.align) - amp*height*(1 - this.align) ));
 	}
 
@@ -95,10 +80,10 @@ Spectrum.prototype.draw = function () {
 	ctx.lineTo(width+padding, height * (1 - this.align));
 	for (var i = data.length; i>0; i--) {
 		nf = i / data.length;
-		f = this.f(nf);
+		f = this.unf(nf);
 
-		x = nf * width;
-		offset = f * data.length;
+		x = f * width;
+		offset = nf * data.length;
 
 		if (Math.round(x) === prevX) continue;
 		prevX = Math.round(x);
@@ -121,15 +106,15 @@ Spectrum.prototype.draw = function () {
 	if (isBar) {
 		for (var i = 0; i < data.length; i++) {
 			nf = i / data.length;
-			f = this.f(nf);
+			f = this.unf(nf);
 
-			x = nf * width;
-			offset = f * data.length;
+			x = f * width;
+			offset = nf * data.length;
 
 			// if (x === prevX) continue;
-			if (offset - prevOffset < 1) continue;
-			prevX = x|0;
-			prevOffset = offset;
+			// prevX = x|0;
+			// if (offset - prevOffset < 1) continue;
+			// prevOffset = offset;
 
 			amp = data[offset|0];
 			amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
@@ -137,5 +122,43 @@ Spectrum.prototype.draw = function () {
 			ctx.fillRect(x, (height*(1 - this.align) - amp*height*(1 - this.align) ), this.width, (amp*height));
 		}
 	}
+};
 
-}
+
+//get linear f from logarithmic f
+Spectrum.prototype.f = function (ratio) {
+	var halfRate = this.sampleRate * .5;
+	var leftF = this.minFrequency / halfRate;
+	var rightF = this.maxFrequency / halfRate;
+
+	//forward action
+	if (this.logarithmic) {
+		var logF = Math.pow(10.,
+			Math.log10(this.minFrequency) + ratio * (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency))
+		);
+		ratio = (logF - this.minFrequency) / (this.maxFrequency - this.minFrequency);
+	}
+
+
+	ratio = leftF + ratio * (rightF - leftF);
+
+	return ratio;
+};
+
+//get log-shifted f from linear f
+Spectrum.prototype.unf = function (ratio) {
+	var halfRate = this.sampleRate * .5;
+	var leftF = this.minFrequency / halfRate;
+	var rightF = this.maxFrequency / halfRate;
+
+	//back action
+	ratio = (ratio - leftF) / (rightF - leftF);
+
+	if (this.logarithmic) {
+		var logRatio = ratio * (this.maxFrequency - this.minFrequency) + this.minFrequency;
+
+		ratio = (Math.log10(logRatio) - Math.log10(this.minFrequency)) / (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency));
+	}
+
+	return clamp(ratio, 0, 1);
+};
