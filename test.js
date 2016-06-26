@@ -85,7 +85,7 @@ var spectrum = new Spectrum({
 	magnitudes: frequencies,
 	fill: colormap,
 	grid: true,
-	minFrequency: 40,
+	minFrequency: 20,
 	maxFrequency: 20000,
 	logarithmic: true,
 	// smoothing: .7,
@@ -150,15 +150,6 @@ createColormapSelector(spectrum);
 
 
 function createColormapSelector (spectrum) {
-	app.addParam('colormap', {
-		values: colormaps,
-		value: colormap,
-		change: (value, state) => {
-			spectrum.setFill(value, app.getParamValue('inversed'));
-			updateView();
-		}
-	});
-
 	app.addParam('type', {
 		values: ['line', 'bar', 'fill'],
 		value: spectrum.type,
@@ -168,6 +159,14 @@ function createColormapSelector (spectrum) {
 		}
 	});
 
+	app.addParam('colormap', {
+		values: colormaps,
+		value: colormap,
+		change: (value, state) => {
+			spectrum.setFill(value, app.getParamValue('inversed'));
+			updateView();
+		}
+	});
 
 	//inversed colormap checkbox
 	app.addParam('inversed', {
@@ -177,7 +176,6 @@ function createColormapSelector (spectrum) {
 			updateView();
 		}
 	});
-
 
 	//weighting switcher
 	app.addParam('weighting', {
@@ -216,13 +214,13 @@ function createColormapSelector (spectrum) {
 		updateView();
 	});
 
-	app.addParam('group', {
-		min: 0,
-		max: 50,
-		step: 1,
-		value: spectrum.group
+	app.addParam('width', {
+		min: 0.5,
+		max: 150,
+		step: .5,
+		value: spectrum.width
 	}, (v) => {
-		spectrum.group = v;
+		spectrum.width = v;
 		updateView();
 	});
 
@@ -241,6 +239,50 @@ function createColormapSelector (spectrum) {
 		(v) => {
 			spectrum.smoothing = v;
 			updateView();
+	});
+
+
+	app.addParams({
+		minDecibels: {
+			type: 'range',
+			value: spectrum.minDecibels,
+			min: -100,
+			max: 0,
+			change: (v) => {
+				spectrum.minDecibels = v;
+				updateView();
+			}
+		},
+		maxDecibels: {
+			type: 'range',
+			value: spectrum.maxDecibels,
+			min: -100,
+			max: 0,
+			change: (v) => {
+				spectrum.maxDecibels = v;
+				updateView();
+			}
+		},
+		minFrequency: {
+			type: 'range',
+			value: spectrum.minFrequency,
+			min: 0,
+			max: 1000,
+			change: (v) => {
+				spectrum.minFrequency = v;
+				updateView();
+			}
+		},
+		maxFrequency: {
+			type: 'range',
+			value: spectrum.maxFrequency,
+			min: 1000,
+			max: spectrum.sampleRate / 2,
+			change: (v) => {
+				spectrum.maxFrequency = v;
+				updateView();
+			}
+		}
 	});
 
 
