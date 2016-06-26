@@ -4,6 +4,7 @@
 
 var Spectrum = require('./lib/core');
 var clamp = require('mumath/clamp');
+var mix = require('mumath/mix');
 
 module.exports = Spectrum;
 
@@ -58,49 +59,49 @@ Spectrum.prototype.draw = function () {
 	ctx.lineWidth = this.width;
 
 	var prevX = -1, prevOffset = -1, nf, f, x, offset, amp, relativeAmp;
-
+	var padding = 40;
 	var gradient = ctx.createLinearGradient(this.viewport[0],0,width,0);
 
 	//build shape
 	ctx.beginPath();
-	ctx.moveTo(-10, height * (1 - this.align));
+	ctx.moveTo(-padding, height * (1 - this.align));
 	gradient.addColorStop(0, `rgba(${this.getColor(0)})`);
 	for (var i = 0; i < data.length; i++) {
 		nf = i / data.length;
 		f = this.f(nf);
 
 		x = nf * width;
-		offset = Math.floor(f * data.length);
+		offset = f * data.length;
 
-		if (offset === prevOffset) continue;
-		prevOffset = offset;
+		// if (offset|0 === prevOffset) continue;
+		// prevOffset = offset|0;
 
-		amp = data[offset];
+		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
 		relativeAmp = this.peak / amp;
 		amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
 
-		gradient.addColorStop(x/width, `rgba(${this.getColor( amp*.5+relativeAmp*.5 )})`);
+		gradient.addColorStop(x/width, `rgba(${this.getColor( amp*.333+relativeAmp*.666 )})`);
 		ctx.lineTo(x, (height*(1 - this.align) - amp*height*(1 - this.align) ));
 	}
 
 	prevOffset = -1;
-	ctx.lineTo(width+10, height * (1 - this.align));
+	ctx.lineTo(width+padding, height * (1 - this.align));
 	for (var i = data.length; i>0; i--) {
 		nf = i / data.length;
 		f = this.f(nf);
 
 		x = nf * width;
-		offset = Math.ceil(f * data.length);
+		offset = f * data.length;
 
-		if (offset === prevOffset) continue;
-		prevOffset = offset;
+		// if (offset|0 === prevOffset) continue;
+		// prevOffset = offset|0;
 
-		amp = data[offset];
+		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
 		amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
 
 		ctx.lineTo(x, (height*(1 - this.align) + amp*height*(this.align) ));
 	}
-	ctx.lineTo(-10, height * (1 - this.align));
+	ctx.lineTo(-padding, height * (1 - this.align));
 	ctx.closePath();
 
 	ctx.strokeStyle = gradient;
