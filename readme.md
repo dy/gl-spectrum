@@ -34,10 +34,7 @@ var spectrum = new Spectrum({
 	grid: true,
 	axes: false,
 	logarithmic: true,
-
-	//rendering settings
 	smoothing: 0.5,
-	details: 1,
 
 	//hits FPS twice, so performance is over aesthetics
 	antialias: false,
@@ -48,8 +45,11 @@ var spectrum = new Spectrum({
 	//Display max within the last N snapshots. 0 - no trail.
 	trail: 0,
 
-	//the width of a bar. Affects the mask.
-	group: 0,
+	//line, bar or fill, or any combination of them.
+	type: 'line',
+
+	//width of line or a bar
+	width: 1,
 
 	//The levels of magnitude/frequency - a colormap name, colormap, pixels array, imageData, imageElement or canvas. Null disables fill.
 	fill: 'greys',
@@ -57,17 +57,20 @@ var spectrum = new Spectrum({
 	//A color tuple, imageData, imageElement, canvas or url. Default is 0-level of the fill
 	background: null,
 
+	//the width of a bar. Affects the mask.
+	group: 0,
+
 	//defines mask image for a bar. Image, imageData or canvasElement.
 	mask: null
 });
 
 //pass db frequencies in -100...0 range
-spectrum.setFrequencies(frequencies);
+spectrum.setFrequencyData(magnitudes);
+
+//update style/options
 spectrum.setFill(colors, inverse?);
 spectrum.setBackground(image);
-
-//update state according to the params
-spectrum.update();
+spectrum.update(options);
 ```
 
 ## Related

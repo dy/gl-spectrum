@@ -3,7 +3,7 @@
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./');
+var Spectrum = require('./2d');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -25,7 +25,8 @@ var app = startApp({
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
 	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/crossingsofficial/podcast-023-sam-pauli',
 	params: true,
-	github: 'audio-lab/gl-spectrum'
+	github: 'audio-lab/gl-spectrum',
+	history: false,
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// source: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// source: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
@@ -34,7 +35,6 @@ var app = startApp({
 
 var source = null;
 var analyser = ctx.createAnalyser();
-analyser.frequencyBinCount = 2048;
 analyser.smoothingTimeConstant = .1;
 analyser.connect(ctx.destination);
 
@@ -61,12 +61,13 @@ for (var i = 0; i < N; i++) {
 // var frequencies = new Float32Array(1024).fill(0.5);
 // var frequencies = ft(noise);
 //NOTE: ios does not allow setting too big this value
+analyser.fftSize = 1024;
 var frequencies = new Float32Array(analyser.frequencyBinCount);
-for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
+// for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
-// frequencies = frequencies
-// .map((v, i) => v*blackman(i, noise.length))
-// .map((v) => db.fromGain(v));
+frequencies = frequencies
+.map((v, i) => v*blackman(i, N))
+.map((v) => db.fromGain(v));
 
 var colormaps = [];
 for (var name in colorScales) {
@@ -81,7 +82,7 @@ var colormap = colormaps[(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
 	// autostart: false,
-	// frequencies: frequencies,
+	// magnitudes: frequencies,
 	fill: colormap,
 	grid: true,
 	minFrequency: 40,
@@ -93,12 +94,14 @@ var spectrum = new Spectrum({
 	mask: createMask(10, 10),
 	align: .5,
 	trail: 38,
-	autostart: true,
+	// autostart: false,
 	// balance: .5,
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
 	group: 6,
+	type: 'bar',
+	width: 3,
 	// background: [27/255,0/255,37/255, 1],
 	//background: [1,0,0,1]//'./images/bg-small.jpg'
 	// viewport: function (w, h) {
@@ -109,8 +112,10 @@ var spectrum = new Spectrum({
 	// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
 	analyser.getFloatFrequencyData(frequencies);
-	spectrum.setFrequencies(frequencies);
+	spectrum.setFrequencyData(frequencies);
 });
+
+spectrum.render();
 
 createColormapSelector(spectrum);
 
@@ -152,6 +157,15 @@ function createColormapSelector (spectrum) {
 		value: colormap,
 		change: (value, state) => {
 			spectrum.setFill(value, app.getParamValue('inversed'));
+			updateView();
+		}
+	});
+
+	app.addParam('type', {
+		values: ['line', 'bar', 'fill'],
+		value: spectrum.type,
+		change: (value, state) => {
+			spectrum.type = value;
 			updateView();
 		}
 	});
