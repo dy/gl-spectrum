@@ -3,7 +3,7 @@
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./');
+var Spectrum = require('./2d');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -63,7 +63,7 @@ for (var i = 0; i < N; i++) {
 //NOTE: ios does not allow setting too big this value
 analyser.fftSize = 1024;
 var frequencies = new Float32Array(analyser.frequencyBinCount);
-// for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
+for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
 // frequencies = frequencies
 // .map((v, i) => v*blackman(i, N))
@@ -82,11 +82,11 @@ var colormap = colormaps[(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
 	// autostart: false,
-	magnitudes: frequencies,
+	// magnitudes: frequencies,
 	fill: colormap,
 	grid: true,
 	minFrequency: 20,
-	maxFrequency: 20000,
+	maxFrequency: 12257.61,
 	logarithmic: true,
 	// smoothing: .7,
 	maxDecibels: 0,
@@ -113,7 +113,7 @@ var spectrum = new Spectrum({
 	spectrum.setFrequencyData(frequencies);
 });
 
-spectrum.render();
+// spectrum.render();
 
 createColormapSelector(spectrum);
 

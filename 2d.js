@@ -52,7 +52,7 @@ Spectrum.prototype.draw = function () {
 	ctx.moveTo(-padding, height * (1 - this.align));
 	gradient.addColorStop(0, `rgba(${this.getColor(0)})`);
 	for (var i = 0; i < data.length; i++) {
-		nf = i / data.length;
+		nf = (i + .5) / data.length;
 		f = this.unf(nf);
 
 		x = f * width;
@@ -66,7 +66,6 @@ Spectrum.prototype.draw = function () {
 		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
 		relativeAmp = this.peak / amp;
 		amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
-
 		gradient.addColorStop(f, `rgba(${this.getColor( amp*.75+relativeAmp*.25 )})`);
 		ctx.lineTo(x, (height*(1 - this.align) - amp*height*(1 - this.align) ));
 	}
