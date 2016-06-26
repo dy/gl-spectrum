@@ -73,6 +73,8 @@ Spectrum.prototype.draw = function () {
 		x = nf * width;
 		offset = f * data.length;
 
+		if (Math.round(x) === prevX) continue;
+		prevX = Math.round(x);
 		// if (offset|0 === prevOffset) continue;
 		// prevOffset = offset|0;
 
@@ -80,7 +82,7 @@ Spectrum.prototype.draw = function () {
 		relativeAmp = this.peak / amp;
 		amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
 
-		gradient.addColorStop(x/width, `rgba(${this.getColor( amp*.333+relativeAmp*.666 )})`);
+		gradient.addColorStop(nf, `rgba(${this.getColor( amp*.333+relativeAmp*.666 )})`);
 		ctx.lineTo(x, (height*(1 - this.align) - amp*height*(1 - this.align) ));
 	}
 
@@ -93,6 +95,8 @@ Spectrum.prototype.draw = function () {
 		x = nf * width;
 		offset = f * data.length;
 
+		if (Math.round(x) === prevX) continue;
+		prevX = Math.round(x);
 		// if (offset|0 === prevOffset) continue;
 		// prevOffset = offset|0;
 
