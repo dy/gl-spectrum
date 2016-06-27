@@ -3,7 +3,7 @@
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./2d');
+var Spectrum = require('./');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -78,10 +78,9 @@ for (var name in colorScales) {
 	if (name === 'phase') continue;
 	colormaps.push(name);
 }
-var colormap = colormaps[(Math.random() * colormaps.length) | 0];
+var colormap = colormaps[9]//(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
-	// autostart: false,
 	// magnitudes: frequencies,
 	fill: colormap,
 	grid: true,
@@ -97,7 +96,7 @@ var spectrum = new Spectrum({
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	type: 'bar',
+	type: 'fill',
 	width: 2,
 	// weighting: 'z',
 	// background: [27/255,0/255,37/255, 1],
@@ -226,7 +225,7 @@ function createColormapSelector (spectrum) {
 
 	app.addParam('trail', {
 		min: 0,
-		max: 50,
+		max: 100,
 		step: 1,
 		value: spectrum.trail
 	}, (v) => {

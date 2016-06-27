@@ -22,13 +22,21 @@ Spectrum.prototype.init = function () {
 	this.maxDecibelsLocation = gl.getUniformLocation(this.program, 'maxDecibels');
 	this.logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
 	this.sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
-	this.brighterLocation = gl.getUniformLocation(this.program, 'brighter');
 	this.peakLocation = gl.getUniformLocation(this.program, 'peak');
+	this.trailPeakLocation = gl.getUniformLocation(this.program, 'trailPeak');
 	this.widthLocation = gl.getUniformLocation(this.program, 'width');
 	this.sizeLocation = gl.getUniformLocation(this.program, 'size');
+	this.typeLocation = gl.getUniformLocation(this.program, 'type');
+	this.brightnessLocation = gl.getUniformLocation(this.program, 'brightness');
 
 	this.setTexture({
-		frequencies: {
+		magnitudes: {
+			type: gl.UNSIGNED_BYTE,
+			filter: gl.LINEAR,
+			wrap: gl.CLAMP_TO_EDGE,
+			format: gl.ALPHA
+		},
+		trail: {
 			type: gl.UNSIGNED_BYTE,
 			filter: gl.LINEAR,
 			wrap: gl.CLAMP_TO_EDGE,
@@ -44,13 +52,16 @@ Spectrum.prototype.init = function () {
 		}
 	});
 
-	this.on('push', (magnitudes, peak) => {
+	this.on('data', (magnitudes) => {
 		//map mags to 0..255 range limiting by db subrange
 		magnitudes = magnitudes.map((value) => clamp(255 * (1 + value / 100), 0, 255));
+		var trail = this.trailMagnitudes.map(v => clamp(255 * (v * .01 + 1), 0, 255));
 
-		this.gl.uniform1f(this.peakLocation, peak * .01 + 1);
+		this.gl.uniform1f(this.peakLocation, this.peak * .01 + 1);
+		this.gl.uniform1f(this.trailPeakLocation, this.trailPeak * .01 + 1);
 
-		this.setTexture('frequencies', magnitudes);
+		this.setTexture('magnitudes', magnitudes);
+		this.setTexture('trail', trail);
 	});
 
 	this.on('resize', () => {
@@ -72,6 +83,7 @@ Spectrum.prototype.init = function () {
 		this.gl.uniform1f(this.sampleRateLocation, this.sampleRate);
 		this.gl.uniform1f(this.widthLocation, this.width);
 		this.gl.uniform1f(this.sizeLocation, this.magnitudes.length);
+		this.gl.uniform1f(this.brightnessLocation, 1);
 	})
 }
 
@@ -82,13 +94,14 @@ Spectrum.prototype.alpha = true;
 Spectrum.prototype.float = false;
 
 
-//scale verteces to frequencies values and apply alignment
+//scale verteces to magnitudes values and apply alignment
 Spectrum.prototype.vert = `
 	precision highp float;
 
 	attribute vec2 position;
 
-	uniform sampler2D frequencies;
+	uniform sampler2D magnitudes;
+	uniform sampler2D trail;
 	uniform float align;
 	uniform float minFrequency;
 	uniform float maxFrequency;
@@ -97,12 +110,15 @@ Spectrum.prototype.vert = `
 	uniform float logarithmic;
 	uniform float sampleRate;
 	uniform vec4 viewport;
-	uniform float peak;
 	uniform float width;
 	uniform float size;
+	uniform float peak;
+	uniform float trailPeak;
+	uniform float type;
 
 	varying float vDist;
 	varying float vMag;
+	varying float vIntensity;
 
 	const float log10 = ${Math.log(10)};
 
@@ -147,6 +163,11 @@ Spectrum.prototype.vert = `
 		return clamp(ratio, 0., 1.);
 	}
 
+	//bring magnitude to range
+	float m (float mag) {
+		return clamp( ((mag - 1.) * 100. - minDecibels) / (maxDecibels - minDecibels), 0., 1.);
+	}
+
 	void main () {
 		vec2 coord = position;
 
@@ -160,14 +181,22 @@ Spectrum.prototype.vert = `
 
 		float widthRatio = width / viewport.z;
 
-		coord.x = decide(unf(leftX), min(unf(nextLeftX), unf(leftX) + widthRatio), isRight);
+		float realLeftX = unf(leftX);
+		coord.x = decide(realLeftX, min(unf(nextLeftX), realLeftX + widthRatio), isRight);
 
-		float mag = texture2D(frequencies, vec2(leftX, 0.5)).w;
-		mag = clamp( ((mag - 1.) * 100. - minDecibels) / (maxDecibels - minDecibels), 0., 1.);
+
+		float trail = texture2D(trail, vec2(leftX, 0.5)).w;
+		float mag = texture2D(magnitudes, vec2(leftX, 0.5)).w;
+
+		vIntensity = decide(mag/peak, trail/trailPeak, type);
+
+		trail = m(trail);
+		mag = m(mag);
 
 		vMag = mag;
 
 		//map y-coord to alignment
+		mag = decide(mag, trail, type);
 		coord.y = coord.y * mag - mag * align + align;
 
 		//save distance from the align
@@ -184,12 +213,13 @@ Spectrum.prototype.frag = `
 	uniform sampler2D fill;
 	uniform vec4 viewport;
 	uniform float align;
-	uniform float brighter;
-	uniform float peak;
+	uniform float width;
+	uniform float type;
 
-	const float balance = .666;
+	const float balance = .5;
 
 	varying float vDist;
+	varying float vIntensity;
 	varying float vMag;
 
 	vec2 coord;
@@ -201,19 +231,25 @@ Spectrum.prototype.frag = `
 	void main () {
 		coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 
-		float mag = vMag;
-
-		//calc dist
 		float dist = abs(vDist);
 
-		//calc intensity
-		float intensity = pow(dist, .75) * balance + pow(mag/peak, 1.25) * (1. - balance);
-		intensity /= (peak * .48 + .5);
-		intensity = intensity * .85 + .15;
+		//0-type - render magnitudes
+		//1-type - render trail
+		//2-type - render variance of trail/mag
 
-		gl_FragColor = vec4(vec3(1), 1);
-		vec4 fillColor = texture2D(fill, vec2(max(0., intensity) + brighter * (mag * .5 / peak + .15 ), coord.x));
+		float intensity = pow(dist + .1, .8888) * balance + pow(vIntensity, 2.) * (1. - balance);
+		// float intensity = (dist + .1) * balance + vIntensity * (1. - balance);
+		intensity = clamp(intensity, 0., 1.);
+
+		intensity = decide(intensity, (intensity + .333) * 1.1, step(.5, type));
+
+		float widthRatio = (width - .5) / viewport.w;
+		intensity *= decide(1., .5 * smoothstep(.99*vMag - widthRatio, vMag - widthRatio, dist), type - 1.);
+
+
+		vec4 fillColor = texture2D(fill, vec2(intensity, coord.x));
 		fillColor.a = 1.;
+
 		gl_FragColor = fillColor;
 	}
 `;
@@ -228,6 +264,8 @@ Spectrum.prototype.recalc = function () {
 
 	var type = ''+this.type;
 	var isBar = /bar/.test(type);
+	var isLine = /line/.test(type);
+	var isFill = /fill/.test(type);
 
 	//stripe
 	if (!isBar) {
@@ -288,23 +326,16 @@ Spectrum.prototype.draw = function () {
 	var type = ''+this.type;
 	var isLine = /line/.test(type);
 
-	if (this.fill) {
-		if (isLine) {
-			// gl.uniform1f(this.brighterLocation, 1);
-			gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
-			// gl.uniform1f(this.brighterLocation, 0);
-		}
-		else {
-			gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
-		}
-	}
-
-	if (this.trail) {
-		//TODO: fix this - do not update freqs each draw call
-		// !isLine && gl.uniform1f(this.brighterLocation, 1);
-		this.setTexture('frequencies', this.trailFrequencies.map(v => clamp(255 * (v * .01 + 1), 0, 255) ));
+	if (isLine) {
+		gl.uniform1f(this.typeLocation, 2);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+		gl.uniform1f(this.typeLocation, 1);
 		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
-		// !isLine && gl.uniform1f(this.brighterLocation, 0);
+	} else {
+		gl.uniform1f(this.typeLocation, 0);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+		gl.uniform1f(this.typeLocation, 1);
+		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
 	}
 
 	return this;

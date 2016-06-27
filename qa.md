@@ -1,3 +1,16 @@
+## Q: what is good API for trail/type/channels in webgl?
+1. Render by passing color, style and data to render method.
+	- need to introduce `dashes` type to render trail for bars
+	- forces user to pick combination for dash/bar, because type does not reflect complex style
+	+ possible to easily do shift param
+	+ easy to render additional channel
+	- churns frequenciesData more often than required - each renderframe
+2. Track freq (possibly chanelled) and trails.
+	+ complex and easy to get-going solution (no need to care about style match)
+	+ less frequent updates of data
+	- some possible difficulty with channels
+		+ best way seems to be hooking up second spectrum on the same canvas
+
 ## Q: how to make single-line spectrum?
 1. We could provide specific colormap with only >0.9 black.
 	- too worrisome
