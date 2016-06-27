@@ -2555,219 +2555,200 @@ exports.encode = exports.stringify = require('./encode');
 
 },{"./decode":7,"./encode":8}],10:[function(require,module,exports){
 /**
- * Simplified 2d version of spectrum
+ * @module  gl-spectrum
  */
 
 var Spectrum = require('./lib/core');
 var clamp = require('mumath/clamp');
-var mix = require('mumath/mix');
 
 module.exports = Spectrum;
 
-Spectrum.prototype.context = '2d';
+Spectrum.prototype.init = function () {
+	var this$1 = this;
 
+	var gl = this.gl;
 
-//return color based on current palette
-Spectrum.prototype.getColor = function (ratio) {
-	var cm = this.fillData;
-	ratio = clamp(ratio, 0, 1);
-	var idx = (ratio*(cm.length - 1)*.25)|0;
-	var left = cm.slice(Math.floor(idx)*4, Math.floor(idx)*4 + 4);
-	var right = cm.slice(Math.ceil(idx)*4, Math.ceil(idx)*4 + 4);
-	var amt = idx % 1;
-	var values = left.map(function (v,i) { return (v * (1 - amt) + right[i] * amt)|0; } );
-	return values;
+	//setup alpha
+	gl.enable( gl.BLEND );
+	gl.blendEquation( gl.FUNC_ADD );
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+	this.alignLocation = gl.getUniformLocation(this.program, 'align');
+	this.minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
+	this.maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
+	this.minDecibelsLocation = gl.getUniformLocation(this.program, 'minDecibels');
+	this.maxDecibelsLocation = gl.getUniformLocation(this.program, 'maxDecibels');
+	this.logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
+	this.sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
+	this.peakLocation = gl.getUniformLocation(this.program, 'peak');
+	this.trailPeakLocation = gl.getUniformLocation(this.program, 'trailPeak');
+	this.widthLocation = gl.getUniformLocation(this.program, 'width');
+	this.sizeLocation = gl.getUniformLocation(this.program, 'size');
+	this.typeLocation = gl.getUniformLocation(this.program, 'type');
+	this.brightnessLocation = gl.getUniformLocation(this.program, 'brightness');
+
+	this.setTexture({
+		magnitudes: {
+			type: gl.UNSIGNED_BYTE,
+			filter: gl.LINEAR,
+			wrap: gl.CLAMP_TO_EDGE,
+			format: gl.ALPHA
+		},
+		trail: {
+			type: gl.UNSIGNED_BYTE,
+			filter: gl.LINEAR,
+			wrap: gl.CLAMP_TO_EDGE,
+			format: gl.ALPHA
+		},
+		fill: {
+			type: gl.UNSIGNED_BYTE,
+			format: gl.RGBA,
+			// filter: gl.LINEAR,
+			// wrap: gl.CLAMP_TO_EDGE,
+			filter: gl.LINEAR,
+			wrap: gl.CLAMP_TO_EDGE,
+		}
+	});
+
+	this.on('data', function (magnitudes) {
+		//map mags to 0..255 range limiting by db subrange
+		magnitudes = magnitudes.map(function (value) { return clamp(255 * (1 + value / 100), 0, 255); });
+		var trail = this$1.trailMagnitudes.map(function ( v ) { return clamp(255 * (v * .01 + 1), 0, 255); });
+
+		this$1.gl.uniform1f(this$1.peakLocation, this$1.peak * .01 + 1);
+		this$1.gl.uniform1f(this$1.trailPeakLocation, this$1.trailPeak * .01 + 1);
+
+		this$1.setTexture('magnitudes', magnitudes);
+		this$1.setTexture('trail', trail);
+	});
+
+	this.on('resize', function () {
+		this$1.recalc();
+	});
+
+	this.on('update', function () {
+
+		//update verteces
+		this$1.recalc();
+
+		//update uniforms
+		this$1.gl.uniform1f(this$1.alignLocation, this$1.align);
+		this$1.gl.uniform1f(this$1.minFrequencyLocation, this$1.minFrequency);
+		this$1.gl.uniform1f(this$1.maxFrequencyLocation, this$1.maxFrequency);
+		this$1.gl.uniform1f(this$1.minDecibelsLocation, this$1.minDecibels);
+		this$1.gl.uniform1f(this$1.maxDecibelsLocation, this$1.maxDecibels);
+		this$1.gl.uniform1f(this$1.logarithmicLocation, this$1.logarithmic ? 1 : 0);
+		this$1.gl.uniform1f(this$1.sampleRateLocation, this$1.sampleRate);
+		this$1.gl.uniform1f(this$1.widthLocation, this$1.width);
+		this$1.gl.uniform1f(this$1.sizeLocation, this$1.magnitudes.length);
+		this$1.gl.uniform1f(this$1.brightnessLocation, 1);
+	})
 }
 
 
+Spectrum.prototype.antialias = true;
+Spectrum.prototype.premultipliedAlpha = true;
+Spectrum.prototype.alpha = true;
+Spectrum.prototype.float = false;
 
-//
+
+//scale verteces to magnitudes values and apply alignment
+Spectrum.prototype.vert = "\n\tprecision highp float;\n\n\tattribute vec2 position;\n\n\tuniform sampler2D magnitudes;\n\tuniform sampler2D trail;\n\tuniform float align;\n\tuniform float minFrequency;\n\tuniform float maxFrequency;\n\tuniform float minDecibels;\n\tuniform float maxDecibels;\n\tuniform float logarithmic;\n\tuniform float sampleRate;\n\tuniform vec4 viewport;\n\tuniform float width;\n\tuniform float size;\n\tuniform float peak;\n\tuniform float trailPeak;\n\tuniform float type;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vIntensity;\n\n\tconst float log10 = " + (Math.log(10)) + ";\n\n\tfloat lg (float x) {\n\t\treturn log(x) / log10;\n\t}\n\n\t//return a or b based on weight\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\t//get mapped frequency\n\tfloat f (float ratio) {\n\t\tfloat halfRate = sampleRate * .5;\n\n\t\tfloat logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\n\t\tratio = decide(ratio, (logF - minFrequency) / (maxFrequency - minFrequency), logarithmic);\n\n\t\tfloat leftF = minFrequency / halfRate;\n\t\tfloat rightF = maxFrequency / halfRate;\n\n\t\tratio = leftF + ratio * (rightF - leftF);\n\n\t\treturn ratio;\n\t}\n\n\tfloat unf (float ratio) {\n\t\tfloat halfRate = sampleRate * .5;\n\t\tfloat leftF = minFrequency / halfRate;\n\t\tfloat rightF = maxFrequency / halfRate;\n\n\t\tratio = (ratio - leftF) / (rightF - leftF);\n\n\t\tfloat logRatio = ratio * (maxFrequency - minFrequency) + minFrequency;\n\n\t\tlogRatio = (lg(logRatio) - lg(minFrequency)) / (lg(maxFrequency) - lg(minFrequency));\n\n\t\tratio = decide(ratio, logRatio, logarithmic);\n\n\t\treturn clamp(ratio, 0., 1.);\n\t}\n\n\t//bring magnitude to range\n\tfloat m (float mag) {\n\t\treturn clamp( ((mag - 1.) * 100. - minDecibels) / (maxDecibels - minDecibels), 0., 1.);\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = position;\n\n\t\tfloat c = .01 / size;\n\n\t\t//the bar’s left coord x\n\t\tfloat leftX = floor( (coord.x + c) * size)/size;\n\t\tfloat nextLeftX = ceil( (coord.x + c) * size)/size;\n\n\t\tfloat isRight = step( .25 / size, coord.x - leftX);\n\n\t\tfloat widthRatio = width / viewport.z;\n\n\t\tfloat realLeftX = unf(leftX);\n\t\tcoord.x = decide(realLeftX, min(unf(nextLeftX), realLeftX + widthRatio), isRight);\n\n\n\t\tfloat trail = texture2D(trail, vec2(leftX, 0.5)).w;\n\t\tfloat mag = texture2D(magnitudes, vec2(leftX, 0.5)).w;\n\n\t\tvIntensity = decide(mag/peak, trail/trailPeak, type);\n\n\t\ttrail = m(trail);\n\t\tmag = m(mag);\n\n\t\tvMag = mag;\n\n\t\t//map y-coord to alignment\n\t\tmag = decide(mag, trail, type);\n\t\tcoord.y = coord.y * mag - mag * align + align;\n\n\t\t//save distance from the align\n\t\tvDist = (coord.y - align) * (1. / max(align, 1. - align));\n\n\t\t// gl_Position = vec4(position, 0, 1);\n\t\tgl_Position = vec4(coord*2. - 1., 0, 1);\n\t}\n";
+
+Spectrum.prototype.frag = "\n\tprecision highp float;\n\n\tuniform sampler2D fill;\n\tuniform vec4 viewport;\n\tuniform float align;\n\tuniform float width;\n\tuniform float type;\n\n\tconst float balance = .5;\n\n\tvarying float vDist;\n\tvarying float vIntensity;\n\tvarying float vMag;\n\n\tvec2 coord;\n\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\tvoid main () {\n\t\tcoord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\n\t\tfloat dist = abs(vDist);\n\n\t\t//0-type - render magnitudes\n\t\t//1-type - render trail\n\t\t//2-type - render variance of trail/mag\n\n\t\tfloat intensity = pow(dist + .1, .8888) * balance + pow(vIntensity, 2.) * (1. - balance);\n\t\tintensity = clamp(intensity, 0., 1.);\n\n\t\tintensity = decide(intensity, (intensity + .333) * 1.1, step(.5, type));\n\n\t\tfloat widthRatio = (width - .5) / viewport.w;\n\t\tfloat mag = abs(vMag);\n\t\tintensity *= decide(1., .5 * smoothstep(.99 * mag, 1.01*mag, dist), type - .5);\n\n\n\t\tvec4 fillColor = texture2D(fill, vec2(intensity, coord.x));\n\t\tfillColor.a = 1.;\n\n\t\tgl_FragColor = fillColor;\n\t}\n";
+
+
+/**
+ * Recalculate number of verteces
+ */
+//FIXME: might be need to be called on data push as it takes data length
+Spectrum.prototype.recalc = function () {
+	var data = [], l = this.magnitudes.length;
+
+	var type = ''+this.type;
+	var isBar = /bar/.test(type);
+	var isLine = /line/.test(type);
+	var isFill = /fill/.test(type);
+
+	//stripe
+	if (!isBar) {
+		for (var i = 0; i < l; i++) {
+			var curr = i/l;
+			var next = (i+1)/l;
+			data.push(curr);
+			data.push(1);
+			data.push(next);
+			data.push(1);
+			data.push(curr);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+		}
+	}
+
+	//bars
+	else {
+		for (var i = 0; i < l; i++) {
+			var curr = i/l;
+			var next = (i+.5)/l;
+			data.push(curr);
+			data.push(1);
+			data.push(curr);
+			data.push(1);
+			data.push(curr);
+			data.push(1);
+			data.push(next);
+			data.push(1);
+			data.push(curr);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+			data.push(next);
+			data.push(0);
+		}
+	}
+
+	this.setAttribute('position', data);
+
+	return this;
+};
+
+
+/**
+ * Render main loop
+ */
 Spectrum.prototype.draw = function () {
-	var this$1 = this;
+	var gl = this.gl;
 
-	var ctx = this.context;
-	var width = this.viewport[2],
-		height = this.viewport[3];
+	gl.useProgram(this.program);
+
+	var count = this.attributes.position.data.length / 2;
 
 	var type = ''+this.type;
 	var isLine = /line/.test(type);
-	var isFill = /fill/.test(type);
-	var isBar = /bar/.test(type);
-
-	ctx.clearRect.apply(ctx,this.viewport);
-
-	//FIXME: value of 1 fucks up here and in gl-spectrum apparently
-	ctx.lineWidth = this.width;
-
-	var prevX = -1, prevOffset = -1, nf, f, x, offset, amp, relativeAmp;
-	var padding = 40;
-
-	//draw trail
-	var gradient = ctx.createLinearGradient(this.viewport[0],0,width,0);
-	this.createShape(this.trailMagnitudes, gradient);
-	ctx.fillStyle = gradient;
-	if (isFill || isLine) {
-		ctx.strokeStyle = "rgba(" + (this.getColor(1)) + ")";
-		ctx.stroke();
-	}
-	if (isLine) {
-		ctx.fill();
-	}
-
-	//draw main magnitudes
-	this.createShape(this.magnitudes);
-	ctx.strokeStyle = gradient;
-	ctx.fillStyle = gradient;
 
 	if (isLine) {
-		ctx.save();
-		ctx.globalCompositeOperation = 'xor';
-		ctx.fillStyle = 'rgba(0,0,0,1)';
-		ctx.fill();
-		ctx.restore();
-	}
-	if (isFill) ctx.fill();
-
-
-	var magnitudes = this.magnitudes;
-	var trail = this.trailMagnitudes;
-	var barWidth;
-	if (isBar) {
-		for (var i = .5; i < magnitudes.length; i++) {
-			nf = i / magnitudes.length;
-			f = this$1.unf(nf);
-
-			x = f * width;
-			offset = nf * magnitudes.length;
-
-			barWidth = Math.min(this$1.width, Math.abs(x - prevX));
-			if (x === prevX) continue;
-			prevX = x|0;
-			if (offset === prevOffset) continue;
-			prevOffset = offset|0;
-
-			amp = magnitudes[offset|0];
-			amp = clamp((amp - this$1.minDecibels) / (this$1.maxDecibels - this$1.minDecibels), 0, 1);
-
-			ctx.fillRect(x - barWidth, (height*(1 - this$1.align) - amp*height*(1 - this$1.align) ), barWidth, (amp*height));
+		if (this.trail) {
+			gl.uniform1f(this.typeLocation, 2);
+			gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
 		}
-		ctx.fillStyle = "rgba(" + (this.getColor(1)) + ")";
-		prevX = 0;
-		for (var i = .5; i < trail.length; i++) {
-			nf = i / trail.length;
-			f = this$1.unf(nf);
-
-			x = f * width;
-			offset = nf * trail.length;
-
-			barWidth = Math.min(this$1.width, x - prevX);
-
-			if (x === prevX) continue;
-			prevX = x|0;
-			if (offset === prevOffset) continue;
-			prevOffset = offset|0;
-
-			amp = trail[offset|0];
-			amp = clamp((amp - this$1.minDecibels) / (this$1.maxDecibels - this$1.minDecibels), 0, 1);
-
-
-			ctx.fillRect(x - barWidth, (height*(1 - this$1.align) - amp*height*(1 - this$1.align) ), barWidth, 1);
-			ctx.fillRect(x - barWidth, (height*(1 - this$1.align) - amp*height*(1 - this$1.align) + amp*height ) - 1, barWidth, 1);
+		gl.uniform1f(this.typeLocation, 1);
+		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
+	} else {
+		gl.uniform1f(this.typeLocation, 0);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+		if (this.trail) {
+			gl.uniform1f(this.typeLocation, 1);
+			gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
 		}
 	}
-};
-
-
-Spectrum.prototype.createShape = function (data, gradient) {
-	var this$1 = this;
-
-	var ctx = this.context;
-	var prevX = -1, prevOffset = -1, nf, f, x, offset, amp, relativeAmp;
-	var padding = 40;
-	var balance = .5;
-
-	var width = this.viewport[2],
-		height = this.viewport[3];
-
-	ctx.beginPath();
-	ctx.moveTo(-padding, height * (1 - this.align));
-	gradient && gradient.addColorStop(0, ("rgba(" + (this.getColor(0.5)) + ")"));
-
-	for (var i = 0; i < data.length; i++) {
-		nf = (i + .5) / data.length;
-		f = this$1.unf(nf);
-
-		x = f * width;
-		offset = nf * data.length;
-
-		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
-		relativeAmp = (amp + 100) / (this$1.peak + 100);
-		amp = clamp((amp - this$1.minDecibels) / (this$1.maxDecibels - this$1.minDecibels), 0, 1);
-		gradient && gradient.addColorStop(f, ("rgba(" + (this$1.getColor( amp*balance + relativeAmp*(1 - balance) )) + ")"));
-		ctx.lineTo(x, (height*(1 - this$1.align) - amp*height*(1 - this$1.align) ));
-	}
-
-	prevOffset = -1;
-	prevX = -1;
-	ctx.lineTo(width+padding, height * (1 - this.align));
-	for (var i = data.length - 1; i>=0; i--) {
-		nf = (i + .5) / data.length;
-		f = this$1.unf(nf);
-
-		x = f * width;
-		offset = nf * data.length;
-
-		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
-		amp = clamp((amp - this$1.minDecibels) / (this$1.maxDecibels - this$1.minDecibels), 0, 1);
-
-		ctx.lineTo(x, (height*(1 - this$1.align) + amp*height*(this$1.align) ));
-	}
-	ctx.lineTo(-padding, height * (1 - this.align));
-	ctx.closePath();
 
 	return this;
-}
-
-
-//get linear f from logarithmic f
-Spectrum.prototype.f = function (ratio) {
-	var halfRate = this.sampleRate * .5;
-	var leftF = this.minFrequency / halfRate;
-	var rightF = this.maxFrequency / halfRate;
-
-	//forward action
-	if (this.logarithmic) {
-		var logF = Math.pow(10.,
-			Math.log10(this.minFrequency) + ratio * (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency))
-		);
-		ratio = (logF - this.minFrequency) / (this.maxFrequency - this.minFrequency);
-	}
-
-
-	ratio = leftF + ratio * (rightF - leftF);
-
-	return ratio;
 };
 
-//get log-shifted f from linear f
-Spectrum.prototype.unf = function (ratio) {
-	var halfRate = this.sampleRate * .5;
-	var leftF = this.minFrequency / halfRate;
-	var rightF = this.maxFrequency / halfRate;
-
-	//back action
-	ratio = (ratio - leftF) / (rightF - leftF);
-
-	if (this.logarithmic) {
-		var logRatio = ratio * (this.maxFrequency - this.minFrequency) + this.minFrequency;
-
-		ratio = (Math.log10(logRatio) - Math.log10(this.minFrequency)) / (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency));
-	}
-
-	return clamp(ratio, 0, 1);
-};
-
-},{"./lib/core":11,"mumath/clamp":53,"mumath/mix":56}],11:[function(require,module,exports){
+},{"./lib/core":11,"mumath/clamp":53}],11:[function(require,module,exports){
 /**
  * @module  gl-spectrum/lib/code
  */
@@ -2840,7 +2821,7 @@ Spectrum.prototype.setFrequencyData = function (magnitudes) {
 	this.trailPeak = this.trailMagnitudes.reduce(function (prev, curr) { return Math.max(curr, prev); }, -200);
 
 	this.emit('data', magnitudes);
-}
+};
 
 
 /**
@@ -3033,7 +3014,7 @@ Spectrum.prototype.update = function () {
 	return this;
 };
 
-},{"gl-spectrogram/lib/core":41,"inherits":45,"is-browser":47,"mumath/clamp":53,"mumath/lg":55,"plot-grid":64,"xtend/mutable":88}],12:[function(require,module,exports){
+},{"gl-spectrogram/lib/core":41,"inherits":45,"is-browser":47,"mumath/clamp":53,"mumath/lg":55,"plot-grid":63,"xtend/mutable":87}],12:[function(require,module,exports){
 module.exports = function a (f) {
 	var f2 = f*f;
 	return 1.2588966 * 148840000 * f2*f2 /
@@ -5020,7 +5001,7 @@ Component.prototype.createProgram = function (vSrc, fSrc) {
 	return program;
 }
 
-},{"canvas-fit":23,"events":3,"get-canvas-context":37,"inherits":45,"is-browser":47,"mutype/is-object":60,"raf-loop":65,"xtend/mutable":88}],41:[function(require,module,exports){
+},{"canvas-fit":23,"events":3,"get-canvas-context":37,"inherits":45,"is-browser":47,"mutype/is-object":59,"raf-loop":64,"xtend/mutable":87}],41:[function(require,module,exports){
 /**
  * @module  gl-spectrogram/lib/core
  */
@@ -5110,21 +5091,14 @@ Spectrogram.prototype.push = function (magnitudes) {
 	var l = halfRate / this.magnitudes.length;
 	var w = weighting[this.weighting] || weighting.z;
 
-	magnitudes = magnitudes.map(function (v, i) {
-		//apply weighting
-		v = clamp(clamp(v, -100, 0) + 20 * Math.log(w(i * l)) / Math.log(10), -200, 0);
-
-		return v;
-	});
-
-	//choose bigger data
-	// var bigger = this.magnitudes.length >= magnitudes.length ? this.magnitudes : magnitudes;
-	// var shorter = (bigger === magnitudes ? this.magnitudes : magnitudes);
-	// bigger = [].slice.call(bigger);
 	magnitudes = [].slice.call(magnitudes);
 
-	//apply smoothing
-	// var smoothing = (bigger === this.magnitudes ? 1 - this.smoothing : this.smoothing);
+	//apply weighting and clamping
+	for (var i = 0; i < magnitudes.length; i++) {
+		var v = magnitudes[i];
+		magnitudes[i] = clamp(clamp(v, -100, 0) + 20 * Math.log(w(i * l)) / Math.log(10), -200, 0);
+	}
+
 	var smoothing = this.smoothing;
 
 	for (var i = 0; i < magnitudes.length; i++) {
@@ -5136,7 +5110,6 @@ Spectrogram.prototype.push = function (magnitudes) {
 
 	//find peak
 	this.peak = this.magnitudes.reduce(function (prev, curr) { return Math.max(curr, prev); }, -200);
-
 	//emit magnitudes in db range
 	this.emit('push', magnitudes, this.peak);
 
@@ -5330,7 +5303,7 @@ Spectrogram.prototype.update = function () {
 	this.emit('update');
 };
 
-},{"a-weighting":16,"color-parse":26,"color-space/hsl":27,"colormap":43,"colormap/colorScales":42,"flatten":34,"gl-component":40,"inherits":45,"is-browser":47,"mumath/clamp":53,"mumath/lg":55,"plot-grid":64,"xtend/mutable":88}],42:[function(require,module,exports){
+},{"a-weighting":16,"color-parse":26,"color-space/hsl":27,"colormap":43,"colormap/colorScales":42,"flatten":34,"gl-component":40,"inherits":45,"is-browser":47,"mumath/clamp":53,"mumath/lg":55,"plot-grid":63,"xtend/mutable":87}],42:[function(require,module,exports){
 module.exports={
 	"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],
 
@@ -5749,7 +5722,7 @@ function leftPad (str, len, ch) {
 module.exports = require('./wrap')(function(a, min, max){
 	return max > min ? Math.max(Math.min(a,max),min) : Math.max(Math.min(a,min),max);
 });
-},{"./wrap":59}],54:[function(require,module,exports){
+},{"./wrap":58}],54:[function(require,module,exports){
 /**
  * @module  mumath/closest
  */
@@ -5775,14 +5748,7 @@ module.exports = function closest (num, arr) {
 module.exports = require('./wrap')(function (a) {
 	return Math.log(a) / Math.log(10);
 });
-},{"./wrap":59}],56:[function(require,module,exports){
-/**
- * @module mumath/mix
- */
-module.exports = require('./wrap')(function (x, y, a) {
-	return x * (1.0 - a) + y * a;
-});
-},{"./wrap":59}],57:[function(require,module,exports){
+},{"./wrap":58}],56:[function(require,module,exports){
 /**
  * @module mumath/order
  */
@@ -5791,7 +5757,7 @@ module.exports = require('./wrap')(function (n) {
 	var order = Math.floor(Math.log(n) / Math.LN10 + 0.000000001);
 	return Math.pow(10,order);
 });
-},{"./wrap":59}],58:[function(require,module,exports){
+},{"./wrap":58}],57:[function(require,module,exports){
 /**
  * Whether element is between left & right including
  *
@@ -5810,7 +5776,7 @@ module.exports = require('./wrap')(function(a, left, right){
 	if (a <= right && a >= left) return true;
 	return false;
 });
-},{"./wrap":59}],59:[function(require,module,exports){
+},{"./wrap":58}],58:[function(require,module,exports){
 /**
  * Get fn wrapped with array/object attrs recognition
  *
@@ -5852,7 +5818,7 @@ module.exports = function(fn){
 		}
 	};
 };
-},{}],60:[function(require,module,exports){
+},{}],59:[function(require,module,exports){
 /**
  * @module mutype/is-object
  */
@@ -5865,7 +5831,7 @@ module.exports = function(o){
 	return !!o && typeof o === 'object' && o.constructor === Object;
 };
 
-},{}],61:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 'use strict';
 /* eslint-disable no-unused-vars */
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -5952,7 +5918,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 	return to;
 };
 
-},{}],62:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 var trim = require('trim')
   , forEach = require('for-each')
   , isArray = function(arg) {
@@ -5984,7 +5950,7 @@ module.exports = function (headers) {
 
   return result
 }
-},{"for-each":35,"trim":74}],63:[function(require,module,exports){
+},{"for-each":35,"trim":73}],62:[function(require,module,exports){
 (function (process){
 // Generated by CoffeeScript 1.7.1
 (function() {
@@ -6020,7 +5986,7 @@ module.exports = function (headers) {
 }).call(this);
 
 }).call(this,require('_process'))
-},{"_process":6}],64:[function(require,module,exports){
+},{"_process":6}],63:[function(require,module,exports){
 /**
  * @module  plot-grid
  */
@@ -6335,7 +6301,7 @@ Grid.prototype.update = function (options) {
 
 	return this;
 };
-},{"events":3,"get-uid":39,"inherits":45,"insert-css":46,"is-browser":47,"mumath/closest":54,"mumath/lg":55,"mumath/order":57,"mumath/within":58,"xtend":87}],65:[function(require,module,exports){
+},{"events":3,"get-uid":39,"inherits":45,"insert-css":46,"is-browser":47,"mumath/closest":54,"mumath/lg":55,"mumath/order":56,"mumath/within":57,"xtend":86}],64:[function(require,module,exports){
 var inherits = require('inherits')
 var EventEmitter = require('events').EventEmitter
 var now = require('right-now')
@@ -6380,7 +6346,7 @@ Engine.prototype.tick = function() {
     this.emit('tick', dt)
     this.last = time
 }
-},{"events":3,"inherits":45,"raf":66,"right-now":67}],66:[function(require,module,exports){
+},{"events":3,"inherits":45,"raf":65,"right-now":66}],65:[function(require,module,exports){
 (function (global){
 var now = require('performance-now')
   , root = typeof window === 'undefined' ? global : window
@@ -6456,7 +6422,7 @@ module.exports.polyfill = function() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"performance-now":63}],67:[function(require,module,exports){
+},{"performance-now":62}],66:[function(require,module,exports){
 (function (global){
 module.exports =
   global.performance &&
@@ -6467,7 +6433,7 @@ module.exports =
   }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],68:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 'use strict'
 
 function blackmanHarris (i,N) {
@@ -6482,7 +6448,7 @@ function blackmanHarris (i,N) {
 
 module.exports = blackmanHarris
 
-},{}],69:[function(require,module,exports){
+},{}],68:[function(require,module,exports){
 var isDom = require('is-dom')
 var lookup = require('browser-media-mime-type')
 
@@ -6539,7 +6505,7 @@ function extension (data) {
   return data.substring(extIdx + 1)
 }
 
-},{"browser-media-mime-type":21,"is-dom":48}],70:[function(require,module,exports){
+},{"browser-media-mime-type":21,"is-dom":48}],69:[function(require,module,exports){
 /**
  * @module audio-demo
  */
@@ -7627,7 +7593,7 @@ StartApp.prototype.setParamValue = function (name, value) {
 
 	this.paramsList[this.paramsCache[name]].value = value;
 }
-},{"audio-context":20,"color-parse":26,"color-space/hsl":27,"events":3,"get-float-time-domain-data":38,"inherits":45,"insert-css":46,"is-mobile":50,"is-url":51,"left-pad":52,"mutype/is-object":60,"querystring":9,"raf":66,"right-now":67,"web-audio-player":75,"xhr":73,"xtend/mutable":88}],71:[function(require,module,exports){
+},{"audio-context":20,"color-parse":26,"color-space/hsl":27,"events":3,"get-float-time-domain-data":38,"inherits":45,"insert-css":46,"is-mobile":50,"is-url":51,"left-pad":52,"mutype/is-object":59,"querystring":9,"raf":65,"right-now":66,"web-audio-player":74,"xhr":72,"xtend/mutable":87}],70:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
     module.exports = window;
@@ -7640,7 +7606,7 @@ if (typeof window !== "undefined") {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],72:[function(require,module,exports){
+},{}],71:[function(require,module,exports){
 module.exports = once
 
 once.proto = once(function () {
@@ -7661,7 +7627,7 @@ function once (fn) {
   }
 }
 
-},{}],73:[function(require,module,exports){
+},{}],72:[function(require,module,exports){
 "use strict";
 var window = require("global/window")
 var once = require("once")
@@ -7882,7 +7848,7 @@ function _createXHR(options) {
 
 function noop() {}
 
-},{"global/window":71,"is-function":49,"once":72,"parse-headers":62,"xtend":87}],74:[function(require,module,exports){
+},{"global/window":70,"is-function":49,"once":71,"parse-headers":61,"xtend":86}],73:[function(require,module,exports){
 
 exports = module.exports = trim;
 
@@ -7898,7 +7864,7 @@ exports.right = function(str){
   return str.replace(/\s*$/, '');
 };
 
-},{}],75:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 var buffer = require('./lib/buffer-source')
 var media = require('./lib/media-source')
 
@@ -7910,14 +7876,14 @@ function webAudioPlayer (src, opt) {
   else return media(src, opt)
 }
 
-},{"./lib/buffer-source":77,"./lib/media-source":80}],76:[function(require,module,exports){
+},{"./lib/buffer-source":76,"./lib/media-source":79}],75:[function(require,module,exports){
 module.exports = createAudioContext
 function createAudioContext () {
   var AudioCtor = window.AudioContext || window.webkitAudioContext
   return new AudioCtor()
 }
 
-},{}],77:[function(require,module,exports){
+},{}],76:[function(require,module,exports){
 (function (process){
 var canPlaySrc = require('./can-play-src')
 var createAudioContext = require('./audio-context')
@@ -8077,7 +8043,7 @@ function createBufferSource (src, opt) {
 }
 
 }).call(this,require('_process'))
-},{"./audio-context":76,"./can-play-src":78,"./resume-context":81,"./xhr-audio":82,"_process":6,"events":3,"right-now":67}],78:[function(require,module,exports){
+},{"./audio-context":75,"./can-play-src":77,"./resume-context":80,"./xhr-audio":81,"_process":6,"events":3,"right-now":66}],77:[function(require,module,exports){
 var lookup = require('browser-media-mime-type')
 var audio
 
@@ -8127,7 +8093,7 @@ function extension (data) {
   return data.substring(extIdx + 1)
 }
 
-},{"browser-media-mime-type":21}],79:[function(require,module,exports){
+},{"browser-media-mime-type":21}],78:[function(require,module,exports){
 module.exports = addOnce
 function addOnce (element, event, fn) {
   function tmp (ev) {
@@ -8136,7 +8102,7 @@ function addOnce (element, event, fn) {
   }
   element.addEventListener(event, tmp, false)
 }
-},{}],80:[function(require,module,exports){
+},{}],79:[function(require,module,exports){
 (function (process){
 var EventEmitter = require('events').EventEmitter
 var createAudio = require('simple-media-element').audio
@@ -8291,7 +8257,7 @@ function createMediaSource (src, opt) {
 }
 
 }).call(this,require('_process'))
-},{"./audio-context":76,"./can-play-src":78,"./event-add-once":79,"./resume-context":81,"_process":6,"events":3,"object-assign":61,"simple-media-element":69}],81:[function(require,module,exports){
+},{"./audio-context":75,"./can-play-src":77,"./event-add-once":78,"./resume-context":80,"_process":6,"events":3,"object-assign":60,"simple-media-element":68}],80:[function(require,module,exports){
 module.exports = function (audioContext) {
   if (audioContext.state === 'suspended' &&
       typeof audioContext.resume === 'function') {
@@ -8299,7 +8265,7 @@ module.exports = function (audioContext) {
   }
 }
 
-},{}],82:[function(require,module,exports){
+},{}],81:[function(require,module,exports){
 var xhr = require('xhr')
 var xhrProgress = require('xhr-progress')
 
@@ -8333,13 +8299,13 @@ function xhrAudio (audioContext, src, cb, progress, decoding) {
   }
 }
 
-},{"xhr":85,"xhr-progress":86}],83:[function(require,module,exports){
+},{"xhr":84,"xhr-progress":85}],82:[function(require,module,exports){
+arguments[4][70][0].apply(exports,arguments)
+},{"dup":70}],83:[function(require,module,exports){
 arguments[4][71][0].apply(exports,arguments)
 },{"dup":71}],84:[function(require,module,exports){
 arguments[4][72][0].apply(exports,arguments)
-},{"dup":72}],85:[function(require,module,exports){
-arguments[4][73][0].apply(exports,arguments)
-},{"dup":73,"global/window":83,"is-function":49,"once":84,"parse-headers":62,"xtend":87}],86:[function(require,module,exports){
+},{"dup":72,"global/window":82,"is-function":49,"once":83,"parse-headers":61,"xtend":86}],85:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter
 
 module.exports = progress
@@ -8390,7 +8356,7 @@ function progress(xhr) {
   return emitter
 }
 
-},{"events":3}],87:[function(require,module,exports){
+},{"events":3}],86:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -8413,7 +8379,7 @@ function extend() {
     return target
 }
 
-},{}],88:[function(require,module,exports){
+},{}],87:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -8434,13 +8400,13 @@ function extend(target) {
     return target
 }
 
-},{}],89:[function(require,module,exports){
+},{}],88:[function(require,module,exports){
 // var test = require('tst');
 // var Formant = require('audio-formant');
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./2d');
+var Spectrum = require('./');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -8449,6 +8415,7 @@ var colorScales = require('colormap/colorScales');
 var startApp = require('start-app');
 var ctx = require('audio-context');
 var isMobile = require('is-mobile')();
+// require('get-float-time-domain-data');
 // var createAudioContext = require('ios-safe-audio-context')
 
 
@@ -8460,7 +8427,7 @@ var app = startApp({
 	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
-	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/crossingsofficial/podcast-023-sam-pauli',
+	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
 	params: true,
 	github: 'audio-lab/gl-spectrum',
 	history: false,
@@ -8498,11 +8465,11 @@ for (var i = 0; i < N; i++) {
 // var frequencies = ft(noise);
 // var frequencies = new Float32Array(1024).fill(0.5);
 //NOTE: ios does not allow setting too big this value
-analyser.fftSize = 1024;
+// analyser.fftSize = 1024;
 var frequencies = new Float32Array(analyser.frequencyBinCount);
 for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
-frequencies = frequencies
+// frequencies = frequencies
 // .map((v, i) => v*blackman(i, N))
 // .map((v) => db.fromGain(v));
 
@@ -8534,7 +8501,7 @@ var spectrum = new Spectrum({
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	type: 'fill',
+	type: 'line',
 	width: 2,
 	// weighting: 'z',
 	// background: [27/255,0/255,37/255, 1],
@@ -8733,4 +8700,4 @@ function createColormapSelector (spectrum) {
 	}
 }
 
-},{"./2d":10,"audio-context":20,"colormap/colorScales":29,"decibels":31,"fourier-transform":36,"is-browser":47,"is-mobile":50,"scijs-window-functions/blackman-harris":68,"start-app":70}]},{},[89]);
+},{"./":10,"audio-context":20,"colormap/colorScales":29,"decibels":31,"fourier-transform":36,"is-browser":47,"is-mobile":50,"scijs-window-functions/blackman-harris":67,"start-app":69}]},{},[88]);
