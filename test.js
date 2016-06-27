@@ -3,7 +3,7 @@
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./');
+var Spectrum = require('./2d');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -65,7 +65,7 @@ analyser.fftSize = 1024;
 var frequencies = new Float32Array(analyser.frequencyBinCount);
 for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
-// frequencies = frequencies
+frequencies = frequencies
 // .map((v, i) => v*blackman(i, N))
 // .map((v) => db.fromGain(v));
 

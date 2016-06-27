@@ -48,7 +48,7 @@ var spectrum = new Spectrum({
 	//line, bar or fill, or any combination of them.
 	type: 'line',
 
-	//width of line or a bar
+	//width of line or bar
 	width: 1,
 
 	//The levels of magnitude/frequency - a colormap name, colormap, pixels array, imageData, imageElement or canvas. Null disables fill.
