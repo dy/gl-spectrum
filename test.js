@@ -3,7 +3,7 @@
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./2d');
+var Spectrum = require('./');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -12,6 +12,7 @@ var colorScales = require('colormap/colorScales');
 var startApp = require('start-app');
 var ctx = require('audio-context');
 var isMobile = require('is-mobile')();
+// require('get-float-time-domain-data');
 // var createAudioContext = require('ios-safe-audio-context')
 
 
@@ -23,7 +24,7 @@ var app = startApp({
 	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
-	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/crossingsofficial/podcast-023-sam-pauli',
+	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
 	params: true,
 	github: 'audio-lab/gl-spectrum',
 	history: false,
@@ -61,11 +62,11 @@ for (var i = 0; i < N; i++) {
 // var frequencies = ft(noise);
 // var frequencies = new Float32Array(1024).fill(0.5);
 //NOTE: ios does not allow setting too big this value
-analyser.fftSize = 1024;
+// analyser.fftSize = 1024;
 var frequencies = new Float32Array(analyser.frequencyBinCount);
 for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
-frequencies = frequencies
+// frequencies = frequencies
 // .map((v, i) => v*blackman(i, N))
 // .map((v) => db.fromGain(v));
 
@@ -78,7 +79,8 @@ for (var name in colorScales) {
 	if (name === 'phase') continue;
 	colormaps.push(name);
 }
-var colormap = colormaps[9]//(Math.random() * colormaps.length) | 0];
+// var colormap = colormaps[9];
+var colormap = colormaps[(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
 	// magnitudes: frequencies,
@@ -96,7 +98,7 @@ var spectrum = new Spectrum({
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	type: 'fill',
+	type: 'line',
 	width: 2,
 	// weighting: 'z',
 	// background: [27/255,0/255,37/255, 1],

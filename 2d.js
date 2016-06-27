@@ -12,13 +12,24 @@ Spectrum.prototype.context = '2d';
 
 
 //return color based on current palette
+// Spectrum.prototype.getColor = function (ratio) {
+// 	var cm = this.fillData;
+// 	ratio = clamp(ratio, 0, 1);
+// 	var idx = (ratio*(cm.length - 1)*.25)|0;
+// 	var left = cm.slice(Math.floor(idx)*4, Math.floor(idx)*4 + 4);
+// 	var right = cm.slice(Math.ceil(idx)*4, Math.ceil(idx)*4 + 4);
+// 	var amt = idx % 1;
+// 	var values = left.map((v,i) => (v * (1 - amt) + right[i] * amt)|0 );
+// 	return values;
+// }
+
 Spectrum.prototype.getColor = function (ratio) {
 	var cm = this.fillData;
 	ratio = clamp(ratio, 0, 1);
-	var idx = (ratio*(cm.length - 1)*.25)|0;
+	var idx = ratio*(cm.length*.25 - 1);
+	var amt = idx % 1;
 	var left = cm.slice(Math.floor(idx)*4, Math.floor(idx)*4 + 4);
 	var right = cm.slice(Math.ceil(idx)*4, Math.ceil(idx)*4 + 4);
-	var amt = idx % 1;
 	var values = left.map((v,i) => (v * (1 - amt) + right[i] * amt)|0 );
 	return values;
 }
@@ -39,7 +50,7 @@ Spectrum.prototype.draw = function () {
 	ctx.clearRect.apply(ctx,this.viewport);
 
 	//FIXME: value of 1 fucks up here and in gl-spectrum apparently
-	ctx.lineWidth = this.width;
+	ctx.lineWidth = this.trail ? this.width * 2 : this.width;
 
 	var prevX = -1, prevOffset = -1, nf, f, x, offset, amp, relativeAmp;
 	var padding = 40;
@@ -48,11 +59,11 @@ Spectrum.prototype.draw = function () {
 	var gradient = ctx.createLinearGradient(this.viewport[0],0,width,0);
 	this.createShape(this.trailMagnitudes, gradient);
 	ctx.fillStyle = gradient;
-	if (isFill || isLine) {
-		ctx.strokeStyle = `rgba(${this.getColor(1)})`;
+	ctx.strokeStyle = `rgba(${this.getColor(1)})`;
+	if ((isFill && this.trail) || isLine) {
 		ctx.stroke();
 	}
-	if (isLine) {
+	if (isLine && this.trail) {
 		ctx.fill();
 	}
 
@@ -61,7 +72,7 @@ Spectrum.prototype.draw = function () {
 	ctx.strokeStyle = gradient;
 	ctx.fillStyle = gradient;
 
-	if (isLine) {
+	if (isLine && this.trail) {
 		ctx.save();
 		ctx.globalCompositeOperation = 'xor';
 		ctx.fillStyle = 'rgba(0,0,0,1)';
@@ -80,7 +91,7 @@ Spectrum.prototype.draw = function () {
 			f = this.unf(nf);
 
 			x = f * width;
-			offset = nf * magnitudes.length;
+			offset = nf * (magnitudes.length - 1);
 
 			barWidth = Math.min(this.width, Math.abs(x - prevX));
 			if (x === prevX) continue;
@@ -93,28 +104,31 @@ Spectrum.prototype.draw = function () {
 
 			ctx.fillRect(x - barWidth, (height*(1 - this.align) - amp*height*(1 - this.align) ), barWidth, (amp*height));
 		}
-		ctx.fillStyle = `rgba(${this.getColor(1)})`;
-		prevX = 0;
-		for (var i = .5; i < trail.length; i++) {
-			nf = i / trail.length;
-			f = this.unf(nf);
 
-			x = f * width;
-			offset = nf * trail.length;
+		if (this.trail) {
+			ctx.fillStyle = `rgba(${this.getColor(1)})`;
+			prevX = 0;
+			for (var i = .5; i < trail.length; i++) {
+				nf = i / trail.length;
+				f = this.unf(nf);
 
-			barWidth = Math.min(this.width, x - prevX);
+				x = f * width;
+				offset = nf * (trail.length - 1);
 
-			if (x === prevX) continue;
-			prevX = x|0;
-			if (offset === prevOffset) continue;
-			prevOffset = offset|0;
+				barWidth = Math.min(this.width, x - prevX);
 
-			amp = trail[offset|0];
-			amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
+				if (x === prevX) continue;
+				prevX = x|0;
+				if (offset === prevOffset) continue;
+				prevOffset = offset|0;
+
+				amp = trail[offset|0];
+				amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
 
 
-			ctx.fillRect(x - barWidth, (height*(1 - this.align) - amp*height*(1 - this.align) ), barWidth, 1);
-			ctx.fillRect(x - barWidth, (height*(1 - this.align) - amp*height*(1 - this.align) + amp*height ) - 1, barWidth, 1);
+				ctx.fillRect(x - barWidth, (height*(1 - this.align) - amp*height*(1 - this.align) ), barWidth, 1);
+				ctx.fillRect(x - barWidth, (height*(1 - this.align) - amp*height*(1 - this.align) + amp*height ) - 1, barWidth, 1);
+			}
 		}
 	}
 };
@@ -131,14 +145,14 @@ Spectrum.prototype.createShape = function (data, gradient) {
 
 	ctx.beginPath();
 	ctx.moveTo(-padding, height * (1 - this.align));
-	gradient && gradient.addColorStop(0, `rgba(${this.getColor(0)})`);
+	gradient && gradient.addColorStop(0, `rgba(${this.getColor(0.5)})`);
 
 	for (var i = 0; i < data.length; i++) {
 		nf = (i + .5) / data.length;
 		f = this.unf(nf);
 
 		x = f * width;
-		offset = nf * data.length;
+		offset = nf * (data.length - 1);
 
 		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
 		relativeAmp = (amp + 100) / (this.peak + 100);
@@ -155,7 +169,7 @@ Spectrum.prototype.createShape = function (data, gradient) {
 		f = this.unf(nf);
 
 		x = f * width;
-		offset = nf * data.length;
+		offset = nf * (data.length - 1);
 
 		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
 		amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);

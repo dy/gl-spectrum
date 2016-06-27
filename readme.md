@@ -1,6 +1,6 @@
 # gl-spectrum [![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
 
-Spectrum rendering component.
+Spectrum rendering component with webgl or context2d.
 
 [![Spectrum](https://raw.githubusercontent.com/audio-lab/gl-spectrum/gh-pages/preview.png "Spectrum")](http://audio-lab.github.io/gl-spectrum/)
 
@@ -66,6 +66,8 @@ spectrum.setFill(colors, inverse?);
 spectrum.setBackground(image);
 spectrum.update(options);
 ```
+
+Lightweight 2d version is available as `require('gl-spectrum/2d')`.
 
 ## Related
 

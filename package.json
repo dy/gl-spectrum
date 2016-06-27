@@ -16,6 +16,7 @@
     "bubleify": "^0.2.0",
     "decibels": "^1.0.1",
     "fourier-transform": "^1.0.0",
+    "get-float-time-domain-data": "^0.1.0",
     "start-app": "^1.1.0",
     "tst": "^1.3.1"
   },

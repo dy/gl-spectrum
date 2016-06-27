@@ -238,13 +238,13 @@ Spectrum.prototype.frag = `
 		//2-type - render variance of trail/mag
 
 		float intensity = pow(dist + .1, .8888) * balance + pow(vIntensity, 2.) * (1. - balance);
-		// float intensity = (dist + .1) * balance + vIntensity * (1. - balance);
 		intensity = clamp(intensity, 0., 1.);
 
 		intensity = decide(intensity, (intensity + .333) * 1.1, step(.5, type));
 
 		float widthRatio = (width - .5) / viewport.w;
-		intensity *= decide(1., .5 * smoothstep(.99*vMag - widthRatio, vMag - widthRatio, dist), type - 1.);
+		float mag = abs(vMag);
+		intensity *= decide(1., .5 * smoothstep(.99 * mag, 1.01*mag, dist), type - .5);
 
 
 		vec4 fillColor = texture2D(fill, vec2(intensity, coord.x));
@@ -327,15 +327,19 @@ Spectrum.prototype.draw = function () {
 	var isLine = /line/.test(type);
 
 	if (isLine) {
-		gl.uniform1f(this.typeLocation, 2);
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+		if (this.trail) {
+			gl.uniform1f(this.typeLocation, 2);
+			gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
+		}
 		gl.uniform1f(this.typeLocation, 1);
 		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
 	} else {
 		gl.uniform1f(this.typeLocation, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
-		gl.uniform1f(this.typeLocation, 1);
-		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
+		if (this.trail) {
+			gl.uniform1f(this.typeLocation, 1);
+			gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
+		}
 	}
 
 	return this;
