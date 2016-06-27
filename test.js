@@ -24,7 +24,7 @@ var app = startApp({
 	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
-	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
+	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
 	params: true,
 	github: 'audio-lab/gl-spectrum',
 	history: false,
@@ -46,29 +46,29 @@ app.on('source', function (node) {
 
 
 //generate input sine
-var N = 512;
+var N = 4096;
 var sine = new Float32Array(N);
 var saw = new Float32Array(N);
 var noise = new Float32Array(N);
 var rate = 44100;
 
 for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(10000 * Math.PI * 2 * (i / rate));
+	sine[i] = Math.sin(8000 * Math.PI * 2 * (i / rate)) + Math.sin(800 * Math.PI * 2 * (i / rate)) + Math.sin(80 * Math.PI * 2 * (i / rate));
 	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
 	noise[i] = Math.random() * 2 - 1;
 }
 
-// var frequencies = ft(sine);
+var frequencies = ft(sine);
 // var frequencies = ft(noise);
 // var frequencies = new Float32Array(1024).fill(0.5);
 //NOTE: ios does not allow setting too big this value
 // analyser.fftSize = 1024;
-var frequencies = new Float32Array(analyser.frequencyBinCount);
-for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
+// var frequencies = new Float32Array(analyser.frequencyBinCount);
+// for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
-// frequencies = frequencies
+frequencies = frequencies
 // .map((v, i) => v*blackman(i, N))
-// .map((v) => db.fromGain(v));
+.map((v) => db.fromGain(v));
 
 var colormaps = [];
 for (var name in colorScales) {
@@ -83,17 +83,17 @@ for (var name in colorScales) {
 var colormap = colormaps[(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
-	// magnitudes: frequencies,
+	magnitudes: frequencies,
 	fill: colormap,
 	grid: true,
 	minFrequency: 20,
-	maxFrequency: 12257.61,
+	maxFrequency: 20000,
 	logarithmic: true,
 	// smoothing: .7,
 	maxDecibels: 0,
 	align: .5,
 	trail: 38,
-	// autostart: false,
+	autostart: false,
 	// balance: .5,
 	// antialias: true,
 	// fill: [1,1,1,0],
@@ -110,11 +110,11 @@ var spectrum = new Spectrum({
 	// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 	// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-	analyser.getFloatFrequencyData(frequencies);
-	spectrum.setFrequencyData(frequencies);
+	// analyser.getFloatFrequencyData(frequencies);
+	// spectrum.setFrequencyData(frequencies);
 });
 
-// spectrum.render();
+spectrum.render();
 
 createColormapSelector(spectrum);
 

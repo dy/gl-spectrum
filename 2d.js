@@ -5,6 +5,8 @@
 var Spectrum = require('./lib/core');
 var clamp = require('mumath/clamp');
 var mix = require('mumath/mix');
+var spiral = require('spiral-2d');
+
 
 module.exports = Spectrum;
 
@@ -12,17 +14,6 @@ Spectrum.prototype.context = '2d';
 
 
 //return color based on current palette
-// Spectrum.prototype.getColor = function (ratio) {
-// 	var cm = this.fillData;
-// 	ratio = clamp(ratio, 0, 1);
-// 	var idx = (ratio*(cm.length - 1)*.25)|0;
-// 	var left = cm.slice(Math.floor(idx)*4, Math.floor(idx)*4 + 4);
-// 	var right = cm.slice(Math.ceil(idx)*4, Math.ceil(idx)*4 + 4);
-// 	var amt = idx % 1;
-// 	var values = left.map((v,i) => (v * (1 - amt) + right[i] * amt)|0 );
-// 	return values;
-// }
-
 Spectrum.prototype.getColor = function (ratio) {
 	var cm = this.fillData;
 	ratio = clamp(ratio, 0, 1);
@@ -46,9 +37,106 @@ Spectrum.prototype.draw = function () {
 
 	ctx.clearRect.apply(ctx,this.viewport);
 
-	if (isLine) return this.drawLine();
-	else if (isBar) return this.drawBar();
-	return this.drawFill();
+	this.drawSpiral(this.magnitudes);
+
+	// if (isLine) return this.drawLine(this.magnitudes);
+	// else if (isBar) return this.drawBar(this.magnitudes);
+	// return this.drawFill();
+};
+
+
+Spectrum.prototype.drawSpiral = function (data) {
+	var ctx = this.context;
+	var width = this.viewport[2],
+		height = this.viewport[3];
+	var center = [width*.5, height*.5];
+	var balance = .5;
+
+	//log spiral
+	if (this.logarithmic) {
+		var startAngle = Math.PI * Math.log10(this.minFrequency) * 2;
+		var endAngle = Math.PI * Math.log10(this.maxFrequency) * 2;
+
+		if (width > height) {
+			var b = spiral.logarithmic.b(height*.5, endAngle, 1);
+		}
+		else {
+			var b = spiral.logarithmic.b(width*.5, endAngle, 1);
+		}
+
+
+		//paint spiral curve in canvas
+		ctx.beginPath();
+		var coords = spiral.logarithmic(center, startAngle, 1, b);
+		ctx.moveTo(coords[0], coords[1]);
+
+		//draw spiral
+		for (var angle = startAngle; angle <= endAngle; angle+=0.1) {
+			coords = spiral.logarithmic(center, angle, 1, b);
+			ctx.lineTo(coords[0], coords[1]);
+		}
+		ctx.lineWidth = this.width;
+		ctx.strokeStyle = `rgba(${this.getColor(1)})`;
+		ctx.stroke();
+
+
+		//draw bars
+		var ratio = 0, maxAmp = 0, amp = 0, nf, f, x, offset;
+		// var gradient = ctx.createLinearGradient(this.viewport[0],0,width,0);
+		// gradient.addColorStop(0, `rgba(${this.getColor(0.5)})`)
+
+		var coords = spiral.logarithmic(center, startAngle, 1, b);
+		ctx.moveTo(coords[0], coords[1]);
+
+		for (var i = 0; i < data.length; i++) {
+			nf = (i + .5) / data.length;
+			f = this.unf(nf);
+
+			angle = f * (endAngle - startAngle) + startAngle;
+
+			amp = data[i];
+			relativeAmp = (amp + 100) / (this.peak + 100);
+			amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
+
+			ratio = (angle - startAngle) / (endAngle - startAngle);
+			maxAmp = spiral.radius(angle, 1, b) - spiral.radius(angle - Math.PI * 2, 1, b);
+
+			var radius = amp * maxAmp;
+			var from = spiral.logarithmic(center, angle, 1, b);
+			var to = [-radius * Math.cos(angle) + from[0], -radius * Math.sin(angle) + from[1]];
+
+			ctx.beginPath();
+			ctx.moveTo(from[0], from[1]);
+			ctx.lineTo(to[0], to[1]);
+			ctx.strokeStyle = `rgba(${this.getColor( amp*balance + relativeAmp*(1 - balance) )})`;
+			ctx.stroke();
+		}
+
+	}
+
+	//archimedean spiral
+	else {
+		if (width > height) {
+			var b = spiral.archimedean.b(width*.5, Math.PI * 4, 0);
+		}
+		else {
+			var b = spiral.archimedean.b(height*.5, Math.PI * 4, 0);
+		}
+
+		//paint spiral curve in canvas
+		ctx.beginPath();
+		ctx.moveTo(center[0], center[1]);
+		for (var angle = 0; angle <= Math.PI * 4; angle+=0.01) {
+			var coords = spiral.archimedean(center, angle, 0, b);
+			ctx.lineTo(coords[0], coords[1]);
+		}
+
+		ctx.lineWidth = this.width;
+		ctx.strokeStyle = `rgba(${this.getColor(.5)})`;
+		ctx.stroke();
+	}
+
+	return this;
 };
 
 
@@ -84,7 +172,7 @@ Spectrum.prototype.drawLine = function () {
 	}
 
 	return this;
-}
+};
 
 
 //render fill-style
@@ -113,7 +201,7 @@ Spectrum.prototype.drawFill = function () {
 	ctx.fill();
 
 	return this;
-}
+};
 
 
 //render bar-style
@@ -175,7 +263,7 @@ Spectrum.prototype.drawBar = function () {
 	}
 
 	return this;
-}
+};
 
 
 //create shape for a data in rect view
@@ -225,17 +313,19 @@ Spectrum.prototype.createShape = function (data, gradient) {
 	ctx.closePath();
 
 	return this;
-}
+};
 
 
 //get linear f from logarithmic f
-Spectrum.prototype.f = function (ratio) {
+Spectrum.prototype.f = function (ratio, log) {
+	log = log == null ? this.logarithmic : log;
+
 	var halfRate = this.sampleRate * .5;
 	var leftF = this.minFrequency / halfRate;
 	var rightF = this.maxFrequency / halfRate;
 
 	//forward action
-	if (this.logarithmic) {
+	if (log) {
 		var logF = Math.pow(10.,
 			Math.log10(this.minFrequency) + ratio * (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency))
 		);
@@ -249,7 +339,9 @@ Spectrum.prototype.f = function (ratio) {
 };
 
 //get log-shifted f from linear f
-Spectrum.prototype.unf = function (ratio) {
+Spectrum.prototype.unf = function (ratio, log) {
+	log = log == null ? this.logarithmic : log;
+
 	var halfRate = this.sampleRate * .5;
 	var leftF = this.minFrequency / halfRate;
 	var rightF = this.maxFrequency / halfRate;
@@ -257,7 +349,7 @@ Spectrum.prototype.unf = function (ratio) {
 	//back action
 	ratio = (ratio - leftF) / (rightF - leftF);
 
-	if (this.logarithmic) {
+	if (log) {
 		var logRatio = ratio * (this.maxFrequency - this.minFrequency) + this.minFrequency;
 
 		ratio = (Math.log10(logRatio) - Math.log10(this.minFrequency)) / (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency));
