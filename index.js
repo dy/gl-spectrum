@@ -2375,127 +2375,429 @@ process.chdir = function (dir) {
 process.umask = function() { return 0; };
 
 },{}],7:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+'use strict';
+
+// If obj.hasOwnProperty has been overridden, then calling
+// obj.hasOwnProperty(prop) will break.
+// See: https://github.com/joyent/node/issues/1707
+function hasOwnProperty(obj, prop) {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
+module.exports = function(qs, sep, eq, options) {
+  sep = sep || '&';
+  eq = eq || '=';
+  var obj = {};
+
+  if (typeof qs !== 'string' || qs.length === 0) {
+    return obj;
+  }
+
+  var regexp = /\+/g;
+  qs = qs.split(sep);
+
+  var maxKeys = 1000;
+  if (options && typeof options.maxKeys === 'number') {
+    maxKeys = options.maxKeys;
+  }
+
+  var len = qs.length;
+  // maxKeys <= 0 means that we should not limit keys count
+  if (maxKeys > 0 && len > maxKeys) {
+    len = maxKeys;
+  }
+
+  for (var i = 0; i < len; ++i) {
+    var x = qs[i].replace(regexp, '%20'),
+        idx = x.indexOf(eq),
+        kstr, vstr, k, v;
+
+    if (idx >= 0) {
+      kstr = x.substr(0, idx);
+      vstr = x.substr(idx + 1);
+    } else {
+      kstr = x;
+      vstr = '';
+    }
+
+    k = decodeURIComponent(kstr);
+    v = decodeURIComponent(vstr);
+
+    if (!hasOwnProperty(obj, k)) {
+      obj[k] = v;
+    } else if (isArray(obj[k])) {
+      obj[k].push(v);
+    } else {
+      obj[k] = [obj[k], v];
+    }
+  }
+
+  return obj;
+};
+
+var isArray = Array.isArray || function (xs) {
+  return Object.prototype.toString.call(xs) === '[object Array]';
+};
+
+},{}],8:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+'use strict';
+
+var stringifyPrimitive = function(v) {
+  switch (typeof v) {
+    case 'string':
+      return v;
+
+    case 'boolean':
+      return v ? 'true' : 'false';
+
+    case 'number':
+      return isFinite(v) ? v : '';
+
+    default:
+      return '';
+  }
+};
+
+module.exports = function(obj, sep, eq, name) {
+  sep = sep || '&';
+  eq = eq || '=';
+  if (obj === null) {
+    obj = undefined;
+  }
+
+  if (typeof obj === 'object') {
+    return map(objectKeys(obj), function(k) {
+      var ks = encodeURIComponent(stringifyPrimitive(k)) + eq;
+      if (isArray(obj[k])) {
+        return map(obj[k], function(v) {
+          return ks + encodeURIComponent(stringifyPrimitive(v));
+        }).join(sep);
+      } else {
+        return ks + encodeURIComponent(stringifyPrimitive(obj[k]));
+      }
+    }).join(sep);
+
+  }
+
+  if (!name) return '';
+  return encodeURIComponent(stringifyPrimitive(name)) + eq +
+         encodeURIComponent(stringifyPrimitive(obj));
+};
+
+var isArray = Array.isArray || function (xs) {
+  return Object.prototype.toString.call(xs) === '[object Array]';
+};
+
+function map (xs, f) {
+  if (xs.map) return xs.map(f);
+  var res = [];
+  for (var i = 0; i < xs.length; i++) {
+    res.push(f(xs[i], i));
+  }
+  return res;
+}
+
+var objectKeys = Object.keys || function (obj) {
+  var res = [];
+  for (var key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) res.push(key);
+  }
+  return res;
+};
+
+},{}],9:[function(require,module,exports){
+'use strict';
+
+exports.decode = exports.parse = require('./decode');
+exports.encode = exports.stringify = require('./encode');
+
+},{"./decode":7,"./encode":8}],10:[function(require,module,exports){
 /**
- * @module  gl-spectrum
+ * Simplified 2d version of spectrum
+ */
+
+var Spectrum = require('./lib/core');
+var clamp = require('mumath/clamp');
+var mix = require('mumath/mix');
+
+module.exports = Spectrum;
+
+Spectrum.prototype.context = '2d';
+
+
+//return color based on current palette
+Spectrum.prototype.getColor = function (ratio) {
+	var cm = this.fillData;
+	ratio = clamp(ratio, 0, 1);
+	var idx = (ratio*(cm.length - 1)*.25)|0;
+	var left = cm.slice(Math.floor(idx)*4, Math.floor(idx)*4 + 4);
+	var right = cm.slice(Math.ceil(idx)*4, Math.ceil(idx)*4 + 4);
+	var amt = idx % 1;
+	var values = left.map(function (v,i) { return (v * (1 - amt) + right[i] * amt)|0; } );
+	return values;
+}
+
+
+
+//
+Spectrum.prototype.draw = function () {
+	var this$1 = this;
+
+	var ctx = this.context;
+	var width = this.viewport[2],
+		height = this.viewport[3];
+
+	var type = ''+this.type;
+	var isLine = /line/.test(type);
+	var isFill = /fill/.test(type);
+	var isBar = /bar/.test(type);
+
+	ctx.clearRect.apply(ctx,this.viewport);
+
+	//FIXME: value of 1 fucks up here and in gl-spectrum apparently
+	ctx.lineWidth = this.width;
+
+	var prevX = -1, prevOffset = -1, nf, f, x, offset, amp, relativeAmp;
+	var padding = 40;
+
+	//draw trail
+	var gradient = ctx.createLinearGradient(this.viewport[0],0,width,0);
+	this.createShape(this.trailMagnitudes, gradient);
+	ctx.fillStyle = gradient;
+	if (isFill || isLine) {
+		ctx.strokeStyle = "rgba(" + (this.getColor(1)) + ")";
+		ctx.stroke();
+	}
+	if (isLine) {
+		ctx.fill();
+	}
+
+	//draw main magnitudes
+	this.createShape(this.magnitudes);
+	ctx.strokeStyle = gradient;
+	ctx.fillStyle = gradient;
+
+	if (isLine) {
+		ctx.save();
+		ctx.globalCompositeOperation = 'xor';
+		ctx.fillStyle = 'rgba(0,0,0,1)';
+		ctx.fill();
+		ctx.restore();
+	}
+	if (isFill) ctx.fill();
+
+
+	var magnitudes = this.magnitudes;
+	var trail = this.trailMagnitudes;
+	var barWidth;
+	if (isBar) {
+		for (var i = .5; i < magnitudes.length; i++) {
+			nf = i / magnitudes.length;
+			f = this$1.unf(nf);
+
+			x = f * width;
+			offset = nf * magnitudes.length;
+
+			barWidth = Math.min(this$1.width, Math.abs(x - prevX));
+			if (x === prevX) continue;
+			prevX = x|0;
+			if (offset === prevOffset) continue;
+			prevOffset = offset|0;
+
+			amp = magnitudes[offset|0];
+			amp = clamp((amp - this$1.minDecibels) / (this$1.maxDecibels - this$1.minDecibels), 0, 1);
+
+			ctx.fillRect(x - barWidth, (height*(1 - this$1.align) - amp*height*(1 - this$1.align) ), barWidth, (amp*height));
+		}
+		ctx.fillStyle = "rgba(" + (this.getColor(1)) + ")";
+		prevX = 0;
+		for (var i = .5; i < trail.length; i++) {
+			nf = i / trail.length;
+			f = this$1.unf(nf);
+
+			x = f * width;
+			offset = nf * trail.length;
+
+			barWidth = Math.min(this$1.width, x - prevX);
+
+			if (x === prevX) continue;
+			prevX = x|0;
+			if (offset === prevOffset) continue;
+			prevOffset = offset|0;
+
+			amp = trail[offset|0];
+			amp = clamp((amp - this$1.minDecibels) / (this$1.maxDecibels - this$1.minDecibels), 0, 1);
+
+
+			ctx.fillRect(x - barWidth, (height*(1 - this$1.align) - amp*height*(1 - this$1.align) ), barWidth, 1);
+			ctx.fillRect(x - barWidth, (height*(1 - this$1.align) - amp*height*(1 - this$1.align) + amp*height ) - 1, barWidth, 1);
+		}
+	}
+};
+
+
+Spectrum.prototype.createShape = function (data, gradient) {
+	var this$1 = this;
+
+	var ctx = this.context;
+	var prevX = -1, prevOffset = -1, nf, f, x, offset, amp, relativeAmp;
+	var padding = 40;
+	var balance = .5;
+
+	var width = this.viewport[2],
+		height = this.viewport[3];
+
+	ctx.beginPath();
+	ctx.moveTo(-padding, height * (1 - this.align));
+	gradient && gradient.addColorStop(0, ("rgba(" + (this.getColor(0.5)) + ")"));
+
+	for (var i = 0; i < data.length; i++) {
+		nf = (i + .5) / data.length;
+		f = this$1.unf(nf);
+
+		x = f * width;
+		offset = nf * data.length;
+
+		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
+		relativeAmp = (amp + 100) / (this$1.peak + 100);
+		amp = clamp((amp - this$1.minDecibels) / (this$1.maxDecibels - this$1.minDecibels), 0, 1);
+		gradient && gradient.addColorStop(f, ("rgba(" + (this$1.getColor( amp*balance + relativeAmp*(1 - balance) )) + ")"));
+		ctx.lineTo(x, (height*(1 - this$1.align) - amp*height*(1 - this$1.align) ));
+	}
+
+	prevOffset = -1;
+	prevX = -1;
+	ctx.lineTo(width+padding, height * (1 - this.align));
+	for (var i = data.length - 1; i>=0; i--) {
+		nf = (i + .5) / data.length;
+		f = this$1.unf(nf);
+
+		x = f * width;
+		offset = nf * data.length;
+
+		amp = mix(data[offset|0], data[(offset+1)|0], offset%1);
+		amp = clamp((amp - this$1.minDecibels) / (this$1.maxDecibels - this$1.minDecibels), 0, 1);
+
+		ctx.lineTo(x, (height*(1 - this$1.align) + amp*height*(this$1.align) ));
+	}
+	ctx.lineTo(-padding, height * (1 - this.align));
+	ctx.closePath();
+
+	return this;
+}
+
+
+//get linear f from logarithmic f
+Spectrum.prototype.f = function (ratio) {
+	var halfRate = this.sampleRate * .5;
+	var leftF = this.minFrequency / halfRate;
+	var rightF = this.maxFrequency / halfRate;
+
+	//forward action
+	if (this.logarithmic) {
+		var logF = Math.pow(10.,
+			Math.log10(this.minFrequency) + ratio * (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency))
+		);
+		ratio = (logF - this.minFrequency) / (this.maxFrequency - this.minFrequency);
+	}
+
+
+	ratio = leftF + ratio * (rightF - leftF);
+
+	return ratio;
+};
+
+//get log-shifted f from linear f
+Spectrum.prototype.unf = function (ratio) {
+	var halfRate = this.sampleRate * .5;
+	var leftF = this.minFrequency / halfRate;
+	var rightF = this.maxFrequency / halfRate;
+
+	//back action
+	ratio = (ratio - leftF) / (rightF - leftF);
+
+	if (this.logarithmic) {
+		var logRatio = ratio * (this.maxFrequency - this.minFrequency) + this.minFrequency;
+
+		ratio = (Math.log10(logRatio) - Math.log10(this.minFrequency)) / (Math.log10(this.maxFrequency) - Math.log10(this.minFrequency));
+	}
+
+	return clamp(ratio, 0, 1);
+};
+
+},{"./lib/core":11,"mumath/clamp":53,"mumath/mix":56}],11:[function(require,module,exports){
+/**
+ * @module  gl-spectrum/lib/code
  */
 
 var extend = require('xtend/mutable');
-var Component = require('gl-component');
 var inherits = require('inherits');
 var lg = require('mumath/lg');
 var isBrowser = require('is-browser');
 var createGrid = require('plot-grid');
-var colormap = require('colormap');
-var flatten = require('flatten');
 var clamp = require('mumath/clamp');
-var weighting = require('a-weighting');
+var Spectrogram = require('gl-spectrogram/lib/core');
 
 module.exports = Spectrum;
-
 
 
 /**
  * @contructor
  */
 function Spectrum (options) {
-	var this$1 = this;
-
 	if (!(this instanceof Spectrum)) return new Spectrum(options);
 
-	var that = this;
+	//stack of frequency snapshots
+	this.trailStack = [];
 
-	options = options || {};
-
-	Component.call(this, options);
-
-	if (isBrowser) {
-		this.container.classList.add('gl-spectrum');
-	}
-
-	if (!this.is2d) {
-		var gl = this.gl;
-
-		//setup alpha
-		gl.enable( gl.BLEND );
-		gl.blendEquation( gl.FUNC_ADD );
-		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-		this.maskSizeLocation = gl.getUniformLocation(this.program, 'maskSize');
-		this.alignLocation = gl.getUniformLocation(this.program, 'align');
-		this.minFrequencyLocation = gl.getUniformLocation(this.program, 'minFrequency');
-		this.maxFrequencyLocation = gl.getUniformLocation(this.program, 'maxFrequency');
-		this.logarithmicLocation = gl.getUniformLocation(this.program, 'logarithmic');
-		this.sampleRateLocation = gl.getUniformLocation(this.program, 'sampleRate');
-		this.groupLocation = gl.getUniformLocation(this.program, 'group');
-		this.trailLocation = gl.getUniformLocation(this.program, 'trail');
-		this.balanceLocation = gl.getUniformLocation(this.program, 'balance');
-		this.peakLocation = gl.getUniformLocation(this.program, 'peak');
-
-		this.setTexture({
-			frequencies: {
-				filter: gl.LINEAR,
-				wrap: gl.CLAMP_TO_EDGE,
-				format: gl.ALPHA
-			},
-			fill: {
-				filter: gl.LINEAR,
-				wrap: gl.CLAMP_TO_EDGE,
-				format: gl.RGBA
-			},
-			mask: {
-				type: gl.FLOAT,
-				format: gl.LUMINOCITY,
-				wrap: gl.CLAMP_TO_EDGE
-			}
-		});
-	}
-
-	this.freqBuffer = [];
-
-	this.on('resize', function () {
-		this$1.recalc();
-	});
-
-	this.update();
+	Spectrogram.call(this, options);
 }
 
-inherits(Spectrum, Component);
+inherits(Spectrum, Spectrogram);
 
-
-Spectrum.prototype.antialias = false;
-Spectrum.prototype.premultipliedAlpha = true;
-Spectrum.prototype.alpha = true;
-Spectrum.prototype.float = true;
-
-Spectrum.prototype.maxDecibels = -30;
-Spectrum.prototype.minDecibels = -100;
-
-Spectrum.prototype.maxFrequency = 20000;
-Spectrum.prototype.minFrequency = 20;
-
-Spectrum.prototype.smoothing = 0.75;
-Spectrum.prototype.details = 1;
-
-Spectrum.prototype.snap = null;
-
-Spectrum.prototype.grid = true;
-Spectrum.prototype.axes = false;
-
-Spectrum.prototype.logarithmic = true;
-
-Spectrum.prototype.weighting = 'itu';
-
-//evenly distributed within indicated diapasone
-Spectrum.prototype.frequencies = new Float32Array(512);
-for (var i = 0; i < 512; i++) {Spectrum.prototype.frequencies[i] = Spectrum.prototype.minDecibels;};
-
-//required to detect frequency resolution
-Spectrum.prototype.sampleRate = 44100;
-
-//colors to map spectrum against
-Spectrum.prototype.fill = 'greys';
-Spectrum.prototype.balance = .65;
-Spectrum.prototype.background = undefined;
+Spectrum.prototype.className = 'gl-spectrum';
 
 //amount of alignment
 Spectrum.prototype.align = .0;
@@ -2503,240 +2805,57 @@ Spectrum.prototype.align = .0;
 //shadow frequencies, like averaged/max values
 Spectrum.prototype.trail = 1;
 
-//mask defines style of bars, dots or line
-Spectrum.prototype.mask = null;
-
-//group freq range by subbands
-Spectrum.prototype.group = false;
-
-
-//scale verteces to frequencies values and apply alignment
-Spectrum.prototype.vert = "\n\tprecision highp float;\n\n\tattribute vec2 position;\n\n\tuniform sampler2D frequencies;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform float align;\n\tuniform float minFrequency;\n\tuniform float maxFrequency;\n\tuniform float logarithmic;\n\tuniform float sampleRate;\n\tuniform vec4 viewport;\n\tuniform float group;\n\tuniform float peak;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tconst float log10 = " + (Math.log(10)) + ";\n\n\tfloat lg (float x) {\n\t\treturn log(x) / log10;\n\t}\n\n\t//return a or b based on weight\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\t//get mapped frequency\n\tfloat f (float ratio) {\n\t\tfloat halfRate = sampleRate * .5;\n\n\t\tfloat logF = pow(10., lg(minFrequency) + ratio * (lg(maxFrequency) - lg(minFrequency)) );\n\n\t\tratio = decide(ratio, (logF - minFrequency) / (maxFrequency - minFrequency), logarithmic);\n\n\t\tfloat leftF = minFrequency / halfRate;\n\t\tfloat rightF = maxFrequency / halfRate;\n\n\t\tratio = leftF + ratio * (rightF - leftF);\n\n\t\treturn ratio;\n\t}\n\n\tvoid main () {\n\t\tvec2 coord = position;\n\t\tfloat _group = max(group, .5);\n\t\tfloat groupRatio = _group / viewport.z;\n\n\t\t//round x-coord to the step, @c is a precision fix constant\n\t\tfloat c = 1./viewport.z;\n\t\tfloat leftX = floor((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tfloat rightX = ceil((coord.x * viewport.z + c ) / _group) * _group / viewport.z;\n\t\tcoord.x = decide(leftX, rightX, step(coord.x - leftX + c*.5, groupRatio * .5));\n\n\t\tfloat mag = texture2D(frequencies, vec2(f(leftX), 0.5)).w;\n\t\tmag = clamp(mag, 0., 1.);\n\n\t\tvMag = mag;\n\t\tvLeft = leftX;\n\t\tvRight = rightX;\n\n\t\t//ensure mask borders are set\n\t\tmag += maskSize.y / viewport.w;\n\n\t\t//map y-coord to alignment\n\t\tcoord.y = coord.y * mag - mag * align + align;\n\n\t\t//save distance from the align\n\t\tvDist = (coord.y - align) * (1. / max(align, 1. - align));\n\n\t\tgl_Position = vec4(coord*2. - 1., 0, 1);\n\t}\n";
-
-Spectrum.prototype.frag = "\n\tprecision highp float;\n\n\tuniform sampler2D fill;\n\tuniform sampler2D mask;\n\tuniform vec2 maskSize;\n\tuniform vec4 viewport;\n\tuniform float align;\n\tuniform float group;\n\tuniform float trail;\n\tuniform float peak;\n\tuniform float balance;\n\n\tvarying float vDist;\n\tvarying float vMag;\n\tvarying float vLeft;\n\tvarying float vRight;\n\n\tvec2 coord;\n\n\tfloat decide (float a, float b, float w) {\n\t\treturn step(0.5, w) * b + step(w, 0.5) * a;\n\t}\n\n\tvoid main () {\n\t\tcoord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);\n\t\tfloat groupRatio = group / viewport.z;\n\t\tfloat maskRatio = maskSize.x / viewport.z;\n\n\t\t//calc mask\n\t\tfloat halfX = min(group * .5 / maskSize.x, .5);\n\t\tfloat leftX = ((coord.x - vLeft) * viewport.z) / maskSize.x;\n\t\tfloat leftPart = step(leftX, halfX) * step(0., leftX);\n\t\tfloat rightX = 1. - max(((vRight - coord.x) * viewport.z),0.) / maskSize.x;\n\t\tfloat rightPart = step(rightX, 1.) * step(1. - halfX, rightX);\n\t\t// rightPart -= rightPart * leftPart;\n\t\tfloat centralPart = 1. - leftPart - rightPart;\n\n\t\tfloat maskX = decide(.5, centralPart * .5 + leftPart * leftX + rightPart * rightX, step(4., group));\n\n\t\t//find mask’s offset frequency\n\t\tfloat mag = vMag;\n\n\t\t//calc dist\n\t\tfloat dist = abs(vDist);\n\n\t\t//calc intensity\n\t\tfloat intensity = pow(dist, .85) * balance + pow(mag/peak, 1.25) * (1. - balance);\n\t\tintensity /= (peak * .48 + .5);\n\t\tintensity = intensity * .85 + .15;\n\n\t\t//apply mask\n\t\tfloat top = coord.y - mag + align*mag - align + .5*maskSize.y/viewport.w;\n\t\tfloat bottom = -coord.y - align*mag + align + .5*maskSize.y/viewport.w;\n\t\tfloat maskY = max(\n\t\t\tmax(top * viewport.w / maskSize.y, .5),\n\t\t\tmax(bottom * viewport.w / maskSize.y, .5)\n\t\t);\n\t\tvec2 maskCoord = vec2(maskX, maskY);\n\t\tfloat maskLevel = texture2D(mask, maskCoord).x;\n\n\t\tgl_FragColor = vec4(vec3(1), 1);\n\t\tvec4 fillColor = texture2D(fill, vec2(coord.x, max(0., intensity) + trail * (mag * .5 / peak + .15 )));\n\t\tfillColor.a *= maskLevel;\n\t\tfillColor.a += trail * texture2D(mask, vec2(maskX, .5)).x;\n\t\tgl_FragColor = fillColor;\n\t}\n";
+//style of rendering
+Spectrum.prototype.type = 'fill';
+Spectrum.prototype.width = 1;
 
 
 /**
  * Set frequencies taking into account smoothing, logarithmic and grouping params
  */
-Spectrum.prototype.setFrequencies = function (frequencies) {
+Spectrum.prototype.setFrequencyData = function (magnitudes) {
 	var this$1 = this;
 
-	if (!frequencies) return this;
+	this.push(magnitudes);
 
-	this.gl.useProgram(this.program);
-
-	var gl = this.gl;
-	var minF = this.minFrequency, maxF = this.maxFrequency;
-	var minDb = this.minDecibels, maxDb = this.maxDecibels;
-	var halfRate = this.sampleRate * 0.5;
-	var l = halfRate / this.frequencies.length;
-
-	//choose bigger data
-	var bigger = this.frequencies.length >= frequencies.length ? this.frequencies : frequencies;
-	var shorter = (bigger === frequencies ? this.frequencies : frequencies);
-	bigger = [].slice.call(bigger);
-
-	var smoothing = (bigger === this.frequencies ? 1 - this.smoothing : this.smoothing);
-
-	for (var i = 0; i < bigger.length; i++) {
-		bigger[i] = clamp(bigger[i], -100, 0) * smoothing + clamp(shorter[Math.floor(shorter.length * (i / bigger.length))], -100, 0) * (1 - smoothing);
-	}
-
-	//save actual frequencies
-	this.frequencies = bigger;
-
-	//prepare f’s for rendering
-	magnitudes = bigger.slice();
-
-	//apply a-weighting
-	if (weighting[this.weighting]) {
-		var w = weighting[this.weighting];
-		magnitudes = magnitudes.map(function (mag, i, data) { return clamp(mag + 20 * Math.log(w(i * l)) / Math.log(10), -200, 0); });
-	}
-
-	//snap magnitudes
-	if (this.snap) {
-		magnitudes = magnitudes.map(function (value) { return Math.round(value * this$1.snap) / this$1.snap; });
-	}
-
-	//convert mags to 0..1 range limiting by db subrange
-	magnitudes = magnitudes.map(function (value) { return (value - minDb) / (maxDb - minDb); });
-
-	//find peak
-	var peak = magnitudes.reduce(function (prev, curr) { return Math.max(curr, prev); }, 0);
-	this.gl.uniform1f(this.peakLocation, peak);
+	magnitudes = this.magnitudes;
 
 	//calc trail
 	if (this.trail) {
-		this.freqBuffer.unshift(magnitudes);
-		this.freqBuffer = this.freqBuffer.slice(0, this.trail);
+		this.trailStack.unshift(magnitudes);
+		this.trailStack = this.trailStack.slice(0, this.trail);
 		var trail = magnitudes.slice();
-		for (var k = 1; k < this$1.freqBuffer.length; k++) {
-			for (var i = 0; i < Math.min(trail.length, this$1.freqBuffer[k].length); i++) {
-				trail[i] = Math.max(this$1.freqBuffer[k][i], trail[i]);
+		for (var k = 1; k < this$1.trailStack.length; k++) {
+			for (var i = 0; i < Math.min(trail.length, this$1.trailStack[k].length); i++) {
+				trail[i] = Math.max(this$1.trailStack[k][i], trail[i]);
 			}
 		}
-		this.trailFrequencies = trail;
+		this.trailMagnitudes = trail;
 	}
-
-	return this.setTexture('frequencies', magnitudes);
-};
-
-
-/**
- * Recalculate number of verteces
- */
-Spectrum.prototype.recalc = function () {
-	var data = [], w = this.viewport[2] * this.details;
-
-	//no-grouping is simply connected points
-	if (!this.group || this.group <= .5) {
-		for (var i = 0; i < w; i++) {
-			var curr = i/w;
-			var next = (i+1)/w;
-			data.push(curr);
-			data.push(1);
-			data.push(next);
-			data.push(1);
-			data.push(curr);
-			data.push(0);
-			data.push(next);
-			data.push(0);
-		}
-	}
-	//grouping renders bars
 	else {
-		var size = this.group === true ? 1 : this.group;
-		var w = w / size;
-		for (var i = 0; i < w; i++) {
-			var curr = i/(w);
-			var next = (i+.5)/(w);
-			data.push(curr);
-			data.push(1);
-			data.push(curr);
-			data.push(1);
-			data.push(curr);
-			data.push(1);
-			data.push(next);
-			data.push(1);
-			data.push(curr);
-			data.push(0);
-			data.push(next);
-			data.push(0);
-			data.push(next);
-			data.push(0);
-			data.push(next);
-			data.push(0);
-		}
+		this.trailMagnitudes = magnitudes;
 	}
 
-	this.setAttribute('position', data);
+	//find trail peak
+	this.trailPeak = this.trailMagnitudes.reduce(function (prev, curr) { return Math.max(curr, prev); }, -200);
 
-	return this;
-};
+	this.emit('data', magnitudes);
+}
 
 
 /**
  * Reset colormap
+ * Completely compatible with gl-spectrogram setValues
  */
 Spectrum.prototype.setFill = function (cm, inverse) {
-	//named colormap
-	var this$1 = this;
-
-	if (typeof cm === 'string' && !/\\|\//.test(cm)) {
-		this.fill = (flatten(colormap({
-			colormap: cm,
-			nshades: 128,
-			format: 'rgba',
-			alpha: 1
-		})).map(function (v,i) { return !((i + 1) % 4) ? v : v/255; }));
-	}
-	else if (!cm) {
-		this.fill = null;
-		if (!this.background) this.setBackground([1,1,1,1]);
-		return this;
-	}
-	//image, canvas etc
-	else if (!Array.isArray(cm)) {
-		this.fill = cm;
-
-		this.setTexture('fill', this.fill);
-
-		return this;
-	}
-	//custom array
-	else {
-		this.fill = (flatten(cm));
-	}
-
-	if (inverse) {
-		var reverse = this.fill.slice();
-		for (var i = 0; i < this$1.fill.length; i+=4){
-			reverse[this$1.fill.length - i - 1] = this$1.fill[i + 3];
-			reverse[this$1.fill.length - i - 2] = this$1.fill[i + 2];
-			reverse[this$1.fill.length - i - 3] = this$1.fill[i + 1];
-			reverse[this$1.fill.length - i - 4] = this$1.fill[i + 0];
-		}
-		this.fill = reverse;
-	}
-
-	this.setTexture('fill', {
-		data: this.fill,
-		width: 1,
-		height: (this.fill.length / 4)|0
-	});
-
-	//ensure bg
-	if (!this.background) {
-		this.setBackground(this.fill.slice(0, 4));
-	}
+	Spectrogram.prototype.setFill.call(this, cm, inverse);
 
 	//set grid color to colormap’s color
 	if (this.freqGridComponent) {
-		var gridColor = this.fill.slice(-4).map(function (v) { return v*255; });
-		this.freqGridComponent.linesContainer.style.color = "rgba(" + gridColor + ")";
-		this.topGridComponent.linesContainer.style.color = "rgba(" + gridColor + ")";
-		this.bottomGridComponent.linesContainer.style.color = "rgba(" + gridColor + ")";
+		this.freqGridComponent.linesContainer.style.color = this.color;
+		this.topGridComponent.linesContainer.style.color = this.color;
+		this.bottomGridComponent.linesContainer.style.color = this.color;
 	}
-
-	return this;
-};
-
-
-/** Set background */
-Spectrum.prototype.setBackground = function (bg) {
-	if (this.background !== null) {
-		var bgStyle = null;
-		if (typeof bg === 'string') {
-			bgStyle = bg;
-		}
-		else if (Array.isArray(bg)) {
-			//map 0..1 range to 0..255
-			if (bg[0] && bg[0] <= 1 && bg[1] && bg[1] <= 1 && bg[2] && bg[2] <= 1) {
-				bg = [
-					bg[0] * 255, bg[1] * 255, bg[2] * 255, bg[3] || 1
-				];
-			}
-
-			bgStyle = "rgba(" + (bg.slice(0,3).map(function ( v ) { return Math.round(v); }).join(', ')) + ", " + (bg[3]) + ")";
-		}
-		this.canvas.style.background = bgStyle;
-	}
-
-	return this;
-};
-
-
-/**
- * Set named or array mask
- */
-Spectrum.prototype.setMask = function (mask) {
-	this.mask = mask || [1,1,1,1];
-
-	this.setTexture('mask', this.mask);
-
-	this.gl.uniform2f(this.maskSizeLocation, this.textures.mask.width, this.textures.mask.height);
 
 	return this;
 };
@@ -2764,9 +2883,8 @@ Spectrum.prototype.update = function () {
 		this.align = parseFloat(this.align);
 	}
 
-	if (typeof this.group === 'string') {
-		this.group = parseInt(this.group);
-	}
+	//limit base
+	this.minFrequency = Math.max(1, this.minFrequency);
 
 	//create grid, if not created yet
 	if (this.grid) {
@@ -2854,28 +2972,36 @@ Spectrum.prototype.update = function () {
 			});
 
 			this.on('resize', function () {
-				if (this$1.isPlannedGridUpdate) return;
-				this$1.isPlannedGridUpdate = true;
-				this$1.once('render', function () {
-					this$1.isPlannedGridUpdate = false;
-					this$1.topGridComponent.update();
-					this$1.bottomGridComponent.update();
-					this$1.freqGridComponent.update();
-				});
+				this$1.topGridComponent.update();
+				this$1.bottomGridComponent.update();
+				this$1.freqGridComponent.update();
 			});
 		} else {
 			this.freqGridComponent.linesContainer.style.display = 'block';
 			this.topGridComponent.linesContainer.style.display = 'block';
 			this.bottomGridComponent.linesContainer.style.display = 'block';
 
-			this.topGridComponent.update();
-			this.bottomGridComponent.update();
-
+			this.topGridComponent.update({
+				lines: [{
+					min: this.minDecibels,
+					max: this.maxDecibels
+				}]
+			});
+			this.bottomGridComponent.update({
+				lines: [{
+					max: this.minDecibels,
+					min: this.maxDecibels
+				}]
+			});
 			this.freqGridComponent.update({
 				lines: [{
-						logarithmic: this.logarithmic
+						logarithmic: this.logarithmic,
+						min: this.minFrequency,
+						max: this.maxFrequency,
 					}, {
 						logarithmic: this.logarithmic,
+						min: this.minFrequency,
+						max: this.maxFrequency,
 						style: {
 							display: this.logarithmic ? null : 'none'
 						}
@@ -2893,77 +3019,42 @@ Spectrum.prototype.update = function () {
 
 	//preset trail buffer
 	if (this.trail === true) {
-		this.trail = Spectrum.prototype.trail;
+		this.trail = Spectrogram.prototype.trail;
 	}
-
-	//update verteces
-	this.recalc();
 
 	//update textures
 	this.setBackground(this.background);
-	this.setFrequencies(this.frequencies);
-	this.setFill(this.fill);
-	this.setMask(this.mask);
+	this.setFrequencyData(this.magnitudes.slice());
+	this.setFill(this.fill, this.inversed);
 
-	this.gl.uniform1f(this.alignLocation, this.align);
-	this.gl.uniform1f(this.minFrequencyLocation, this.minFrequency);
-	this.gl.uniform1f(this.maxFrequencyLocation, this.maxFrequency);
-	this.gl.uniform1f(this.logarithmicLocation, this.logarithmic ? 1 : 0);
-	this.gl.uniform1f(this.sampleRateLocation, this.sampleRate);
-	this.gl.uniform1f(this.groupLocation, this.group || 0);
-	this.gl.uniform1f(this.balanceLocation, this.balance || 0);
+	//emit update
+	this.emit('update');
 
 	return this;
 };
 
-
-/**
- * Render main loop
- */
-Spectrum.prototype.draw = function () {
-	var gl = this.gl;
-
-	gl.useProgram(this.program);
-
-	var count = this.attributes.position.data.length / 2;
-
-	if (this.fill) {
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.attributes.position.data.length / 2);
-	}
-
-	if (this.trail) {
-		//TODO: fix this - do not update freqs each draw call
-		gl.uniform1f(this.trailLocation, 1);
-		this.setTexture('frequencies', this.trailFrequencies);
-		gl.drawArrays(gl.LINES, 0, this.attributes.position.data.length / 2);
-		gl.uniform1f(this.trailLocation, 0);
-	}
-
-	return this;
-};
-
-},{"a-weighting":12,"colormap":26,"flatten":31,"gl-component":37,"inherits":39,"is-browser":41,"mumath/clamp":47,"mumath/lg":49,"plot-grid":57,"xtend/mutable":81}],8:[function(require,module,exports){
+},{"gl-spectrogram/lib/core":41,"inherits":45,"is-browser":47,"mumath/clamp":53,"mumath/lg":55,"plot-grid":64,"xtend/mutable":88}],12:[function(require,module,exports){
 module.exports = function a (f) {
 	var f2 = f*f;
 	return 1.2588966 * 148840000 * f2*f2 /
 	((f2 + 424.36) * Math.sqrt((f2 + 11599.29) * (f2 + 544496.41)) * (f2 + 148840000));
 };
 
-},{}],9:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 module.exports = function b (f) {
 	var f2 = f*f;
 	return 1.019764760044717 * 148840000 * f*f2 /
 	((f2 + 424.36) * Math.sqrt(f2 + 25122.25) * (f2 + 148840000));
 };
 
-},{}],10:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 module.exports = function c (f) {
 	var f2 = f*f;
 	return 1.0069316688518042 * 148840000 * f2 /
 	((f2 + 424.36) * (f2 + 148840000));
 };
 
-},{}],11:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 module.exports = function d (f) {
 	var f2 = f*f;
 	return (f / 6.8966888496476e-5) * Math.sqrt(
@@ -2974,7 +3065,7 @@ module.exports = function d (f) {
 	);
 };
 
-},{}],12:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 /**
  * @module  noise-weighting
  */
@@ -2987,7 +3078,7 @@ module.exports = {
 	itu: require('./itu'),
 	z: require('./z')
 };
-},{"./a":8,"./b":9,"./c":10,"./d":11,"./itu":13,"./z":14}],13:[function(require,module,exports){
+},{"./a":12,"./b":13,"./c":14,"./d":15,"./itu":17,"./z":18}],17:[function(require,module,exports){
 module.exports = function itu (f) {
 	var f2 = f*f;
 
@@ -2997,12 +3088,12 @@ module.exports = function itu (f) {
 	return 8.128305161640991 * 1.246332637532143e-4 * f / Math.sqrt(h1*h1 + h2*h2);
 };
 
-},{}],14:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 module.exports = function (f) {
 	return 1;
 };
 
-},{}],15:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 'use strict';
 
 var arraytools  = function () {
@@ -3191,13 +3282,13 @@ var arraytools  = function () {
 
 module.exports = arraytools();
 
-},{}],16:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 var window = require('global/window');
 
 var Context = window.AudioContext || window.webkitAudioContext;
 if (Context) module.exports = new Context;
 
-},{"global/window":38}],17:[function(require,module,exports){
+},{"global/window":44}],21:[function(require,module,exports){
 // sourced from:
 // http://www.leanbackplayer.com/test/h5mt.html
 // https://github.com/broofa/node-mime/blob/master/types.json
@@ -3219,7 +3310,7 @@ module.exports = function lookup (ext) {
   return mimeLookup[ext.toLowerCase()]
 }
 
-},{"./mime-types":18}],18:[function(require,module,exports){
+},{"./mime-types":22}],22:[function(require,module,exports){
 module.exports = {
   "audio/midi": ["mid", "midi", "kar", "rmi"],
   "audio/mp4": ["mp4a", "m4a"],
@@ -3242,7 +3333,7 @@ module.exports = {
   "video/x-m4v": ["m4v"],
   "video/x-matroska": ["mkv", "mk3d", "mks"]
 }
-},{}],19:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var size = require('element-size')
 
 module.exports = fit
@@ -3292,7 +3383,7 @@ function fit(canvas, parent, scale) {
   }
 }
 
-},{"element-size":30}],20:[function(require,module,exports){
+},{"element-size":33}],24:[function(require,module,exports){
 (function (Buffer){
 var clone = (function() {
 'use strict';
@@ -3456,7 +3547,7 @@ if (typeof module === 'object' && module.exports) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":2}],21:[function(require,module,exports){
+},{"buffer":2}],25:[function(require,module,exports){
 module.exports = {
 	"aliceblue": [240, 248, 255],
 	"antiquewhite": [250, 235, 215],
@@ -3607,7 +3698,7 @@ module.exports = {
 	"yellow": [255, 255, 0],
 	"yellowgreen": [154, 205, 50]
 };
-},{}],22:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 /**
  * @module color-parse
  */
@@ -3736,7 +3827,7 @@ function parse (cstr) {
 		alpha: alpha
 	};
 }
-},{"color-name":21}],23:[function(require,module,exports){
+},{"color-name":25}],27:[function(require,module,exports){
 /**
  * @module color-space/hsl
  */
@@ -3843,7 +3934,7 @@ rgb.hsl = function(rgb) {
 
 	return [h, s * 100, l * 100];
 };
-},{"./rgb":24}],24:[function(require,module,exports){
+},{"./rgb":28}],28:[function(require,module,exports){
 /**
  * RGB space.
  *
@@ -3857,7 +3948,7 @@ module.exports = {
 	channel: ['red', 'green', 'blue'],
 	alias: ['RGB']
 };
-},{}],25:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 module.exports={
 	"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],
 
@@ -3950,161 +4041,24 @@ module.exports={
 	"cubehelix": [{"index":0,"rgb":[0,0,0]},{"index":0.07,"rgb":[22,5,59]},{"index":0.13,"rgb":[60,4,105]},{"index":0.2,"rgb":[109,1,135]},{"index":0.27,"rgb":[161,0,147]},{"index":0.33,"rgb":[210,2,142]},{"index":0.4,"rgb":[251,11,123]},{"index":0.47,"rgb":[255,29,97]},{"index":0.53,"rgb":[255,54,69]},{"index":0.6,"rgb":[255,85,46]},{"index":0.67,"rgb":[255,120,34]},{"index":0.73,"rgb":[255,157,37]},{"index":0.8,"rgb":[241,191,57]},{"index":0.87,"rgb":[224,220,93]},{"index":0.93,"rgb":[218,241,142]},{"index":1,"rgb":[227,253,198]}]
 };
 
-},{}],26:[function(require,module,exports){
-/*
- * Ben Postlethwaite
- * January 2013
- * License MIT
- */
-'use strict';
-
-var at = require('arraytools');
-var clone = require('clone');
-var colorScale = require('./colorScales');
-
-module.exports = createColormap;
-
-function createColormap (spec) {
-    /*
-     * Default Options
-     */
-    var indicies, rgba, fromrgba, torgba,
-        nsteps, cmap, colormap, format,
-        nshades, colors, alpha, index, i,
-        r = [],
-        g = [],
-        b = [],
-        a = [];
-
-    if ( !at.isPlainObject(spec) ) spec = {};
-
-    nshades = spec.nshades || 72;
-    format = spec.format || 'hex';
-
-    colormap = spec.colormap;
-    if (!colormap) colormap = 'jet';
-
-    if (typeof colormap === 'string') {
-        colormap = colormap.toLowerCase();
-
-        if (!colorScale[colormap]) {
-            throw Error(colormap + ' not a supported colorscale');
-        }
-
-        cmap = clone(colorScale[colormap]);
-
-    } else if (Array.isArray(colormap)) {
-        cmap = clone(colormap);
-
-    } else {
-        throw Error('unsupported colormap option', colormap);
-    }
-
-    if (cmap.length > nshades) {
-        throw new Error(
-            colormap+' map requires nshades to be at least size '+cmap.length
-        );
-    }
-
-    if (!Array.isArray(spec.alpha)) {
-
-        if (typeof spec.alpha === 'number') {
-            alpha = [spec.alpha, spec.alpha];
-
-        } else {
-            alpha = [1, 1];
-        }
-
-    } else if (spec.alpha.length !== 2) {
-        alpha = [1, 1];
-
-    } else {
-        alpha = clone(spec.alpha);
-    }
-
-    /*
-     * map index points from 0->1 to 0 -> n-1
-     */
-    indicies = cmap.map(function(c) {
-        return Math.round(c.index * nshades);
-    });
-
-    /*
-     * Add alpha channel to the map
-     */
-    if (alpha[0] < 0) alpha[0] = 0;
-    if (alpha[1] < 0) alpha[0] = 0;
-    if (alpha[0] > 1) alpha[0] = 1;
-    if (alpha[1] > 1) alpha[0] = 1;
-
-    for (i = 0; i < indicies.length; ++i) {
-        index = cmap[i].index;
-        rgba = cmap[i].rgb;
-
-        // if user supplies their own map use it
-        if (rgba.length === 4 && rgba[3] >= 0 && rgba[3] <= 1) continue;
-        rgba[3] = alpha[0] + (alpha[1] - alpha[0])*index;
-    }
-
-    /*
-     * map increasing linear values between indicies to
-     * linear steps in colorvalues
-     */
-    for (i = 0; i < indicies.length-1; ++i) {
-        nsteps = indicies[i+1] - indicies[i];
-        fromrgba = cmap[i].rgb;
-        torgba = cmap[i+1].rgb;
-        r = r.concat(at.linspace(fromrgba[0], torgba[0], nsteps ) );
-        g = g.concat(at.linspace(fromrgba[1], torgba[1], nsteps ) );
-        b = b.concat(at.linspace(fromrgba[2], torgba[2], nsteps ) );
-        a = a.concat(at.linspace(fromrgba[3], torgba[3], nsteps ) );
-    }
-
-    r = r.map( Math.round );
-    g = g.map( Math.round );
-    b = b.map( Math.round );
-
-    colors = at.zip(r, g, b, a);
-
-    if (format === 'hex') colors = colors.map( rgb2hex );
-    if (format === 'rgbaString') colors = colors.map( rgbaStr );
-
-    return colors;
-};
-
-
-function rgb2hex (rgba) {
-    var dig, hex = '#';
-    for (var i = 0; i < 3; ++i) {
-        dig = rgba[i];
-        dig = dig.toString(16);
-        hex += ('00' + dig).substr( dig.length );
-    }
-    return hex;
-}
-
-function rgbaStr (rgba) {
-    return 'rgba(' + rgba.join(',') + ')';
-}
-
-},{"./colorScales":25,"arraytools":15,"clone":20}],27:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 module.exports = function gainToDecibels(value) {
   if (value == null) return 0
   return Math.round(Math.round(20 * (0.43429 * Math.log(value)) * 100) / 100 * 10) / 10
 }
-},{}],28:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 module.exports = {
   fromGain: require('./from-gain'),
   toGain: require('./to-gain')
 }
-},{"./from-gain":27,"./to-gain":29}],29:[function(require,module,exports){
+},{"./from-gain":30,"./to-gain":32}],32:[function(require,module,exports){
 module.exports = function decibelsToGain(value){
   if (value <= -40){
     return 0
   }
   return Math.round(Math.exp(value / 8.6858) * 10000) / 10000
 }
-},{}],30:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 module.exports = getSize
 
 function getSize(element) {
@@ -4140,7 +4094,7 @@ function parse(prop) {
   return parseFloat(prop) || 0
 }
 
-},{}],31:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 module.exports = function flatten(list, depth) {
   depth = (typeof depth == 'number') ? depth : Infinity;
 
@@ -4165,7 +4119,7 @@ module.exports = function flatten(list, depth) {
   }
 };
 
-},{}],32:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 var isFunction = require('is-function')
 
 module.exports = forEach
@@ -4213,7 +4167,7 @@ function forEachObject(object, iterator, context) {
     }
 }
 
-},{"is-function":43}],33:[function(require,module,exports){
+},{"is-function":49}],36:[function(require,module,exports){
 /**
  * Real values fourier transform.
  *
@@ -4437,7 +4391,7 @@ function reverseBinPermute (N, dest, source) {
 
 	dest[nm1] = source[nm1];
 };
-},{}],34:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 module.exports = getCanvasContext
 function getCanvasContext (type, opts) {
   if (typeof type !== 'string') {
@@ -4475,7 +4429,7 @@ function getCanvasContext (type, opts) {
   return (gl || null) // ensure null on fail
 }
 
-},{}],35:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 (function (global){
 "use strict";
 
@@ -4490,14 +4444,14 @@ if (global.AnalyserNode && !global.AnalyserNode.prototype.getFloatTimeDomainData
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],36:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 /** generate unique id for selector */
 var counter = Date.now() % 1e9;
 
 module.exports = function getUid(){
 	return (Math.random() * 1e9 >>> 0) + (counter++);
 };
-},{}],37:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 /**
  * @module  gl-spectrum
  */
@@ -4619,10 +4573,11 @@ function Component (options) {
 	//set canvas fit container size
 	if (isBrowser) {
 		this.fit = fit(this.canvas, this.container);
-		this.resize = this.resize.bind(this);
 
 		this.resize();
-		window.addEventListener('resize', this.resize, false);
+		window.addEventListener('resize', function () {
+			this$1.resize()
+		}, false);
 	}
 
 
@@ -4984,7 +4939,7 @@ Component.prototype.start = function () {
 /**
  * Render main loop
  */
-Component.prototype.render = function () {
+Component.prototype.render = function (data) {
 	var gl = this.context;
 
 	if (!this.is2d) {
@@ -4993,14 +4948,11 @@ Component.prototype.render = function () {
 
 		gl.viewport.apply(gl, this.glViewport);
 
-		this.emit('render');
-		this.draw();
-
 		// gl.viewport.apply(gl, viewport);
 	}
-	else {
-		this.emit('render');
-	}
+
+	this.emit('render', data);
+	this.draw(data);
 
 	return this;
 };
@@ -5008,7 +4960,7 @@ Component.prototype.render = function () {
 /**
  * A specific way to draw data.
  */
-Component.prototype.draw = function () {
+Component.prototype.draw = function (data) {
 
 	this.gl.useProgram(this.program);
 	//Q: how should we organize drawArrays method?
@@ -5068,7 +5020,547 @@ Component.prototype.createProgram = function (vSrc, fSrc) {
 	return program;
 }
 
-},{"canvas-fit":19,"events":3,"get-canvas-context":34,"inherits":39,"is-browser":41,"mutype/is-object":53,"raf-loop":58,"xtend/mutable":81}],38:[function(require,module,exports){
+},{"canvas-fit":23,"events":3,"get-canvas-context":37,"inherits":45,"is-browser":47,"mutype/is-object":60,"raf-loop":65,"xtend/mutable":88}],41:[function(require,module,exports){
+/**
+ * @module  gl-spectrogram/lib/core
+ */
+
+
+var extend = require('xtend/mutable');
+var Component = require('gl-component');
+var inherits = require('inherits');
+var isBrowser = require('is-browser');
+var createGrid = require('plot-grid');
+var flatten = require('flatten');
+var lg = require('mumath/lg');
+var clamp = require('mumath/clamp');
+var weighting = require('a-weighting');
+var colormap = require('colormap');
+var parseColor = require('color-parse');
+var hsl = require('color-space/hsl');
+var colorScales = require('colormap/colorScales');
+
+module.exports = Spectrogram;
+
+
+
+/**
+ * @contructor
+ */
+function Spectrogram (options) {
+	if (!(this instanceof Spectrogram)) return new Spectrogram(options);
+
+	Component.call(this, options);
+
+	if (isBrowser) this.container.classList.add(this.className);
+
+	this.init();
+
+	//preset initial freqs
+
+	this.push(this.magnitudes);
+
+	//init style props
+	this.update();
+}
+
+inherits(Spectrogram, Component);
+
+Spectrogram.prototype.className = 'gl-spectrogram';
+
+Spectrogram.prototype.init = function () {};
+
+Spectrogram.prototype.antialias = false;
+Spectrogram.prototype.premultipliedAlpha = true;
+Spectrogram.prototype.alpha = true;
+Spectrogram.prototype.float = false;
+
+Spectrogram.prototype.maxDecibels = -30;
+Spectrogram.prototype.minDecibels = -90;
+
+Spectrogram.prototype.maxFrequency = 20000;
+Spectrogram.prototype.minFrequency = 40;
+
+Spectrogram.prototype.smoothing = 0.75;
+Spectrogram.prototype.details = 1;
+
+Spectrogram.prototype.grid = true;
+Spectrogram.prototype.axes = false;
+Spectrogram.prototype.logarithmic = true;
+Spectrogram.prototype.weighting = 'itu';
+Spectrogram.prototype.sampleRate = 44100;
+
+Spectrogram.prototype.fill = 'greys';
+Spectrogram.prototype.background = undefined;
+
+
+
+//array with initial values of the last moment
+Spectrogram.prototype.magnitudes = Array(1024).fill(-150);
+
+
+//set last actual frequencies values
+Spectrogram.prototype.push = function (magnitudes) {
+	var this$1 = this;
+
+	if (!magnitudes) magnitudes = [-150];
+
+	var gl = this.gl;
+	var halfRate = this.sampleRate * 0.5;
+	var l = halfRate / this.magnitudes.length;
+	var w = weighting[this.weighting] || weighting.z;
+
+	magnitudes = magnitudes.map(function (v, i) {
+		//apply weighting
+		v = clamp(clamp(v, -100, 0) + 20 * Math.log(w(i * l)) / Math.log(10), -200, 0);
+
+		return v;
+	});
+
+	//choose bigger data
+	// var bigger = this.magnitudes.length >= magnitudes.length ? this.magnitudes : magnitudes;
+	// var shorter = (bigger === magnitudes ? this.magnitudes : magnitudes);
+	// bigger = [].slice.call(bigger);
+	magnitudes = [].slice.call(magnitudes);
+
+	//apply smoothing
+	// var smoothing = (bigger === this.magnitudes ? 1 - this.smoothing : this.smoothing);
+	var smoothing = this.smoothing;
+
+	for (var i = 0; i < magnitudes.length; i++) {
+		magnitudes[i] = magnitudes[i] * (1 - smoothing) + this$1.magnitudes[Math.floor(this$1.magnitudes.length * (i / magnitudes.length))] * smoothing;
+	}
+
+	//save actual magnitudes in db
+	this.magnitudes = magnitudes;
+
+	//find peak
+	this.peak = this.magnitudes.reduce(function (prev, curr) { return Math.max(curr, prev); }, -200);
+
+	//emit magnitudes in db range
+	this.emit('push', magnitudes, this.peak);
+
+	return this;
+};
+
+
+/**
+ * Reset colormap
+ */
+Spectrogram.prototype.setFill = function (cm, inverse) {
+	this.fill = cm;
+	this.inversed = inverse;
+
+	//named colormap
+	if (typeof cm === 'string') {
+		//a color scale
+		if (colorScales[cm]) {
+			var cm = (flatten(colormap({
+				colormap: cm,
+				nshades: 128,
+				format: 'rgba',
+				alpha: 1
+			})));//.map((v,i) => !((i + 1) % 4) ? v : v/255));
+		}
+		//url
+		else if (/\\|\//.test(cm)) {
+			this.setTexture('fill', cm);
+			return this;
+		}
+		//plain color or CSS color string
+		else {
+			var parsed = parseColor(cm);
+
+			if (parsed.space === 'hsl') {
+				cm = hsl.rgb(parsed.values);
+			}
+			else {
+				cm = parsed.values;
+			}
+		}
+	}
+	else if (!cm) {
+		if (!this.background) this.setBackground([0,0,0,1]);
+		return this;
+	}
+	//image, canvas etc
+	else if (!Array.isArray(cm)) {
+		this.setTexture('fill', cm);
+
+		return this;
+	}
+	//custom array, like palette etc.
+	else {
+		cm = flatten(cm);
+	}
+
+	if (inverse) {
+		var reverse = cm.slice();
+		for (var i = 0; i < cm.length; i+=4){
+			reverse[cm.length - i - 1] = cm[i + 3];
+			reverse[cm.length - i - 2] = cm[i + 2];
+			reverse[cm.length - i - 3] = cm[i + 1];
+			reverse[cm.length - i - 4] = cm[i + 0];
+		}
+		cm = reverse;
+	}
+
+	this.setTexture('fill', {
+		data: cm,
+		height: 1,
+		width: (cm.length / 4)|0
+	});
+
+	//ensure bg
+	if (!this.background) {
+		this.setBackground(cm.slice(0, 4));
+	}
+
+	var mainColor = cm.slice(-4);
+	this.color = "rgba(" + mainColor + ")";
+
+	this.fillData = cm;
+
+	//set grid color to colormap’s color
+	if (this.gridComponent) {
+		this.gridComponent.linesContainer.style.color = this.color;
+	}
+
+	return this;
+};
+
+
+/** Set background */
+Spectrogram.prototype.setBackground = function (bg) {
+	if (this.background !== null) {
+		var bgStyle = null;
+		if (typeof bg === 'string') {
+			bgStyle = bg;
+		}
+		else if (Array.isArray(bg)) {
+			//map 0..1 range to 0..255
+			if (bg[0] && bg[0] <= 1 && bg[1] && bg[1] <= 1 && bg[2] && bg[2] <= 1) {
+				bg = [
+					bg[0] * 255, bg[1] * 255, bg[2] * 255, bg[3] || 1
+				];
+			}
+
+			bgStyle = "rgba(" + (bg.slice(0,3).map(function ( v ) { return Math.round(v); }).join(', ')) + ", " + (bg[3]) + ")";
+		}
+		this.canvas.style.background = bgStyle;
+	}
+
+	return this;
+};
+
+
+
+
+//update view
+Spectrogram.prototype.update = function () {
+	var this$1 = this;
+
+	var gl = this.gl;
+
+	if (typeof this.smoothing === 'string') {
+		this.smoothing = parseFloat(this.smoothing);
+	}
+
+	if (this.grid) {
+		if (!this.gridComponent) {
+			this.gridComponent = createGrid({
+				container: this.container,
+				viewport: function () { return this$1.viewport; },
+				lines: Array.isArray(this.grid.lines) ? this.grid.lines : (this.grid.lines === undefined || this.grid.lines === true) && [{
+					min: this.minFrequency,
+					max: this.maxFrequency,
+					orientation: 'y',
+					logarithmic: this.logarithmic,
+					titles: function (value) {
+						return (value >= 1000 ? ((value / 1000).toLocaleString() + 'k') : value.toLocaleString()) + 'Hz';
+					}
+				}, this.logarithmic ? {
+					min: this.minFrequency,
+					max: this.maxFrequency,
+					orientation: 'y',
+					logarithmic: this.logarithmic,
+					values: function (value) {
+						var str = value.toString();
+						if (str[0] !== '1') return null;
+						return value;
+					},
+					titles: null,
+					style: {
+						borderLeftStyle: 'solid',
+						pointerEvents: 'none',
+						opacity: '0.08',
+						display: this.logarithmic ? null :'none'
+					}
+				} : null],
+				axes: Array.isArray(this.grid.axes) ? this.grid.axes : (this.grid.axes || this.axes) && [{
+					name: 'Frequency',
+					labels: function (value, i, opt) {
+						var str = value.toString();
+						if (str[0] !== '2' && str[0] !== '1' && str[0] !== '5') return null;
+						return opt.titles[i];
+					}
+				}]
+			});
+
+			this.on('resize', function () {
+				if (this$1.isPlannedGridUpdate) return;
+				this$1.isPlannedGridUpdate = true;
+				this$1.once('render', function () {
+					this$1.isPlannedGridUpdate = false;
+					this$1.gridComponent.update();
+				});
+			});
+		}
+		else {
+			this.gridComponent.linesContainer.style.display = 'block';
+		}
+	}
+	else if (this.gridComponent) {
+		this.gridComponent.linesContainer.style.display = 'none';
+	}
+
+	this.setBackground(this.background);
+	this.setFill(this.fill, this.inversed);
+
+	this.emit('update');
+};
+
+},{"a-weighting":16,"color-parse":26,"color-space/hsl":27,"colormap":43,"colormap/colorScales":42,"flatten":34,"gl-component":40,"inherits":45,"is-browser":47,"mumath/clamp":53,"mumath/lg":55,"plot-grid":64,"xtend/mutable":88}],42:[function(require,module,exports){
+module.exports={
+	"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],
+
+	"hsv":[{"index":0,"rgb":[255,0,0]},{"index":0.169,"rgb":[253,255,2]},{"index":0.173,"rgb":[247,255,2]},{"index":0.337,"rgb":[0,252,4]},{"index":0.341,"rgb":[0,252,10]},{"index":0.506,"rgb":[1,249,255]},{"index":0.671,"rgb":[2,0,253]},{"index":0.675,"rgb":[8,0,253]},{"index":0.839,"rgb":[255,0,251]},{"index":0.843,"rgb":[255,0,245]},{"index":1,"rgb":[255,0,6]}],
+
+	"hot":[{"index":0,"rgb":[0,0,0]},{"index":0.3,"rgb":[230,0,0]},{"index":0.6,"rgb":[255,210,0]},{"index":1,"rgb":[255,255,255]}],
+
+	"cool":[{"index":0,"rgb":[0,255,255]},{"index":1,"rgb":[255,0,255]}],
+
+	"spring":[{"index":0,"rgb":[255,0,255]},{"index":1,"rgb":[255,255,0]}],
+
+	"summer":[{"index":0,"rgb":[0,128,102]},{"index":1,"rgb":[255,255,102]}],
+
+	"autumn":[{"index":0,"rgb":[255,0,0]},{"index":1,"rgb":[255,255,0]}],
+
+	"winter":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[0,255,128]}],
+
+	"bone":[{"index":0,"rgb":[0,0,0]},{"index":0.376,"rgb":[84,84,116]},{"index":0.753,"rgb":[169,200,200]},{"index":1,"rgb":[255,255,255]}],
+
+	"copper":[{"index":0,"rgb":[0,0,0]},{"index":0.804,"rgb":[255,160,102]},{"index":1,"rgb":[255,199,127]}],
+
+	"greys":[{"index":0,"rgb":[0,0,0]},{"index":1,"rgb":[255,255,255]}],
+
+	"yignbu":[{"index":0,"rgb":[8,29,88]},{"index":0.125,"rgb":[37,52,148]},{"index":0.25,"rgb":[34,94,168]},{"index":0.375,"rgb":[29,145,192]},{"index":0.5,"rgb":[65,182,196]},{"index":0.625,"rgb":[127,205,187]},{"index":0.75,"rgb":[199,233,180]},{"index":0.875,"rgb":[237,248,217]},{"index":1,"rgb":[255,255,217]}],
+
+	"greens":[{"index":0,"rgb":[0,68,27]},{"index":0.125,"rgb":[0,109,44]},{"index":0.25,"rgb":[35,139,69]},{"index":0.375,"rgb":[65,171,93]},{"index":0.5,"rgb":[116,196,118]},{"index":0.625,"rgb":[161,217,155]},{"index":0.75,"rgb":[199,233,192]},{"index":0.875,"rgb":[229,245,224]},{"index":1,"rgb":[247,252,245]}],
+
+	"yiorrd":[{"index":0,"rgb":[128,0,38]},{"index":0.125,"rgb":[189,0,38]},{"index":0.25,"rgb":[227,26,28]},{"index":0.375,"rgb":[252,78,42]},{"index":0.5,"rgb":[253,141,60]},{"index":0.625,"rgb":[254,178,76]},{"index":0.75,"rgb":[254,217,118]},{"index":0.875,"rgb":[255,237,160]},{"index":1,"rgb":[255,255,204]}],
+
+	"bluered":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[255,0,0]}],
+
+	"rdbu":[{"index":0,"rgb":[5,10,172]},{"index":0.35,"rgb":[106,137,247]},{"index":0.5,"rgb":[190,190,190]},{"index":0.6,"rgb":[220,170,132]},{"index":0.7,"rgb":[230,145,90]},{"index":1,"rgb":[178,10,28]}],
+
+	"picnic":[{"index":0,"rgb":[0,0,255]},{"index":0.1,"rgb":[51,153,255]},{"index":0.2,"rgb":[102,204,255]},{"index":0.3,"rgb":[153,204,255]},{"index":0.4,"rgb":[204,204,255]},{"index":0.5,"rgb":[255,255,255]},{"index":0.6,"rgb":[255,204,255]},{"index":0.7,"rgb":[255,153,255]},{"index":0.8,"rgb":[255,102,204]},{"index":0.9,"rgb":[255,102,102]},{"index":1,"rgb":[255,0,0]}],
+
+	"rainbow":[{"index":0,"rgb":[150,0,90]},{"index":0.125,"rgb":[0,0,200]},{"index":0.25,"rgb":[0,25,255]},{"index":0.375,"rgb":[0,152,255]},{"index":0.5,"rgb":[44,255,150]},{"index":0.625,"rgb":[151,255,0]},{"index":0.75,"rgb":[255,234,0]},{"index":0.875,"rgb":[255,111,0]},{"index":1,"rgb":[255,0,0]}],
+
+	"portland":[{"index":0,"rgb":[12,51,131]},{"index":0.25,"rgb":[10,136,186]},{"index":0.5,"rgb":[242,211,56]},{"index":0.75,"rgb":[242,143,56]},{"index":1,"rgb":[217,30,30]}],
+
+	"blackbody":[{"index":0,"rgb":[0,0,0]},{"index":0.2,"rgb":[230,0,0]},{"index":0.4,"rgb":[230,210,0]},{"index":0.7,"rgb":[255,255,255]},{"index":1,"rgb":[160,200,255]}],
+
+	"earth":[{"index":0,"rgb":[0,0,130]},{"index":0.1,"rgb":[0,180,180]},{"index":0.2,"rgb":[40,210,40]},{"index":0.4,"rgb":[230,230,50]},{"index":0.6,"rgb":[120,70,20]},{"index":1,"rgb":[255,255,255]}],
+
+	"electric":[{"index":0,"rgb":[0,0,0]},{"index":0.15,"rgb":[30,0,100]},{"index":0.4,"rgb":[120,0,100]},{"index":0.6,"rgb":[160,90,0]},{"index":0.8,"rgb":[230,200,0]},{"index":1,"rgb":[255,250,220]}],
+
+	"alpha": [{"index":0, "rgb": [255,255,255,0]},{"index":0, "rgb": [255,255,255,1]}],
+
+	"viridis": [{"index":0,"rgb":[68,1,84]},{"index":0.13,"rgb":[71,44,122]},{"index":0.25,"rgb":[59,81,139]},{"index":0.38,"rgb":[44,113,142]},{"index":0.5,"rgb":[33,144,141]},{"index":0.63,"rgb":[39,173,129]},{"index":0.75,"rgb":[92,200,99]},{"index":0.88,"rgb":[170,220,50]},{"index":1,"rgb":[253,231,37]}],
+
+	"inferno": [{"index":0,"rgb":[0,0,4]},{"index":0.13,"rgb":[31,12,72]},{"index":0.25,"rgb":[85,15,109]},{"index":0.38,"rgb":[136,34,106]},{"index":0.5,"rgb":[186,54,85]},{"index":0.63,"rgb":[227,89,51]},{"index":0.75,"rgb":[249,140,10]},{"index":0.88,"rgb":[249,201,50]},{"index":1,"rgb":[252,255,164]}],
+
+	"magma": [{"index":0,"rgb":[0,0,4]},{"index":0.13,"rgb":[28,16,68]},{"index":0.25,"rgb":[79,18,123]},{"index":0.38,"rgb":[129,37,129]},{"index":0.5,"rgb":[181,54,122]},{"index":0.63,"rgb":[229,80,100]},{"index":0.75,"rgb":[251,135,97]},{"index":0.88,"rgb":[254,194,135]},{"index":1,"rgb":[252,253,191]}],
+
+	"plasma": [{"index":0,"rgb":[13,8,135]},{"index":0.13,"rgb":[75,3,161]},{"index":0.25,"rgb":[125,3,168]},{"index":0.38,"rgb":[168,34,150]},{"index":0.5,"rgb":[203,70,121]},{"index":0.63,"rgb":[229,107,93]},{"index":0.75,"rgb":[248,148,65]},{"index":0.88,"rgb":[253,195,40]},{"index":1,"rgb":[240,249,33]}],
+
+	"warm": [{"index":0,"rgb":[125,0,179]},{"index":0.13,"rgb":[172,0,187]},{"index":0.25,"rgb":[219,0,170]},{"index":0.38,"rgb":[255,0,130]},{"index":0.5,"rgb":[255,63,74]},{"index":0.63,"rgb":[255,123,0]},{"index":0.75,"rgb":[234,176,0]},{"index":0.88,"rgb":[190,228,0]},{"index":1,"rgb":[147,255,0]}],
+
+	"cool": [{"index":0,"rgb":[125,0,179]},{"index":0.13,"rgb":[116,0,218]},{"index":0.25,"rgb":[98,74,237]},{"index":0.38,"rgb":[68,146,231]},{"index":0.5,"rgb":[0,204,197]},{"index":0.63,"rgb":[0,247,146]},{"index":0.75,"rgb":[0,255,88]},{"index":0.88,"rgb":[40,255,8]},{"index":1,"rgb":[147,255,0]}],
+
+	"rainbow-soft": [{"index":0,"rgb":[125,0,179]},{"index":0.1,"rgb":[199,0,180]},{"index":0.2,"rgb":[255,0,121]},{"index":0.3,"rgb":[255,108,0]},{"index":0.4,"rgb":[222,194,0]},{"index":0.5,"rgb":[150,255,0]},{"index":0.6,"rgb":[0,255,55]},{"index":0.7,"rgb":[0,246,150]},{"index":0.8,"rgb":[50,167,222]},{"index":0.9,"rgb":[103,51,235]},{"index":1,"rgb":[124,0,186]}],
+
+	"bathymetry": [{"index":0,"rgb":[40,26,44]},{"index":0.13,"rgb":[59,49,90]},{"index":0.25,"rgb":[64,76,139]},{"index":0.38,"rgb":[63,110,151]},{"index":0.5,"rgb":[72,142,158]},{"index":0.63,"rgb":[85,174,163]},{"index":0.75,"rgb":[120,206,163]},{"index":0.88,"rgb":[187,230,172]},{"index":1,"rgb":[253,254,204]}],
+
+	"cdom": [{"index":0,"rgb":[47,15,62]},{"index":0.13,"rgb":[87,23,86]},{"index":0.25,"rgb":[130,28,99]},{"index":0.38,"rgb":[171,41,96]},{"index":0.5,"rgb":[206,67,86]},{"index":0.63,"rgb":[230,106,84]},{"index":0.75,"rgb":[242,149,103]},{"index":0.88,"rgb":[249,193,135]},{"index":1,"rgb":[254,237,176]}],
+
+	"chlorophyll": [{"index":0,"rgb":[18,36,20]},{"index":0.13,"rgb":[25,63,41]},{"index":0.25,"rgb":[24,91,59]},{"index":0.38,"rgb":[13,119,72]},{"index":0.5,"rgb":[18,148,80]},{"index":0.63,"rgb":[80,173,89]},{"index":0.75,"rgb":[132,196,122]},{"index":0.88,"rgb":[175,221,162]},{"index":1,"rgb":[215,249,208]}],
+
+	"density": [{"index":0,"rgb":[54,14,36]},{"index":0.13,"rgb":[89,23,80]},{"index":0.25,"rgb":[110,45,132]},{"index":0.38,"rgb":[120,77,178]},{"index":0.5,"rgb":[120,113,213]},{"index":0.63,"rgb":[115,151,228]},{"index":0.75,"rgb":[134,185,227]},{"index":0.88,"rgb":[177,214,227]},{"index":1,"rgb":[230,241,241]}],
+
+	"freesurface-blue": [{"index":0,"rgb":[30,4,110]},{"index":0.13,"rgb":[47,14,176]},{"index":0.25,"rgb":[41,45,236]},{"index":0.38,"rgb":[25,99,212]},{"index":0.5,"rgb":[68,131,200]},{"index":0.63,"rgb":[114,156,197]},{"index":0.75,"rgb":[157,181,203]},{"index":0.88,"rgb":[200,208,216]},{"index":1,"rgb":[241,237,236]}],
+
+	"freesurface-red": [{"index":0,"rgb":[60,9,18]},{"index":0.13,"rgb":[100,17,27]},{"index":0.25,"rgb":[142,20,29]},{"index":0.38,"rgb":[177,43,27]},{"index":0.5,"rgb":[192,87,63]},{"index":0.63,"rgb":[205,125,105]},{"index":0.75,"rgb":[216,162,148]},{"index":0.88,"rgb":[227,199,193]},{"index":1,"rgb":[241,237,236]}],
+
+	"oxygen": [{"index":0,"rgb":[64,5,5]},{"index":0.13,"rgb":[106,6,15]},{"index":0.25,"rgb":[144,26,7]},{"index":0.38,"rgb":[168,64,3]},{"index":0.5,"rgb":[188,100,4]},{"index":0.63,"rgb":[206,136,11]},{"index":0.75,"rgb":[220,174,25]},{"index":0.88,"rgb":[231,215,44]},{"index":1,"rgb":[248,254,105]}],
+
+	"par": [{"index":0,"rgb":[51,20,24]},{"index":0.13,"rgb":[90,32,35]},{"index":0.25,"rgb":[129,44,34]},{"index":0.38,"rgb":[159,68,25]},{"index":0.5,"rgb":[182,99,19]},{"index":0.63,"rgb":[199,134,22]},{"index":0.75,"rgb":[212,171,35]},{"index":0.88,"rgb":[221,210,54]},{"index":1,"rgb":[225,253,75]}],
+
+	"phase": [{"index":0,"rgb":[145,105,18]},{"index":0.13,"rgb":[184,71,38]},{"index":0.25,"rgb":[186,58,115]},{"index":0.38,"rgb":[160,71,185]},{"index":0.5,"rgb":[110,97,218]},{"index":0.63,"rgb":[50,123,164]},{"index":0.75,"rgb":[31,131,110]},{"index":0.88,"rgb":[77,129,34]},{"index":1,"rgb":[145,105,18]}],
+
+	"salinity": [{"index":0,"rgb":[42,24,108]},{"index":0.13,"rgb":[33,50,162]},{"index":0.25,"rgb":[15,90,145]},{"index":0.38,"rgb":[40,118,137]},{"index":0.5,"rgb":[59,146,135]},{"index":0.63,"rgb":[79,175,126]},{"index":0.75,"rgb":[120,203,104]},{"index":0.88,"rgb":[193,221,100]},{"index":1,"rgb":[253,239,154]}],
+
+	"temperature": [{"index":0,"rgb":[4,35,51]},{"index":0.13,"rgb":[23,51,122]},{"index":0.25,"rgb":[85,59,157]},{"index":0.38,"rgb":[129,79,143]},{"index":0.5,"rgb":[175,95,130]},{"index":0.63,"rgb":[222,112,101]},{"index":0.75,"rgb":[249,146,66]},{"index":0.88,"rgb":[249,196,65]},{"index":1,"rgb":[232,250,91]}],
+
+	"turbidity": [{"index":0,"rgb":[34,31,27]},{"index":0.13,"rgb":[65,50,41]},{"index":0.25,"rgb":[98,69,52]},{"index":0.38,"rgb":[131,89,57]},{"index":0.5,"rgb":[161,112,59]},{"index":0.63,"rgb":[185,140,66]},{"index":0.75,"rgb":[202,174,88]},{"index":0.88,"rgb":[216,209,126]},{"index":1,"rgb":[233,246,171]}],
+
+	"velocity-blue": [{"index":0,"rgb":[17,32,64]},{"index":0.13,"rgb":[35,52,116]},{"index":0.25,"rgb":[29,81,156]},{"index":0.38,"rgb":[31,113,162]},{"index":0.5,"rgb":[50,144,169]},{"index":0.63,"rgb":[87,173,176]},{"index":0.75,"rgb":[149,196,189]},{"index":0.88,"rgb":[203,221,211]},{"index":1,"rgb":[254,251,230]}],
+
+	"velocity-green": [{"index":0,"rgb":[23,35,19]},{"index":0.13,"rgb":[24,64,38]},{"index":0.25,"rgb":[11,95,45]},{"index":0.38,"rgb":[39,123,35]},{"index":0.5,"rgb":[95,146,12]},{"index":0.63,"rgb":[152,165,18]},{"index":0.75,"rgb":[201,186,69]},{"index":0.88,"rgb":[233,216,137]},{"index":1,"rgb":[255,253,205]}],
+
+	"cubehelix": [{"index":0,"rgb":[0,0,0]},{"index":0.07,"rgb":[22,5,59]},{"index":0.13,"rgb":[60,4,105]},{"index":0.2,"rgb":[109,1,135]},{"index":0.27,"rgb":[161,0,147]},{"index":0.33,"rgb":[210,2,142]},{"index":0.4,"rgb":[251,11,123]},{"index":0.47,"rgb":[255,29,97]},{"index":0.53,"rgb":[255,54,69]},{"index":0.6,"rgb":[255,85,46]},{"index":0.67,"rgb":[255,120,34]},{"index":0.73,"rgb":[255,157,37]},{"index":0.8,"rgb":[241,191,57]},{"index":0.87,"rgb":[224,220,93]},{"index":0.93,"rgb":[218,241,142]},{"index":1,"rgb":[227,253,198]}]
+};
+
+},{}],43:[function(require,module,exports){
+/*
+ * Ben Postlethwaite
+ * January 2013
+ * License MIT
+ */
+'use strict';
+
+var at = require('arraytools');
+var clone = require('clone');
+var colorScale = require('./colorScales');
+
+module.exports = createColormap;
+
+function createColormap (spec) {
+    /*
+     * Default Options
+     */
+    var indicies, rgba, fromrgba, torgba,
+        nsteps, cmap, colormap, format,
+        nshades, colors, alpha, index, i,
+        r = [],
+        g = [],
+        b = [],
+        a = [];
+
+    if ( !at.isPlainObject(spec) ) spec = {};
+
+    nshades = spec.nshades || 72;
+    format = spec.format || 'hex';
+
+    colormap = spec.colormap;
+    if (!colormap) colormap = 'jet';
+
+    if (typeof colormap === 'string') {
+        colormap = colormap.toLowerCase();
+
+        if (!colorScale[colormap]) {
+            throw Error(colormap + ' not a supported colorscale');
+        }
+
+        cmap = clone(colorScale[colormap]);
+
+    } else if (Array.isArray(colormap)) {
+        cmap = clone(colormap);
+
+    } else {
+        throw Error('unsupported colormap option', colormap);
+    }
+
+    if (cmap.length > nshades) {
+        throw new Error(
+            colormap+' map requires nshades to be at least size '+cmap.length
+        );
+    }
+
+    if (!Array.isArray(spec.alpha)) {
+
+        if (typeof spec.alpha === 'number') {
+            alpha = [spec.alpha, spec.alpha];
+
+        } else {
+            alpha = [1, 1];
+        }
+
+    } else if (spec.alpha.length !== 2) {
+        alpha = [1, 1];
+
+    } else {
+        alpha = clone(spec.alpha);
+    }
+
+    /*
+     * map index points from 0->1 to 0 -> n-1
+     */
+    indicies = cmap.map(function(c) {
+        return Math.round(c.index * nshades);
+    });
+
+    /*
+     * Add alpha channel to the map
+     */
+    if (alpha[0] < 0) alpha[0] = 0;
+    if (alpha[1] < 0) alpha[0] = 0;
+    if (alpha[0] > 1) alpha[0] = 1;
+    if (alpha[1] > 1) alpha[0] = 1;
+
+    for (i = 0; i < indicies.length; ++i) {
+        index = cmap[i].index;
+        rgba = cmap[i].rgb;
+
+        // if user supplies their own map use it
+        if (rgba.length === 4 && rgba[3] >= 0 && rgba[3] <= 1) continue;
+        rgba[3] = alpha[0] + (alpha[1] - alpha[0])*index;
+    }
+
+    /*
+     * map increasing linear values between indicies to
+     * linear steps in colorvalues
+     */
+    for (i = 0; i < indicies.length-1; ++i) {
+        nsteps = indicies[i+1] - indicies[i];
+        fromrgba = cmap[i].rgb;
+        torgba = cmap[i+1].rgb;
+        r = r.concat(at.linspace(fromrgba[0], torgba[0], nsteps ) );
+        g = g.concat(at.linspace(fromrgba[1], torgba[1], nsteps ) );
+        b = b.concat(at.linspace(fromrgba[2], torgba[2], nsteps ) );
+        a = a.concat(at.linspace(fromrgba[3], torgba[3], nsteps ) );
+    }
+
+    r = r.map( Math.round );
+    g = g.map( Math.round );
+    b = b.map( Math.round );
+
+    colors = at.zip(r, g, b, a);
+
+    if (format === 'hex') colors = colors.map( rgb2hex );
+    if (format === 'rgbaString') colors = colors.map( rgbaStr );
+
+    return colors;
+};
+
+
+function rgb2hex (rgba) {
+    var dig, hex = '#';
+    for (var i = 0; i < 3; ++i) {
+        dig = rgba[i];
+        dig = dig.toString(16);
+        hex += ('00' + dig).substr( dig.length );
+    }
+    return hex;
+}
+
+function rgbaStr (rgba) {
+    return 'rgba(' + rgba.join(',') + ')';
+}
+
+},{"./colorScales":42,"arraytools":19,"clone":24}],44:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
     module.exports = window;
@@ -5079,7 +5571,7 @@ if (typeof window !== "undefined") {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],39:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -5104,7 +5596,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],40:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -5128,9 +5620,9 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],41:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 module.exports = true;
-},{}],42:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 /*global window*/
 
 /**
@@ -5147,7 +5639,7 @@ module.exports = function isNode(val){
   return 'number' == typeof val.nodeType && 'string' == typeof val.nodeName;
 }
 
-},{}],43:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 module.exports = isFunction
 
 var toString = Object.prototype.toString
@@ -5164,7 +5656,7 @@ function isFunction (fn) {
       fn === window.prompt))
 };
 
-},{}],44:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 module.exports = isMobile;
 
 function isMobile (ua) {
@@ -5178,7 +5670,7 @@ function isMobile (ua) {
 }
 
 
-},{}],45:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 
 /**
  * Expose `isUrl`.
@@ -5203,7 +5695,7 @@ function isUrl(string){
   return matcher.test(string);
 }
 
-},{}],46:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 'use strict';
 module.exports = leftPad;
 
@@ -5242,7 +5734,7 @@ function leftPad (str, len, ch) {
   return pad + str;
 }
 
-},{}],47:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 /**
  * Clamp value.
  * Detects proper clamp min/max.
@@ -5257,7 +5749,7 @@ function leftPad (str, len, ch) {
 module.exports = require('./wrap')(function(a, min, max){
 	return max > min ? Math.max(Math.min(a,max),min) : Math.max(Math.min(a,min),max);
 });
-},{"./wrap":52}],48:[function(require,module,exports){
+},{"./wrap":59}],54:[function(require,module,exports){
 /**
  * @module  mumath/closest
  */
@@ -5274,7 +5766,7 @@ module.exports = function closest (num, arr) {
 	}
 	return curr;
 }
-},{}],49:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 /**
  * Base 10 logarithm
  *
@@ -5283,7 +5775,14 @@ module.exports = function closest (num, arr) {
 module.exports = require('./wrap')(function (a) {
 	return Math.log(a) / Math.log(10);
 });
-},{"./wrap":52}],50:[function(require,module,exports){
+},{"./wrap":59}],56:[function(require,module,exports){
+/**
+ * @module mumath/mix
+ */
+module.exports = require('./wrap')(function (x, y, a) {
+	return x * (1.0 - a) + y * a;
+});
+},{"./wrap":59}],57:[function(require,module,exports){
 /**
  * @module mumath/order
  */
@@ -5292,7 +5791,7 @@ module.exports = require('./wrap')(function (n) {
 	var order = Math.floor(Math.log(n) / Math.LN10 + 0.000000001);
 	return Math.pow(10,order);
 });
-},{"./wrap":52}],51:[function(require,module,exports){
+},{"./wrap":59}],58:[function(require,module,exports){
 /**
  * Whether element is between left & right including
  *
@@ -5311,7 +5810,7 @@ module.exports = require('./wrap')(function(a, left, right){
 	if (a <= right && a >= left) return true;
 	return false;
 });
-},{"./wrap":52}],52:[function(require,module,exports){
+},{"./wrap":59}],59:[function(require,module,exports){
 /**
  * Get fn wrapped with array/object attrs recognition
  *
@@ -5353,7 +5852,7 @@ module.exports = function(fn){
 		}
 	};
 };
-},{}],53:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 /**
  * @module mutype/is-object
  */
@@ -5366,7 +5865,7 @@ module.exports = function(o){
 	return !!o && typeof o === 'object' && o.constructor === Object;
 };
 
-},{}],54:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 'use strict';
 /* eslint-disable no-unused-vars */
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -5453,7 +5952,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 	return to;
 };
 
-},{}],55:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 var trim = require('trim')
   , forEach = require('for-each')
   , isArray = function(arg) {
@@ -5485,7 +5984,7 @@ module.exports = function (headers) {
 
   return result
 }
-},{"for-each":32,"trim":67}],56:[function(require,module,exports){
+},{"for-each":35,"trim":74}],63:[function(require,module,exports){
 (function (process){
 // Generated by CoffeeScript 1.7.1
 (function() {
@@ -5521,7 +6020,7 @@ module.exports = function (headers) {
 }).call(this);
 
 }).call(this,require('_process'))
-},{"_process":6}],57:[function(require,module,exports){
+},{"_process":6}],64:[function(require,module,exports){
 /**
  * @module  plot-grid
  */
@@ -5665,10 +6164,9 @@ Grid.prototype.update = function (options) {
 				this.lines[idx].style = extend(this.lines[idx].style, options.lines[idx].style);
 				delete options.lines[idx].style;
 			}
-			lines = extend(this.lines[idx], options.lines[idx]);
+			this.lines[idx] = lines = extend(this.lines[idx], options.lines[idx]);
 		}
 		stats.lines = lines;
-
 		var linesMin = Math.min(lines.max, lines.min);
 		var linesMax = Math.max(lines.min, lines.max);
 		stats.min = linesMin;
@@ -5733,31 +6231,29 @@ Grid.prototype.update = function (options) {
 				line.setAttribute('data-value', value);
 				titles && line.setAttribute('title', titles[i]);
 				linesContainer.appendChild(line);
-				if (!lines.logarithmic) {
-					ratio = (value - linesMin) / (linesMax - linesMin);
-				}
-				else {
-					ratio = (lg(value) - lg(linesMin)) / (lg(linesMax) - lg(linesMin));
-				}
-				if (lines.min > lines.max) ratio = 1 - ratio;
+			}
 
-				ratio *= 100;
-				if (lines.orientation === 'x') {
-					line.style.left = ratio + '%';
-				}
-				else {
-					line.style.top = (100 - ratio) + '%';
-				}
-				if (lines.style) {
-					for (var prop in lines.style) {
-						var val = lines.style[prop];
-						if (typeof val === 'number') val += 'px';
-						line.style[prop] = val;
-					}
-				}
+			if (!lines.logarithmic) {
+				ratio = (value - linesMin) / (linesMax - linesMin);
 			}
 			else {
-				ratio = parseFloat(line.getAttribute('data-value'));
+				ratio = (lg(value) - lg(linesMin)) / (lg(linesMax) - lg(linesMin));
+			}
+			if (lines.min > lines.max) ratio = 1 - ratio;
+
+			ratio *= 100;
+			if (lines.orientation === 'x') {
+				line.style.left = ratio + '%';
+			}
+			else {
+				line.style.top = (100 - ratio) + '%';
+			}
+			if (lines.style) {
+				for (var prop in lines.style) {
+					var val = lines.style[prop];
+					if (typeof val === 'number') val += 'px';
+					line.style[prop] = val;
+				}
 			}
 			line.removeAttribute('hidden');
 
@@ -5839,7 +6335,7 @@ Grid.prototype.update = function (options) {
 
 	return this;
 };
-},{"events":3,"get-uid":36,"inherits":39,"insert-css":40,"is-browser":41,"mumath/closest":48,"mumath/lg":49,"mumath/order":50,"mumath/within":51,"xtend":80}],58:[function(require,module,exports){
+},{"events":3,"get-uid":39,"inherits":45,"insert-css":46,"is-browser":47,"mumath/closest":54,"mumath/lg":55,"mumath/order":57,"mumath/within":58,"xtend":87}],65:[function(require,module,exports){
 var inherits = require('inherits')
 var EventEmitter = require('events').EventEmitter
 var now = require('right-now')
@@ -5884,7 +6380,7 @@ Engine.prototype.tick = function() {
     this.emit('tick', dt)
     this.last = time
 }
-},{"events":3,"inherits":39,"raf":59,"right-now":60}],59:[function(require,module,exports){
+},{"events":3,"inherits":45,"raf":66,"right-now":67}],66:[function(require,module,exports){
 (function (global){
 var now = require('performance-now')
   , root = typeof window === 'undefined' ? global : window
@@ -5960,7 +6456,7 @@ module.exports.polyfill = function() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"performance-now":56}],60:[function(require,module,exports){
+},{"performance-now":63}],67:[function(require,module,exports){
 (function (global){
 module.exports =
   global.performance &&
@@ -5971,7 +6467,7 @@ module.exports =
   }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],61:[function(require,module,exports){
+},{}],68:[function(require,module,exports){
 'use strict'
 
 function blackmanHarris (i,N) {
@@ -5986,7 +6482,7 @@ function blackmanHarris (i,N) {
 
 module.exports = blackmanHarris
 
-},{}],62:[function(require,module,exports){
+},{}],69:[function(require,module,exports){
 var isDom = require('is-dom')
 var lookup = require('browser-media-mime-type')
 
@@ -6043,7 +6539,7 @@ function extension (data) {
   return data.substring(extIdx + 1)
 }
 
-},{"browser-media-mime-type":17,"is-dom":42}],63:[function(require,module,exports){
+},{"browser-media-mime-type":21,"is-dom":48}],70:[function(require,module,exports){
 /**
  * @module audio-demo
  */
@@ -6064,6 +6560,7 @@ var isUrl = require('is-url');
 var ctx = require('audio-context');
 var isPlainObject = require('mutype/is-object');
 var createPlayer = require('web-audio-player');
+var qs = require('querystring');
 require('get-float-time-domain-data');
 
 module.exports = StartApp;
@@ -6241,6 +6738,7 @@ function StartApp (opts, cb) {
 		}
 	});
 	this.stop && this.audioStop.addEventListener('click', function (e) {
+		e.preventDefault();
 		this$1.reset();
 	});
 
@@ -6293,7 +6791,32 @@ function StartApp (opts, cb) {
 	this.paramsEl.setAttribute('hidden', true);
 	this.paramsEl.innerHTML = "<a class=\"params-close\" href=\"#close-params\"><i class=\"icon-close\">✕</i></a>";
 
+	//init params data
+	this.paramsList = []; //list of params values
+	this.paramsCache = {}; //name: idx
+
+	//extend params with the read history state
+	if (this.history) {
+		var params = qs.parse(location.hash.slice(1));
+	}
+
 	this.addParams(this.params);
+
+	if (this.history) {
+		for (var param in params){
+			var value = params[param];
+			if (value.toLowerCase() === 'false') {
+				value = false;
+			}
+			else if (value.toLowerCase() === 'true') {
+				value = true;
+			}
+			else if (/[-0-9\.]+/.test(value)) {
+				value = parseFloat(value);
+			}
+			this.setParamValue(param, value);
+		}
+	}
 
 	this.container.appendChild(this.paramsEl);
 
@@ -6305,7 +6828,8 @@ function StartApp (opts, cb) {
 	this.paramsBtn.setAttribute('hidden', true);
 	this.statusEl.appendChild(this.paramsBtn);
 
-	this.paramsBtn.addEventListener('click', function () {
+	this.paramsBtn.addEventListener('click', function (e) {
+		e.preventDefault();
 		if (this$1.paramsEl.hasAttribute('hidden')) {
 			this$1.paramsEl.removeAttribute('hidden');
 		}
@@ -6313,7 +6837,8 @@ function StartApp (opts, cb) {
 			this$1.paramsEl.setAttribute('hidden', true);
 		}
 	});
-	this.paramsEl.querySelector('.params-close').addEventListener('click', function () {
+	this.paramsEl.querySelector('.params-close').addEventListener('click', function (e) {
+		e.preventDefault();
 		if (this$1.paramsEl.hasAttribute('hidden')) {
 			this$1.paramsEl.removeAttribute('hidden');
 		}
@@ -6357,6 +6882,20 @@ function StartApp (opts, cb) {
 		raf(measure);
 	});
 
+	//update history
+	if (this.history) {
+		this._wait = false;
+		this.on('change', function () {
+			if (this$1._wait) return;
+
+			this$1.updateHistory();
+
+			this$1._wait = true;
+			setTimeout(function () {
+				this$1._wait = false;
+			}, 100);
+		});
+	}
 
 	this.update();
 
@@ -6372,6 +6911,7 @@ function StartApp (opts, cb) {
 		}
 	});
 }
+
 
 inherits(StartApp, Emitter);
 
@@ -6442,7 +6982,12 @@ StartApp.prototype.mobile = true;
 //show params button
 StartApp.prototype.params = true;
 
+//show github link
 StartApp.prototype.github = 'dfcreative/start-app';
+
+//track history of params
+StartApp.prototype.history = false;
+
 
 /**
  * Init settings
@@ -6547,9 +7092,22 @@ StartApp.prototype.update = function (opts) {
 		this.paramsBtn.setAttribute('hidden', true);
 	}
 
+	this.updateHistory();
+
 	return this;
 };
 
+//update hash state
+StartApp.prototype.updateHistory = function () {
+	if (!this.history) return;
+
+	var params = {};
+	this.paramsList.forEach(function (param) {
+		params[param.name] = param.value;
+	});
+
+	location.hash = '#' + qs.stringify(params);
+}
 
 //inner method for setting color
 StartApp.prototype.setColor = function (color) {
@@ -6637,13 +7195,14 @@ StartApp.prototype.setSource = function (src, cb) {
 			buffer: isMobile,
 			crossOrigin: 'Anonymous'
 		}).on('load', function () {
+			this$1.playPause && this$1.audioEl.removeAttribute('hidden');
+			this$1.stop && this$1.audioStop.removeAttribute('hidden');
+
 			this$1.emit('source', this$1.player.node, url);
 			cb && cb(null, url);
 			this$1.autoplay && this$1.play();
 		});
 
-		this.playPause && this.audioEl.removeAttribute('hidden');
-		this.stop && this.audioStop.removeAttribute('hidden');
 
 
 		return this;
@@ -6728,10 +7287,11 @@ StartApp.prototype.setSource = function (src, cb) {
 				self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
 				self.emit('source', self.player.node, streamUrl);
 				cb && cb(null, self.player.node, streamUrl);
-				self.autoplay && self.play();
 
 				self.playPause && self.audioEl.removeAttribute('hidden');
 				self.stop && self.audioStop.removeAttribute('hidden');
+
+				self.autoplay && self.play();
 			})
 			.on('decoding', function () {
 				self.sourceTitle.innerHTML = "decoding " + titleHtml;
@@ -6769,35 +7329,27 @@ StartApp.prototype.setSource = function (src, cb) {
 		self.sourceIcon.innerHTML = self.icons.loading;
 		self.sourceTitle.innerHTML = "loading " + src;
 
-		//FIXME: avoid this double-request
-		xhr({
-			uri: src
-		}, function (err, resp) {
-			if (err) return showError(err);
-			if (resp.statusCode !== 200) return showError(src + ' not found');
 
-			// self.audio.src = src;
-			self.player && self.player.stop();
-			self.player = createPlayer(src, {
-				context: self.context,
-				loop: self.loop,
-				buffer: isMobile, //FIXME: this can be always false here i guess
-				crossOrigin: 'Anonymous'
-			}).on('load', function () {
-				self.source = src;
+		self.player && self.player.stop();
+		self.player = createPlayer(src, {
+			context: self.context,
+			loop: self.loop,
+			buffer: isMobile, //FIXME: this can be always false here i guess
+			crossOrigin: 'Anonymous'
+		}).on('load', function () {
+			self.source = src;
 
-				self.sourceIcon.innerHTML = this$1.icons.url;
-				self.sourceTitle.innerHTML = "\n\t\t\t\t\t<a class=\"source-link\" href=\"" + src + "\" target=\"_blank\" title=\"Open " + src + "\"><span class=\"text-length-limiter\" style=\"max-width: 40vw\">" + src + "</span></a>\n\t\t\t\t";
-				self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
-				self.playPause && self.audioEl.removeAttribute('hidden');
-				self.stop && self.audioStop.removeAttribute('hidden');
+			self.sourceIcon.innerHTML = this$1.icons.url;
+			self.sourceTitle.innerHTML = "\n\t\t\t\t<a class=\"source-link\" href=\"" + src + "\" target=\"_blank\" title=\"Open " + src + "\"><span class=\"text-length-limiter\" style=\"max-width: 40vw\">" + src + "</span></a>\n\t\t\t";
+			self.sourceIcon.setAttribute('title', self.sourceTitle.textContent);
+			self.playPause && self.audioEl.removeAttribute('hidden');
+			self.stop && self.audioStop.removeAttribute('hidden');
 
-				self.emit('source', self.player.node, src);
-				cb && cb(null, self.player.node, src);
-				self.autoplay && self.play();
-			}).on('error', function (err) {
-				showError(err);
-			});
+			self.emit('source', self.player.node, src);
+			cb && cb(null, self.player.node, src);
+			self.autoplay && self.play();
+		}).on('error', function (err) {
+			showError(err);
 		});
 
 	}
@@ -6808,7 +7360,7 @@ StartApp.prototype.setSource = function (src, cb) {
 		self.sourceIcon.innerHTML = self.icons.error;
 		setTimeout(function () {
 			cb && cb('Bad url');
-		}, 1500);
+		}, 2000);
 	}
 
 	return this;
@@ -7032,14 +7584,21 @@ StartApp.prototype.addParam = function (name, opts, cb) {
 	el.querySelector('input, select').addEventListener('input', change);
 	el.querySelector('input, select').addEventListener('change', change);
 
+	opts.idx = this.paramsList.length;
+	this.paramsCache[opts.name] = opts.idx;
+	this.paramsList.push(opts);
+
 	function change () {
 		var v = this.type === 'checkbox' ? this.checked : (this.type === 'number' || this.type === 'range') ? parseFloat(this.value) : this.value;
 		this.title = v;
+		opts.value = v;
 		cb && cb.call(self, v, opts);
 		self.emit('change', opts.name, v, opts);
 	};
 
 	this.paramsEl.appendChild(el);
+
+	this.updateHistory();
 
 	return el;
 };
@@ -7053,6 +7612,9 @@ StartApp.prototype.getParamValue = function (name) {
 
 StartApp.prototype.setParamValue = function (name, value) {
 	var el = this.paramsEl.querySelector('#' + name.toLowerCase());
+
+	if (!el) return;
+
 	if (el.type === 'checkbox') {
 		el.checked = !!value;
 	}
@@ -7062,8 +7624,10 @@ StartApp.prototype.setParamValue = function (name, value) {
 	else {
 		el.value = value;
 	}
+
+	this.paramsList[this.paramsCache[name]].value = value;
 }
-},{"audio-context":16,"color-parse":22,"color-space/hsl":23,"events":3,"get-float-time-domain-data":35,"inherits":39,"insert-css":40,"is-mobile":44,"is-url":45,"left-pad":46,"mutype/is-object":53,"raf":59,"right-now":60,"web-audio-player":68,"xhr":66,"xtend/mutable":81}],64:[function(require,module,exports){
+},{"audio-context":20,"color-parse":26,"color-space/hsl":27,"events":3,"get-float-time-domain-data":38,"inherits":45,"insert-css":46,"is-mobile":50,"is-url":51,"left-pad":52,"mutype/is-object":60,"querystring":9,"raf":66,"right-now":67,"web-audio-player":75,"xhr":73,"xtend/mutable":88}],71:[function(require,module,exports){
 (function (global){
 if (typeof window !== "undefined") {
     module.exports = window;
@@ -7076,7 +7640,7 @@ if (typeof window !== "undefined") {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],65:[function(require,module,exports){
+},{}],72:[function(require,module,exports){
 module.exports = once
 
 once.proto = once(function () {
@@ -7097,7 +7661,7 @@ function once (fn) {
   }
 }
 
-},{}],66:[function(require,module,exports){
+},{}],73:[function(require,module,exports){
 "use strict";
 var window = require("global/window")
 var once = require("once")
@@ -7318,7 +7882,7 @@ function _createXHR(options) {
 
 function noop() {}
 
-},{"global/window":64,"is-function":43,"once":65,"parse-headers":55,"xtend":80}],67:[function(require,module,exports){
+},{"global/window":71,"is-function":49,"once":72,"parse-headers":62,"xtend":87}],74:[function(require,module,exports){
 
 exports = module.exports = trim;
 
@@ -7334,7 +7898,7 @@ exports.right = function(str){
   return str.replace(/\s*$/, '');
 };
 
-},{}],68:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 var buffer = require('./lib/buffer-source')
 var media = require('./lib/media-source')
 
@@ -7346,14 +7910,14 @@ function webAudioPlayer (src, opt) {
   else return media(src, opt)
 }
 
-},{"./lib/buffer-source":70,"./lib/media-source":73}],69:[function(require,module,exports){
+},{"./lib/buffer-source":77,"./lib/media-source":80}],76:[function(require,module,exports){
 module.exports = createAudioContext
 function createAudioContext () {
   var AudioCtor = window.AudioContext || window.webkitAudioContext
   return new AudioCtor()
 }
 
-},{}],70:[function(require,module,exports){
+},{}],77:[function(require,module,exports){
 (function (process){
 var canPlaySrc = require('./can-play-src')
 var createAudioContext = require('./audio-context')
@@ -7471,7 +8035,7 @@ function createBufferSource (src, opt) {
     // Support the same source types as in
     // MediaElement mode...
     if (typeof source.getAttribute === 'function') {
-      source = source.getAttribuet('src')
+      source = source.getAttribute('src')
     } else if (typeof source.src === 'string') {
       source = source.src
     }
@@ -7513,7 +8077,7 @@ function createBufferSource (src, opt) {
 }
 
 }).call(this,require('_process'))
-},{"./audio-context":69,"./can-play-src":71,"./resume-context":74,"./xhr-audio":75,"_process":6,"events":3,"right-now":60}],71:[function(require,module,exports){
+},{"./audio-context":76,"./can-play-src":78,"./resume-context":81,"./xhr-audio":82,"_process":6,"events":3,"right-now":67}],78:[function(require,module,exports){
 var lookup = require('browser-media-mime-type')
 var audio
 
@@ -7563,16 +8127,16 @@ function extension (data) {
   return data.substring(extIdx + 1)
 }
 
-},{"browser-media-mime-type":17}],72:[function(require,module,exports){
+},{"browser-media-mime-type":21}],79:[function(require,module,exports){
 module.exports = addOnce
 function addOnce (element, event, fn) {
   function tmp (ev) {
     element.removeEventListener(event, tmp, false)
-    fn()
+    fn(ev, element)
   }
   element.addEventListener(event, tmp, false)
 }
-},{}],73:[function(require,module,exports){
+},{}],80:[function(require,module,exports){
 (function (process){
 var EventEmitter = require('events').EventEmitter
 var createAudio = require('simple-media-element').audio
@@ -7685,8 +8249,37 @@ function createMediaSource (src, opt) {
   return emitter
 
   function startLoad () {
+    // The file errors (like decoding / 404s) appear on <source>
+    var srcElements = Array.prototype.slice.call(audio.children)
+    var remainingSrcErrors = srcElements.length
+    var hasErrored = false
+    var sourceError = function (err, el) {
+      if (hasErrored) return
+      remainingSrcErrors--
+      console.warn('Error loading source: ' + el.getAttribute('src'))
+      if (remainingSrcErrors <= 0) {
+        hasErrored = true
+        srcElements.forEach(function (el) {
+          el.removeEventListener('error', sourceError, false)
+        })
+        emitter.emit('error', new Error('Could not play any of the supplied sources'))
+      }
+    }
+
     var done = function () {
       emitter.emit('load')
+    }
+
+    if (audio.readyState >= audio.HAVE_ENOUGH_DATA) {
+      process.nextTick(done)
+    } else {
+      addOnce(audio, 'canplay', done)
+      addOnce(audio, 'error', function (ev) {
+        emitter.emit(new Error('Unknown error while loading <audio>'))
+      })
+      srcElements.forEach(function (el) {
+        addOnce(el, 'error', sourceError)
+      })
     }
 
     // On most browsers the loading begins
@@ -7694,20 +8287,11 @@ function createMediaSource (src, opt) {
     // you need to call load() for events
     // to be triggered.
     audio.load()
-
-    if (audio.readyState >= audio.HAVE_ENOUGH_DATA) {
-      process.nextTick(done)
-    } else {
-      addOnce(audio, 'canplay', done)
-      addOnce(audio, 'error', function (err) {
-        emitter.emit('error', err)
-      })
-    }
   }
 }
 
 }).call(this,require('_process'))
-},{"./audio-context":69,"./can-play-src":71,"./event-add-once":72,"./resume-context":74,"_process":6,"events":3,"object-assign":54,"simple-media-element":62}],74:[function(require,module,exports){
+},{"./audio-context":76,"./can-play-src":78,"./event-add-once":79,"./resume-context":81,"_process":6,"events":3,"object-assign":61,"simple-media-element":69}],81:[function(require,module,exports){
 module.exports = function (audioContext) {
   if (audioContext.state === 'suspended' &&
       typeof audioContext.resume === 'function') {
@@ -7715,7 +8299,7 @@ module.exports = function (audioContext) {
   }
 }
 
-},{}],75:[function(require,module,exports){
+},{}],82:[function(require,module,exports){
 var xhr = require('xhr')
 var xhrProgress = require('xhr-progress')
 
@@ -7749,13 +8333,13 @@ function xhrAudio (audioContext, src, cb, progress, decoding) {
   }
 }
 
-},{"xhr":78,"xhr-progress":79}],76:[function(require,module,exports){
-arguments[4][64][0].apply(exports,arguments)
-},{"dup":64}],77:[function(require,module,exports){
-arguments[4][65][0].apply(exports,arguments)
-},{"dup":65}],78:[function(require,module,exports){
-arguments[4][66][0].apply(exports,arguments)
-},{"dup":66,"global/window":76,"is-function":43,"once":77,"parse-headers":55,"xtend":80}],79:[function(require,module,exports){
+},{"xhr":85,"xhr-progress":86}],83:[function(require,module,exports){
+arguments[4][71][0].apply(exports,arguments)
+},{"dup":71}],84:[function(require,module,exports){
+arguments[4][72][0].apply(exports,arguments)
+},{"dup":72}],85:[function(require,module,exports){
+arguments[4][73][0].apply(exports,arguments)
+},{"dup":73,"global/window":83,"is-function":49,"once":84,"parse-headers":62,"xtend":87}],86:[function(require,module,exports){
 var EventEmitter = require('events').EventEmitter
 
 module.exports = progress
@@ -7806,7 +8390,7 @@ function progress(xhr) {
   return emitter
 }
 
-},{"events":3}],80:[function(require,module,exports){
+},{"events":3}],87:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -7829,7 +8413,7 @@ function extend() {
     return target
 }
 
-},{}],81:[function(require,module,exports){
+},{}],88:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -7850,13 +8434,13 @@ function extend(target) {
     return target
 }
 
-},{}],82:[function(require,module,exports){
+},{}],89:[function(require,module,exports){
 // var test = require('tst');
 // var Formant = require('audio-formant');
 // var Speaker = require('audio-speaker');
 // var Sink = require('audio-sink');
 // var Slice = require('audio-slice');
-var Spectrum = require('./');
+var Spectrum = require('./2d');
 var ft = require('fourier-transform');
 var blackman = require('scijs-window-functions/blackman-harris');
 var isBrowser = require('is-browser');
@@ -7875,9 +8459,11 @@ var app = startApp({
 	// source: './Liwei.mp3',
 	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
-	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
+	source: isMobile ? './sample.mp3' : 'https://soundcloud.com/crossingsofficial/podcast-023-sam-pauli',
 	params: true,
-	github: 'audio-lab/gl-spectrum'
+	github: 'audio-lab/gl-spectrum',
+	history: false,
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// source: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// source: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
@@ -7886,7 +8472,6 @@ var app = startApp({
 
 var source = null;
 var analyser = ctx.createAnalyser();
-analyser.frequencyBinCount = 2048;
 analyser.smoothingTimeConstant = .1;
 analyser.connect(ctx.destination);
 
@@ -7897,7 +8482,7 @@ app.on('source', function (node) {
 
 
 //generate input sine
-var N = 2048;
+var N = 512;
 var sine = new Float32Array(N);
 var saw = new Float32Array(N);
 var noise = new Float32Array(N);
@@ -7910,40 +8495,48 @@ for (var i = 0; i < N; i++) {
 }
 
 // var frequencies = ft(sine);
-// var frequencies = new Float32Array(1024).fill(0.5);
 // var frequencies = ft(noise);
+// var frequencies = new Float32Array(1024).fill(0.5);
 //NOTE: ios does not allow setting too big this value
+analyser.fftSize = 1024;
 var frequencies = new Float32Array(analyser.frequencyBinCount);
 for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
-// frequencies = frequencies
-// .map((v, i) => v*blackman(i, noise.length))
+frequencies = frequencies
+// .map((v, i) => v*blackman(i, N))
 // .map((v) => db.fromGain(v));
 
 var colormaps = [];
-for (var name in colorScales) colormaps.push(name);
+for (var name in colorScales) {
+	if (name === 'alpha') continue;
+	if (name === 'hsv') continue;
+	if (name === 'rainbow') continue;
+	if (name === 'rainbow-soft') continue;
+	if (name === 'phase') continue;
+	colormaps.push(name);
+}
+// var colormap = colormaps[9];
 var colormap = colormaps[(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
-	// autostart: false,
-	// frequencies: frequencies,
+	// magnitudes: frequencies,
 	fill: colormap,
 	grid: true,
-	minFrequency: 40,
-	maxFrequency: 20000,
+	minFrequency: 20,
+	maxFrequency: 12257.61,
 	logarithmic: true,
 	// smoothing: .7,
-	details: 1,
 	maxDecibels: 0,
-	mask: createMask(10, 10),
 	align: .5,
 	trail: 38,
-	autostart: true,
+	// autostart: false,
 	// balance: .5,
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	group: 6,
+	type: 'fill',
+	width: 2,
+	// weighting: 'z',
 	// background: [27/255,0/255,37/255, 1],
 	//background: [1,0,0,1]//'./images/bg-small.jpg'
 	// viewport: function (w, h) {
@@ -7954,8 +8547,10 @@ var spectrum = new Spectrum({
 	// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
 	analyser.getFloatFrequencyData(frequencies);
-	spectrum.setFrequencies(frequencies);
+	spectrum.setFrequencyData(frequencies);
 });
+
+// spectrum.render();
 
 createColormapSelector(spectrum);
 
@@ -7992,6 +8587,15 @@ createColormapSelector(spectrum);
 
 
 function createColormapSelector (spectrum) {
+	app.addParam('type', {
+		values: ['line', 'bar', 'fill'],
+		value: spectrum.type,
+		change: function (value, state) {
+			spectrum.type = value;
+			updateView();
+		}
+	});
+
 	app.addParam('colormap', {
 		values: colormaps,
 		value: colormap,
@@ -8001,7 +8605,6 @@ function createColormapSelector (spectrum) {
 		}
 	});
 
-
 	//inversed colormap checkbox
 	app.addParam('inversed', {
 		value: false,
@@ -8010,7 +8613,6 @@ function createColormapSelector (spectrum) {
 			updateView();
 		}
 	});
-
 
 	//weighting switcher
 	app.addParam('weighting', {
@@ -8049,24 +8651,19 @@ function createColormapSelector (spectrum) {
 		updateView();
 	});
 
-	app.addParam('mask', !!spectrum.mask, function (v) {
-		spectrum.setMask(v ? createMask(10, 10) : null);
-		updateView();
-	});
-
-	app.addParam('group', {
-		min: 0,
-		max: 50,
-		step: 1,
-		value: spectrum.group
+	app.addParam('width', {
+		min: 0.5,
+		max: 150,
+		step: .5,
+		value: spectrum.width
 	}, function (v) {
-		spectrum.group = v;
+		spectrum.width = v;
 		updateView();
 	});
 
 	app.addParam('trail', {
 		min: 0,
-		max: 50,
+		max: 100,
 		step: 1,
 		value: spectrum.trail
 	}, function (v) {
@@ -8082,45 +8679,58 @@ function createColormapSelector (spectrum) {
 	});
 
 
+	app.addParams({
+		minDecibels: {
+			type: 'range',
+			value: spectrum.minDecibels,
+			min: -100,
+			max: 0,
+			change: function (v) {
+				spectrum.minDecibels = v;
+				updateView();
+			}
+		},
+		maxDecibels: {
+			type: 'range',
+			value: spectrum.maxDecibels,
+			min: -100,
+			max: 0,
+			change: function (v) {
+				spectrum.maxDecibels = v;
+				updateView();
+			}
+		},
+		minFrequency: {
+			type: 'range',
+			value: spectrum.minFrequency,
+			min: 0,
+			max: 1000,
+			change: function (v) {
+				spectrum.minFrequency = v;
+				updateView();
+			}
+		},
+		maxFrequency: {
+			type: 'range',
+			value: spectrum.maxFrequency,
+			min: 1000,
+			max: spectrum.sampleRate / 2,
+			change: function (v) {
+				spectrum.maxFrequency = v;
+				updateView();
+			}
+		}
+	});
+
+
 	updateView();
 
 	function updateView () {
 		spectrum.update();
-		if (Array.isArray(spectrum.fill)) {
-			app.setColor('rgb(' + spectrum.fill.slice(-4, -1).map(function (v) { return v*255; }).join(', ') + ')');
+		if (Array.isArray(spectrum.fillData)) {
+			app.setColor('rgb(' + spectrum.fillData.slice(-4, -1).join(', ') + ')');
 		}
 	}
 }
 
-
-
-//create mask
-function createMask (w, h) {
-	w = w || 10;
-	h = h || 10;
-	var rect = [w, h];
-	var radius = w/1.5;
-	var canvas = document.createElement('canvas');
-	canvas.width = rect[0] + 2;
-	canvas.height = rect[1] + 2;
-	var ctx = canvas.getContext('2d');
-	ctx.clearRect(0, 0, rect[0] + 2, rect[1] + 2);
-	ctx.fillStyle = 'rgb(0,0,0)';
-	ctx.fillRect(0, 0, rect[0] + 2, rect[1] + 2);
-	ctx.strokeStyle = 'rgb(255,255,255)';
-	ctx.fillStyle = 'rgb(255,255,255)';
-	ctx.lineJoin = 'round';
-	ctx.lineWidth = radius;
-	ctx.strokeRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
-	ctx.fillRect(1 + (radius/2), 1 + (radius/2), rect[0]-radius - 1, rect[1]-radius - 1);
-
-	// document.body.appendChild(canvas);
-	// canvas.style.zIndex = 999;
-	// canvas.style.position = 'absolute';
-	// canvas.style.top = '0px';
-	// canvas.style.left = '0px';
-
-	return canvas;
-}
-
-},{"./":7,"audio-context":16,"colormap/colorScales":25,"decibels":28,"fourier-transform":33,"is-browser":41,"is-mobile":44,"scijs-window-functions/blackman-harris":61,"start-app":63}]},{},[82]);
+},{"./2d":10,"audio-context":20,"colormap/colorScales":29,"decibels":31,"fourier-transform":36,"is-browser":47,"is-mobile":50,"scijs-window-functions/blackman-harris":68,"start-app":70}]},{},[89]);
