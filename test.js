@@ -21,7 +21,7 @@ var app = startApp({
 	color: '#E86F56',
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	// source: './Liwei.mp3',
-	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+	source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
@@ -46,7 +46,7 @@ app.on('source', function (node) {
 
 
 //generate input sine
-var N = 4096;
+var N = 1024;
 var sine = new Float32Array(N);
 var saw = new Float32Array(N);
 var noise = new Float32Array(N);
@@ -58,17 +58,17 @@ for (var i = 0; i < N; i++) {
 	noise[i] = Math.random() * 2 - 1;
 }
 
-var frequencies = ft(sine);
+// var frequencies = ft(sine);
 // var frequencies = ft(noise);
 // var frequencies = new Float32Array(1024).fill(0.5);
 //NOTE: ios does not allow setting too big this value
-// analyser.fftSize = 1024;
-// var frequencies = new Float32Array(analyser.frequencyBinCount);
-// for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
+analyser.fftSize = 1024;
+var frequencies = new Float32Array(analyser.frequencyBinCount);
+for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
 
-frequencies = frequencies
+// frequencies = frequencies
 // .map((v, i) => v*blackman(i, N))
-.map((v) => db.fromGain(v));
+// .map((v) => db.fromGain(v));
 
 var colormaps = [];
 for (var name in colorScales) {
@@ -93,7 +93,7 @@ var spectrum = new Spectrum({
 	maxDecibels: 0,
 	align: .5,
 	trail: 38,
-	autostart: false,
+	// autostart: false,
 	// balance: .5,
 	// antialias: true,
 	// fill: [1,1,1,0],
@@ -110,11 +110,11 @@ var spectrum = new Spectrum({
 	// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 	// frequencies = frequencies.map((f, i) => db.fromGain(f));
 
-	// analyser.getFloatFrequencyData(frequencies);
-	// spectrum.setFrequencyData(frequencies);
+	analyser.getFloatFrequencyData(frequencies);
+	spectrum.setFrequencyData(frequencies);
 });
 
-spectrum.render();
+// spectrum.render();
 
 createColormapSelector(spectrum);
 

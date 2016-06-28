@@ -52,41 +52,34 @@ Spectrum.prototype.drawSpiral = function (data) {
 	var center = [width*.5, height*.5];
 	var balance = .5;
 
+	var type = ''+this.type;
+	var isLine = /line/.test(type);
+	var isFill = /fill/.test(type);
+	var isBar = /bar/.test(type);
+
+
 	//log spiral
 	if (this.logarithmic) {
 		var startAngle = Math.PI * Math.log10(this.minFrequency) * 2;
 		var endAngle = Math.PI * Math.log10(this.maxFrequency) * 2;
 
 		if (width > height) {
-			var b = spiral.logarithmic.b(height*.5, endAngle, 1);
+			var b = spiral.logarithmic.b(height*.4, endAngle + Math.PI, 1);
 		}
 		else {
-			var b = spiral.logarithmic.b(width*.5, endAngle, 1);
+			var b = spiral.logarithmic.b(width*.4, endAngle + Math.PI, 1);
 		}
 
 
-		//paint spiral curve in canvas
-		ctx.beginPath();
-		var coords = spiral.logarithmic(center, startAngle, 1, b);
-		ctx.moveTo(coords[0], coords[1]);
-
-		//draw spiral
-		for (var angle = startAngle; angle <= endAngle; angle+=0.1) {
-			coords = spiral.logarithmic(center, angle, 1, b);
-			ctx.lineTo(coords[0], coords[1]);
-		}
-		ctx.lineWidth = this.width;
-		ctx.strokeStyle = `rgba(${this.getColor(1)})`;
-		ctx.stroke();
-
-
-		//draw bars
-		var ratio = 0, maxAmp = 0, amp = 0, nf, f, x, offset;
+		//create spiral shape to fill
+		var ratio = 0, outerAmp = 0, innerAmp = 0, amp = 0, nf, f, x, offset, pi2 = Math.PI * 2;
 		// var gradient = ctx.createLinearGradient(this.viewport[0],0,width,0);
 		// gradient.addColorStop(0, `rgba(${this.getColor(0.5)})`)
 
+		var innerPoints = [];
+		var outerPoints = [];
+
 		var coords = spiral.logarithmic(center, startAngle, 1, b);
-		ctx.moveTo(coords[0], coords[1]);
 
 		for (var i = 0; i < data.length; i++) {
 			nf = (i + .5) / data.length;
@@ -99,18 +92,58 @@ Spectrum.prototype.drawSpiral = function (data) {
 			amp = clamp((amp - this.minDecibels) / (this.maxDecibels - this.minDecibels), 0, 1);
 
 			ratio = (angle - startAngle) / (endAngle - startAngle);
-			maxAmp = spiral.radius(angle, 1, b) - spiral.radius(angle - Math.PI * 2, 1, b);
+			innerAmp = spiral.radius(angle, 1, b) - spiral.radius(angle - pi2, 1, b);
+			outerAmp = spiral.radius(angle + pi2, 1, b) - spiral.radius(angle, 1, b);
 
-			var radius = amp * maxAmp;
-			var from = spiral.logarithmic(center, angle, 1, b);
-			var to = [-radius * Math.cos(angle) + from[0], -radius * Math.sin(angle) + from[1]];
+			var outerRadius = amp * (outerAmp) * this.align;
+			var innerRadius = amp * (innerAmp) * (1 - this.align);
+			var coord = spiral.logarithmic(center, angle, 1, b);
+			var from = [
+				coord[0] - innerRadius * Math.cos(angle),
+				coord[1] - innerRadius * Math.sin(angle)
+			];
+			var to = [
+				coord[0] + outerRadius * Math.cos(angle),
+				coord[1] + outerRadius * Math.sin(angle)
+			];
 
-			ctx.beginPath();
-			ctx.moveTo(from[0], from[1]);
-			ctx.lineTo(to[0], to[1]);
-			ctx.strokeStyle = `rgba(${this.getColor( amp*balance + relativeAmp*(1 - balance) )})`;
-			ctx.stroke();
+			// 	ctx.beginPath();
+			// 	ctx.moveTo(from[0], from[1]);
+			// 	ctx.lineTo(to[0], to[1]);
+			// 	ctx.strokeStyle = `rgba(${this.getColor( amp*balance + relativeAmp*(1 - balance) )})`;
+			// 	ctx.stroke();
+
+			innerPoints.push(from);
+			outerPoints.push(to);
 		}
+
+		//fill shape
+		ctx.beginPath();
+		var points = innerPoints.concat(outerPoints.reverse());
+		ctx.moveTo(points[0][0], points[0][1]);
+		points.forEach((coord) => {
+			ctx.lineTo(coord[0], coord[1]);
+		});
+		ctx.closePath();
+		ctx.fillStyle = `rgba(${this.getColor(1)})`;
+		ctx.strokeStyle = `rgba(${this.getColor(1)})`;
+		ctx.fill();
+		// ctx.stroke();
+
+
+		//paint spiral curve in canvas
+		// ctx.beginPath();
+		// var coords = spiral.logarithmic(center, startAngle, 1, b);
+		// ctx.moveTo(coords[0], coords[1]);
+
+		// //draw spiral
+		// for (var angle = startAngle; angle <= endAngle; angle+=0.1) {
+		// 	coords = spiral.logarithmic(center, angle, 1, b);
+		// 	ctx.lineTo(coords[0], coords[1]);
+		// }
+		// ctx.lineWidth = this.width;
+		// ctx.strokeStyle = `rgba(${this.getColor(1)})`;
+		// ctx.stroke();
 
 	}
 
