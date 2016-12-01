@@ -17,12 +17,9 @@ var spectrum = new Spectrum({
 	canvas: canvas,
 	context: 'webgl',
 
-	//initial decibels data, -100...0
-	magnitudes: frequenciesData,
-
-	//audio settings
-	maxDecibels: -30,
-	minDecibels: -100,
+	//visible range
+	maxDb: -30,
+	minDb: -100,
 	maxFrequency: 20000,
 	minFrequency: 20,
 	sampleRate: 44100,
@@ -30,47 +27,42 @@ var spectrum = new Spectrum({
 	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
 	weighting: 'itu',
 
-	//draw frequency/decibels grid
+	//display grid, can be an object with plot-grid settings
 	grid: true,
-	axes: false,
-	logarithmic: true,
+
+	//place frequencies logarithmically
+	log: true,
 
 	//rendering settings
 	smoothing: 0.5,
-	antialias: false,
 
-	//0 - place at the bottom, .5 - place symmetrically, 1. - place at the top
+	//0 - bottom, .5 - symmetrically, 1. - top
 	align: 0,
 
-	//Display max within the last N snapshots. 0 - no trail.
-	trail: 0,
+	//display max value trail for the all time.
+	trail: true,
 
-	//line, bar or fill, or any combination of them.
+	//style of rendering: line, bar or fill
 	type: 'line',
 
-	//width of line or bar
-	width: 1,
-
-	//The levels of magnitude/frequency - a colormap name, colormap, pixels array, imageData, imageElement or canvas. Null disables fill.
-	fill: 'greys',
-
-	//A color tuple, imageData, imageElement, canvas or url. Default is 0-level of the fill
-	background: null
+	//colormap for the levels of magnitude
+	colormap: ['black', 'white']
 });
 
-//pass db frequencies in -100...0 range
-spectrum.setFrequencyData(magnitudes);
+//pass db values (-100...0 range)
+spectrum.set(magnitudes);
 
 //update style/options
-spectrum.setFill(colors, inverse?);
-spectrum.setBackground(image);
 spectrum.update(options);
 ```
 
-Lightweight 2d version is available as `require('gl-spectrum/2d')`.
+Canvas 2d version is available as `require('gl-spectrum/2d')`.
 
 ## Related
 
+* [gl-waveform](https://github.com/audio-lab/gl-waveform)
+* [gl-spectrogram](https://github.com/audio-lab/gl-spectrogram)
 * [a-weighting](https://github.com/audio-lab/a-weighting) — perception loudness weighting for audio.
 * [colormap](https://github.com/bpostlethwaite/colormap) — list of js color maps.
 * [cli-visualizer](https://github.com/dpayne/cli-visualizer) — C++ spectrum visualizer.
+* [spectrum](https://github.com/mattdesl/spectrum) by mattdesl

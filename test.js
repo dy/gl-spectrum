@@ -1,22 +1,57 @@
-// var test = require('tst');
-// var Formant = require('audio-formant');
-// var Speaker = require('audio-speaker');
-// var Sink = require('audio-sink');
-// var Slice = require('audio-slice');
-var Spectrum = require('./2d');
-var ft = require('fourier-transform');
-var blackman = require('scijs-window-functions/blackman-harris');
-var isBrowser = require('is-browser');
-var db = require('decibels');
-var colorScales = require('colormap/colorScales');
-var startApp = require('start-app');
-var ctx = require('audio-context');
-var isMobile = require('is-mobile')();
+require('enable-mobile')
+const Spectrum = require('./gl');
+const isBrowser = require('is-browser');
+const db = require('decibels');
+const colormap = require('colormap');
+const colorScales = require('colormap/colorScales');
+const appAudio = require('../app-audio');
+const ctx = require('audio-context');
+const isMobile = require('is-mobile')();
+const Color = require('tinycolor2');
+const createFps = require('fps-indicator');
+let palettes = require('nice-color-palettes');
 // require('get-float-time-domain-data');
-// var createAudioContext = require('ios-safe-audio-context')
 
 
-var app = startApp({
+let colormaps = {};
+
+for (var name in colorScales) {
+	if (name === 'alpha') continue;
+	if (name === 'hsv') continue;
+	if (name === 'rainbow') continue;
+	if (name === 'rainbow-soft') continue;
+	if (name === 'phase') continue;
+
+	colormaps[name] = colormap({
+		colormap: colorScales[name],
+		nshades: 16,
+		format: 'rgbaString'
+	});
+	palettes.push(colormaps[name]);
+}
+
+palettes = palettes
+//filter not readable palettes
+.filter((palette) => {
+	return Color.isReadable(palette[0], palette.slice(-1)[0], {
+		level:"AA", size:"large"
+	});
+});
+
+
+//show framerate
+let fps = createFps();
+// fps.element.style.color = theme.palette[0];
+// fps.element.style.fontFamily = theme.fontFamily;
+fps.element.style.fontWeight = 500;
+fps.element.style.fontSize = '12px';
+fps.element.style.marginTop = '1rem';
+fps.element.style.marginRight = '1rem';
+
+
+
+var analyser;
+var audio = appAudio({
 	context: ctx,
 	color: '#E86F56',
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
@@ -25,98 +60,72 @@ var app = startApp({
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
-	params: true,
-	github: 'audio-lab/gl-spectrum',
-	history: false,
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
 	// source: 'https://soundcloud.com/when-we-dip/atish-mark-slee-manjumasi-mix-when-we-dip-062',
 	// source: 'https://soundcloud.com/dark-textures/dt-darkambients-4',
 	// source: 'https://soundcloud.com/deep-house-amsterdam/diynamic-festival-podcast-by-kollektiv-turmstrasse',
+}).on('load', (node) => {
+	analyser = audio.context.createAnalyser();
+	analyser.smoothingTimeConstant = 0;
+	analyser.fftSize = 1024;
+	analyser.minDecibels = -100;
+	analyser.maxDecibels = 0;
+
+	node.disconnect();
+	node.connect(analyser);
+	analyser.connect(audio.context.destination);
 });
 
-var source = null;
-var analyser = ctx.createAnalyser();
-analyser.smoothingTimeConstant = .1;
-analyser.connect(ctx.destination);
-
-app.on('source', function (node) {
-	source = node;
-	source.connect(analyser);
-});
+// audio.element.style.fontFamily = theme.fontFamily;
+// audio.element.style.fontSize = theme.fontSize;
+// audio.update();
 
 
-//generate input sine
-var N = 1024;
-var sine = new Float32Array(N);
-var saw = new Float32Array(N);
-var noise = new Float32Array(N);
-var rate = 44100;
 
-for (var i = 0; i < N; i++) {
-	sine[i] = Math.sin(8000 * Math.PI * 2 * (i / rate)) + Math.sin(800 * Math.PI * 2 * (i / rate)) + Math.sin(80 * Math.PI * 2 * (i / rate));
-	saw[i] = 2 * ((1000 * i / rate) % 1) - 1;
-	noise[i] = Math.random() * 2 - 1;
-}
-
-// var frequencies = ft(sine);
-// var frequencies = ft(noise);
-// var frequencies = new Float32Array(1024).fill(0.5);
-//NOTE: ios does not allow setting too big this value
-analyser.fftSize = 1024;
-var frequencies = new Float32Array(analyser.frequencyBinCount);
-for (var i = 0; i < frequencies.length; i++) frequencies[i] = -150;
-
-// frequencies = frequencies
-// .map((v, i) => v*blackman(i, N))
-// .map((v) => db.fromGain(v));
-
-var colormaps = [];
-for (var name in colorScales) {
-	if (name === 'alpha') continue;
-	if (name === 'hsv') continue;
-	if (name === 'rainbow') continue;
-	if (name === 'rainbow-soft') continue;
-	if (name === 'phase') continue;
-	colormaps.push(name);
-}
-// var colormap = colormaps[9];
-var colormap = colormaps[(Math.random() * colormaps.length) | 0];
 
 var spectrum = new Spectrum({
-	magnitudes: frequencies,
-	fill: colormap,
-	grid: true,
-	minFrequency: 20,
-	maxFrequency: 20000,
-	logarithmic: true,
-	// smoothing: .7,
-	maxDecibels: 0,
+	autostart: true,
 	align: .5,
-	trail: 38,
+	// fill: colormap,
+	// grid: true,
+	// minFrequency: 20,
+	// maxFrequency: 20000,
+	// logarithmic: true,
+	// smoothing: .7,
+	// maxDecibels: 0,
+	// align: .5,
+	// trail: 38,
 	// autostart: false,
 	// balance: .5,
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	type: 'line',
-	width: 2,
+	// type: 'line',
+	// width: 2,
 	// weighting: 'z',
 	// background: [27/255,0/255,37/255, 1],
 	//background: [1,0,0,1]//'./images/bg-small.jpg'
 	// viewport: function (w, h) {
 	// 	return [50,20,w-70,h-60];
 	// }
-}).on('render', function () {
-	// frequencies = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
-	// frequencies = frequencies.map((f, i) => db.fromGain(f));
+}).on('render', upd)
 
-	analyser.getFloatFrequencyData(frequencies);
-	spectrum.setFrequencyData(frequencies);
-});
+
+
+function upd () {
+	if (!analyser) return;
+
+	var dbMagnitudes = new Float32Array(analyser.frequencyBinCount);
+	// dbMagnitudes = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
+	// dbMagnitudes = dbMagnitudes.map((f, i) => db.fromGain(f));
+
+	analyser.getFloatFrequencyData(dbMagnitudes);
+	spectrum.set(dbMagnitudes);
+}
 
 // spectrum.render();
 
-createColormapSelector(spectrum);
+// createColormapSelector(spectrum);
 
 
 // test('line webgl');

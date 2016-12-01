@@ -2,24 +2,27 @@
   "name": "gl-spectrum",
   "version": "2.0.10",
   "description": "Display spectrum data with webgl",
-  "main": "index.js",
+  "main": "gl.js",
   "dependencies": {
-    "gl-spectrogram": "^1.1.1",
+    "a-weighting": "^1.0.0",
+    "gl-component": "^2.4.1",
     "inherits": "^2.0.1",
     "is-browser": "^2.0.1",
-    "mumath": "^2.0.0",
-    "plot-grid": "^1.0.1",
-    "spiral-2d": "^1.1.0",
+    "mumath": "^3.3.1",
+    "tinycolor2": "^1.4.1",
     "xtend": "^4.0.1"
   },
   "devDependencies": {
+    "app-audio": "^1.1.5",
     "audio-context": "^0.1.0",
-    "bubleify": "^0.2.0",
+    "bubleify": "^0.6.0",
     "decibels": "^1.0.1",
+    "enable-mobile": "^1.0.7",
     "fourier-transform": "^1.0.0",
+    "fps-indicator": "^1.0.2",
     "get-float-time-domain-data": "^0.1.0",
-    "start-app": "^1.1.0",
-    "tst": "^1.3.1"
+    "nice-color-palettes": "^1.0.1",
+    "spiral-2d": "^1.1.0"
   },
   "scripts": {
     "test": "budo test",
