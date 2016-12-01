@@ -63,7 +63,7 @@ Spectrum.prototype.set = function (data) {
 	let gl = this.gl;
 	let halfRate = this.sampleRate * 0.5;
 	let nf = halfRate / data.length;
-	let weight = this.weighting;
+	let weight = typeof this.weighting === 'string' ? (weighting[this.weighting] || weighting.z) : this.weighting;
 	let smoothing = this.smoothing;
 	let magnitudes = this.magnitudes;
 
@@ -93,10 +93,10 @@ Spectrum.prototype.set = function (data) {
 Spectrum.prototype.update = function (options) {
 	let gl = this.gl;
 
+	extend(this, options);
+
 	//limit base
 	this.minFrequency = Math.max(1, this.minFrequency);
-
-	if (!(this.weighting instanceof Function)) this.weighting = weighting[this.weighting] || weighting.z;
 
 	//create grid, if not created yet
 	/*

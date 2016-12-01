@@ -18,10 +18,12 @@
     "bubleify": "^0.6.0",
     "decibels": "^1.0.1",
     "enable-mobile": "^1.0.7",
-    "fourier-transform": "^1.0.0",
+    "fourier-transform": "^1.0.2",
     "fps-indicator": "^1.0.2",
     "get-float-time-domain-data": "^0.1.0",
     "nice-color-palettes": "^1.0.1",
+    "scijs-window-functions": "^2.0.2",
+    "settings-panel": "^1.8.16",
     "spiral-2d": "^1.1.0"
   },
   "scripts": {

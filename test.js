@@ -9,6 +9,10 @@ const ctx = require('audio-context');
 const isMobile = require('is-mobile')();
 const Color = require('tinycolor2');
 const createFps = require('fps-indicator');
+const createSettings = require('settings-panel')
+const theme = require('../settings-panel/theme/typer')
+const fft = require('fourier-transform');
+const blackman = require('scijs-window-functions/blackman-harris');
 let palettes = require('nice-color-palettes');
 // require('get-float-time-domain-data');
 
@@ -53,11 +57,10 @@ fps.element.style.marginRight = '1rem';
 var analyser;
 var audio = appAudio({
 	context: ctx,
-	color: '#E86F56',
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	// source: './Liwei.mp3',
-	source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
-	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
+	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+	source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
@@ -76,9 +79,9 @@ var audio = appAudio({
 	analyser.connect(audio.context.destination);
 });
 
-// audio.element.style.fontFamily = theme.fontFamily;
-// audio.element.style.fontSize = theme.fontSize;
-// audio.update();
+audio.element.style.fontFamily = theme.fontFamily;
+audio.element.style.fontSize = theme.fontSize;
+audio.update();
 
 
 
@@ -115,11 +118,15 @@ var spectrum = new Spectrum({
 function upd () {
 	if (!analyser) return;
 
-	var dbMagnitudes = new Float32Array(analyser.frequencyBinCount);
-	// dbMagnitudes = ft(waveform.map((v, i) => v*blackman(i, waveform.length)));
+	// var waveform = new Float32Array(analyser.fftSize);
+	// analyser.getFloatTimeDomainData(waveform);
+
+	// dbMagnitudes = fft(waveform.map((v, i) => v*blackman(i, waveform.length)));
 	// dbMagnitudes = dbMagnitudes.map((f, i) => db.fromGain(f));
 
+	var dbMagnitudes = new Float32Array(analyser.frequencyBinCount);
 	analyser.getFloatFrequencyData(dbMagnitudes);
+
 	spectrum.set(dbMagnitudes);
 }
 
@@ -156,19 +163,53 @@ function upd () {
 
 // test('oscilloscope');
 
-
-
+let settings = createSettings([
+	{id: 'type', type: 'select', options: ['line', 'bar', 'fill'], value: spectrum.type, change: v => spectrum.update({type: v})},
+	{id: 'weighting', type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
+		value: spectrum.weighting,
+		change: (value) => {
+			spectrum.update({weighting: value})
+		}
+	},
+	{id: 'align', type: 'range', min: 0, max: 1, value: spectrum.align, change: v => spectrum.update({align: v})}
+],{
+	title: '<a href="https://github.com/audio-lab/gl-spectrum">gl-spectrum</a>',
+	theme: theme,
+	fontSize: 12,
+	palette: ['black', 'white'],
+	css: `
+		:host {
+			z-index: 1;
+			position: fixed;
+			bottom: 0;
+			right: 0;
+			left: 0;
+			width: 100%;
+			background-color: transparent;
+			background-image: linear-gradient(to top, rgba(255,255,255, .9) 0%, rgba(255,255,255,0) 120%);
+			box-shadow: none;
+		}
+		.settings-panel-title {
+			width: auto;
+			display: inline-block;
+			line-height: 1;
+			margin-right: 3em;
+			padding: .5rem 0;
+			vertical-align: baseline;
+		}
+		.settings-panel-field {
+			width: auto;
+			vertical-align: top;
+			display: inline-block;
+			margin-right: 1em;
+		}
+		.settings-panel-label {
+			width: auto!important;
+		}
+	`
+});
 
 function createColormapSelector (spectrum) {
-	app.addParam('type', {
-		values: ['line', 'bar', 'fill'],
-		value: spectrum.type,
-		change: (value, state) => {
-			spectrum.type = value;
-			updateView();
-		}
-	});
-
 	app.addParam('colormap', {
 		values: colormaps,
 		value: colormap,
@@ -187,23 +228,6 @@ function createColormapSelector (spectrum) {
 		}
 	});
 
-	//weighting switcher
-	app.addParam('weighting', {
-		values: {
-			A: 'a',
-			B: 'b',
-			C: 'c',
-			D: 'd',
-			ITU: 'itu',
-			Z: 'z'
-		},
-		value: spectrum.weighting,
-		change: (value) => {
-			spectrum.weighting = value;
-			updateView();
-		}
-	});
-
 
 	//logarithmic
 	app.addParam('log', {
@@ -212,11 +236,6 @@ function createColormapSelector (spectrum) {
 			spectrum.logarithmic = v;
 			updateView();
 		}
-	});
-
-	app.addParam('align', spectrum.align, (v) => {
-		spectrum.align = v;
-		updateView();
 	});
 
 	app.addParam('grid', spectrum.grid, (v) => {

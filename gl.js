@@ -141,7 +141,7 @@ Spectrum.prototype.draw = function (gl) {
 		gl.drawArrays(gl.LINE_STRIP, 0, this.positions.length/2);
 	} else {
 		// this.setUniform('type', 0);
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, count);
+		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.positions.length/2);
 		// if (this.trail) {
 		// 	this.setUniform('type', 1);
 		// 	gl.drawArrays(gl.LINES, 0, count);
