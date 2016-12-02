@@ -89,6 +89,11 @@ var audio = appAudio({
 	node.disconnect();
 	node.connect(analyser);
 	analyser.connect(audio.context.destination);
+
+	// setTimeout(upd, 100);
+	// setTimeout(upd, 200);
+	// setTimeout(upd, 300);
+	// setTimeout(upd, 1000);
 });
 
 audio.element.style.fontFamily = theme.fontFamily;
@@ -100,6 +105,8 @@ audio.update();
 
 var spectrum = new Spectrum({
 	autostart: true,
+	interactions: true,
+	log: false,
 	// align: .5,
 	// fill: colormap,
 	// grid: true,
@@ -162,10 +169,10 @@ function upd () {
 // test('oscilloscope');
 
 let settings = createSettings([
-	{id: 'type', type: 'select', label: false, options: ['line', 'bar', 'fill'], value: spectrum.type, change: v => spectrum.update({type: v})},
+	{id: 'type', type: 'select', options: ['line', 'bar', 'fill'], value: spectrum.type, change: v => spectrum.update({type: v})},
 	// {id: 'align', label: '↕', title: 'align', type: 'range', min: 0, max: 1, value: spectrum.align, change: v => spectrum.update({align: v})},
 	// {id: 'smoothing', label: '~', title: 'smoothing', type: 'range', min: 0, max: 1, value: spectrum.smoothing, change: v => spectrum.update({smoothing: v})},
-	{type: 'raw', label: false, id: 'palette', style: ``, content: function (data) {
+	{type: 'raw', label: 'palette', id: 'palette', style: ``, content: function (data) {
 		let el = document.createElement('div');
 		el.className = 'random-palette';
 		el.style.cssText = `
@@ -202,7 +209,7 @@ let settings = createSettings([
 				});
 			}
 			spectrum.update({
-				background: palette.length > 1 ? palette[palette.length - 1] : null,
+				background: palette.length > 1 ? palette[palette.length - 1] : 'white',
 				palette: palette.slice().reverse()
 			});
 
@@ -231,10 +238,10 @@ let settings = createSettings([
 	}},
 	{id: 'log', type: 'checkbox', value: spectrum.log, change: v => spectrum.update({log: v})
 	},
-	{id: 'weighting', label: false, title: 'Weighting', type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
+	{id: 'weighting', label: 'weighting', title: 'Weighting', type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
 		value: spectrum.weighting,
 		change: (value) => {
-			spectrum.update({weighting: value})
+			spectrum.update({weighting: value, trail: true})
 		}
 	},
 	{id: 'trail', label: 'trail', type: 'checkbox', value: !!spectrum.trail, change: v => spectrum.update({trail: v})
@@ -249,19 +256,19 @@ let settings = createSettings([
 			z-index: 1;
 			position: fixed;
 			border-radius: 0;
+			top: 0;
 			bottom: 0;
 			right: 0;
-			left: 0;
-			width: 100%;
+			width: 140px;
 			background-color: transparent;
-			background-image: linear-gradient(to top, rgba(255,255,255, .9) 0%, rgba(255,255,255,0) 120%);
+			background-image: linear-gradient(to left, rgba(255,255,255, .9) 0%, rgba(255,255,255,0) 120%);
 			box-shadow: none;
+			padding-top: 200px;
 		}
 		.settings-panel-title {
 			width: auto;
 			display: inline-block;
 			line-height: 1;
-			margin-right: 3em;
 			padding: .5rem 0;
 			vertical-align: baseline;
 		}
@@ -269,7 +276,7 @@ let settings = createSettings([
 			width: auto;
 			vertical-align: top;
 			display: inline-block;
-			margin-right: 1em;
+			margin-right: 0;
 		}
 		.settings-panel-label {
 			width: auto!important;

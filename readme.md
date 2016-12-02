@@ -59,7 +59,10 @@ var spectrum = new Spectrum({
 	palette: ['black', 'white'],
 
 	//by default transparent
-	background: null
+	background: null,
+
+	//pan and zoom to show detailed view
+	interactions: false
 });
 
 //pass values in decibels (-100...0 range)
