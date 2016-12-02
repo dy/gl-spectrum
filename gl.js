@@ -211,14 +211,15 @@ Spectrum.prototype.vert = `
 
 	float f (float ratio) {
 		float halfRate = sampleRate * .5;
-		float leftF = minFrequency / halfRate;
+		float minF = max(minFrequency, 1e-5);
+		float leftF = minF / halfRate;
 		float rightF = maxFrequency / halfRate;
 
 		ratio = (ratio - leftF) / (rightF - leftF);
 
-		float logRatio = ratio * (maxFrequency - minFrequency) + minFrequency;
+		float logRatio = ratio * (maxFrequency - minF) + minF;
 
-		logRatio = log(logRatio/minFrequency) / log(maxFrequency/minFrequency);
+		logRatio = log(logRatio/minF) / log(maxFrequency/minF);
 
 		ratio = decide(ratio, logRatio, logarithmic);
 

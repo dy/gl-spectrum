@@ -13,6 +13,7 @@ const createFps = require('fps-indicator');
 const createSettings = require('settings-panel')
 const theme = require('../settings-panel/theme/typer')
 const fft = require('fourier-transform');
+const alpha = require('color-alpha');
 const blackman = require('scijs-window-functions/blackman-harris');
 let palettes = require('nice-color-palettes');
 // require('get-float-time-domain-data');
@@ -106,7 +107,7 @@ audio.update();
 var spectrum = new Spectrum({
 	autostart: true,
 	interactions: true,
-	log: false,
+	// log: false,
 	// align: .5,
 	// fill: colormap,
 	// grid: true,
@@ -131,6 +132,8 @@ var spectrum = new Spectrum({
 	// 	return [50,20,w-70,h-60];
 	// }
 }).on('render', upd)
+
+spectrum.grid.update({x: {fontFamily: theme.fontFamily, fontSize: '10px'}});
 
 
 
@@ -183,7 +186,6 @@ let settings = createSettings([
 			display: inline-block;
 			vertical-align: middle;
 			cursor: pointer;
-			margin-right: 1em;
 		`;
 		el.title = 'Randomize palette';
 		let settings = this.panel;
@@ -200,18 +202,22 @@ let settings = createSettings([
 
 		//create colors in the element
 		function setColors(el, palette, active) {
-			let bg = palette.length <= 1 ? 'white' : palette[palette.length -1];
-
-			if (palette.length > 1) {
-				settings.update({
-					palette: palette,
-					style: `background-image: linear-gradient(to top, ${Color(bg).setAlpha(.9).toString()} 0%, ${Color(bg).setAlpha(0).toString()} 100%);`
-				});
-			}
 			spectrum.update({
 				background: palette.length > 1 ? palette[palette.length - 1] : 'white',
 				palette: palette.slice().reverse()
 			});
+
+			let bg = palette.length > 1 ? spectrum.getColor(0.) : 'white';
+
+			settings.update({
+				style: `background-color: ${alpha(bg, .5)};
+					box-shadow: 0 0 0 2px ${alpha(spectrum.getColor(0.5), .1)};`
+			});
+			if (palette.length > 1) {
+				settings.update({
+					palette: palette,
+				});
+			}
 
 			audio.update({color: palette[0]});
 			fps.element.style.color = spectrum.palette[palette.length-1];
@@ -255,15 +261,14 @@ let settings = createSettings([
 		:host {
 			z-index: 1;
 			position: fixed;
-			border-radius: 0;
-			top: 0;
-			bottom: 0;
-			right: 0;
-			width: 140px;
+			left: 50%;
+			transform: translateX(-50%);
+			max-width: 100vw;
+			white-space: nowrap;
+			bottom: 2.5rem;
+			width: auto;
 			background-color: transparent;
-			background-image: linear-gradient(to left, rgba(255,255,255, .9) 0%, rgba(255,255,255,0) 120%);
-			box-shadow: none;
-			padding-top: 200px;
+			padding: .5rem 1rem;
 		}
 		.settings-panel-title {
 			width: auto;
@@ -277,6 +282,7 @@ let settings = createSettings([
 			vertical-align: top;
 			display: inline-block;
 			margin-right: 0;
+			margin-left: 1rem;
 		}
 		.settings-panel-label {
 			width: auto!important;

@@ -12,6 +12,7 @@
     "gl-component": "^2.4.1",
     "inherits": "^2.0.1",
     "is-browser": "^2.0.1",
+    "is-plain-obj": "^1.1.0",
     "mumath": "^3.3.1",
     "pan-zoom": "^2.0.0",
     "plot-grid": "^2.2.3",

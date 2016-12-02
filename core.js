@@ -13,9 +13,9 @@ const Component = require('gl-component')
 const weighting = require('a-weighting')
 const db = require('decibels')
 const interpolate = require('color-interpolate')
-const panzoom = require('pan-zoom')
 const pretty = require('pretty-number')
 const alpha = require('color-alpha')
+const isPlainObj = require('is-plain-obj')
 
 module.exports = Spectrum;
 
@@ -34,45 +34,6 @@ function Spectrum (options) {
 	this.glAttribs = this.gl.getContextAttributes();
 
 	this.magnitudes = [];
-
-	//enable interactions
-	panzoom(this.canvas, e => {
-		if (!this.interactions) return;
-
-		let [left, top, width, height] = this.viewport;
-		let ratio = (e.x - left) / width;
-		let fLeft = this.minFrequency, fRight = this.maxFrequency;
-		let fRange = fRight - fLeft;
-
-		if (e.dz) {
-			let zoom = clamp(-e.dz, -height*.75, height*.75) / height;
-
-			fLeft += zoom * (ratio * fRange);
-			fRight -= zoom * ((1 - ratio) * fRange);
-		}
-		else if (e.dx) {
-			let shift = fRange * e.dx / width;
-			let newLeft = Math.max(fLeft - shift, this.log ? 1 : 0);
-			let newRight = Math.min(fRight - fLeft + newLeft, this.sampleRate/2);
-			fLeft -= -newRight + fRight;
-			fRight = newRight;
-		}
-
-		this.update({
-			minFrequency: fLeft,
-			maxFrequency: fRight
-		});
-	});
-
-	//enable grid
-	if (this.grid) {
-		this.grid = createGrid({
-			autostart: false,
-			context: this.context,
-			x: true,
-			y: false
-		});
-	}
 }
 
 Spectrum.prototype.context = {
@@ -161,6 +122,8 @@ Spectrum.prototype.set = function (data) {
 Spectrum.prototype.update = function (options) {
 	let gl = this.gl;
 
+	if (!options) options = {};
+
 	let [left, top, width, height] = this.viewport;
 
 	extend(this, options);
@@ -171,43 +134,63 @@ Spectrum.prototype.update = function (options) {
 	this.infoColor = this.getColor(.5);
 
 	//limit base
-	this.minFrequency = Math.max(1, this.minFrequency);
+	this.minFrequency = Math.max(this.log ? 1 : 0, this.minFrequency);
 	this.maxFrequency = Math.min(this.sampleRate/2, this.maxFrequency);
 
+	//create grid if true/options passed
+	if (this.grid === true || isPlainObj(this.grid)) {
+		this.grid = createGrid({
+			autostart: false,
+			context: this.context,
+			x: extend({
+				type: this.log ? 'logarithmic' : 'linear',
+				minScale: 1e-10,
+				origin: 0,
+				axisOrigin: -Infinity,
+				min: 0,
+				format: (v) => {
+					// v = this.log ? Math.pow(10, v) : v;
+					return pretty(v);
+				}
+			}, this.grid),
+			// y: false
+		});
 
-	//create grid, if not created yet
+		this.grid.on('panzoom', (grid) => {
+			if (!this.interactions) return;
+			let x = grid.x;
+			let leftF = x.offset;
+			let rightF = x.offset + x.scale*this.viewport[2];
+			if (this.log) {
+				leftF = Math.pow(10, leftF);
+				rightF = Math.pow(10, rightF);
+			}
+			this.update({minFrequency: leftF, maxFrequency: rightF});
+		});
+	}
+
+	//update grid
 	if (this.grid) {
 		let scale, range, offset;
 
-		if (!this.log) {
-			scale = (this.maxFrequency - this.minFrequency) / width;
-			offset = this.minFrequency;
-		} else {
-		// 	offset = lg(this.minFrequency)
-		// 	range = lg(this.maxFrequency/this.minFrequency);
-		// 	scale =  range / width;
+		let xOpts = {
+			color: this.infoColor
+		};
+
+		if (options.log != null) {
+			xOpts.type = this.log ? 'logarithmic' : 'linear';
+			xOpts.max = this.log ? lg(this.sampleRate/2) : this.sampleRate/2;
+
+			xOpts.offset = this.log ? lg(this.minFrequency) : this.minFrequency;
+			xOpts.scale = (this.log ? lg(this.maxFrequency/this.minFrequency) : (this.maxFrequency - this.minFrequency)) / this.viewport[2];
+		}
+		if (options.interactions) {
+			xOpts.pan = xOpts.zoom = options.interactions;
 		}
 
 		this.grid.update({
-			x: {
-				type: this.log ? 'logarithmic' : 'linear',
-				min: this.log ? 0 : 0,
-				max: this.sampleRate / 2,
-				offset: offset,
-				origin: 0,
-				axisOrigin: -Infinity,
-				scale: scale,
-				// minScale: 0.0001,
-				format: (v) => {
-					// v = this.log ? Math.pow(10, v) : v ;
-					return pretty(v);
-				},
-				// lineColor: .1,
-				color: this.infoColor,
-				pan: false,
-				zoom: false
-			}
-		})
+			x: xOpts
+		});
 	}
 
 	if (this.glAttribs.alpha) this.canvas.style.background = this.background;
