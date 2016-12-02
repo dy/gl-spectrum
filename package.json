@@ -1,6 +1,6 @@
 {
   "name": "gl-spectrum",
-  "version": "2.0.10",
+  "version": "3.0.0",
   "description": "Display spectrum data with webgl",
   "main": "gl.js",
   "dependencies": {
