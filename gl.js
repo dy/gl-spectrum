@@ -180,7 +180,7 @@ Spectrum.prototype.draw = function (gl, viewport) {
 
 	//draw grid
 	if (this.grid) {
-		this.grid._draw();
+		this.grid.redraw();
 	}
 
 	return this;

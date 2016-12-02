@@ -4,14 +4,14 @@ const isBrowser = require('is-browser');
 const db = require('decibels');
 const colormap = require('colormap');
 const colorScales = require('colormap/colorScales');
-const appAudio = require('../app-audio');
+const appAudio = require('app-audio');
 const ctx = require('audio-context');
 const insertCss =  require('insert-styles');
 const isMobile = require('is-mobile')();
 const Color = require('tinycolor2');
 const createFps = require('fps-indicator');
 const createSettings = require('settings-panel')
-const theme = require('../settings-panel/theme/typer')
+const theme = require('settings-panel/theme/typer')
 const fft = require('fourier-transform');
 const alpha = require('color-alpha');
 const blackman = require('scijs-window-functions/blackman-harris');
@@ -244,6 +244,8 @@ let settings = createSettings([
 	}},
 	{id: 'log', type: 'checkbox', value: spectrum.log, change: v => spectrum.update({log: v})
 	},
+	{id: 'grid', type: 'checkbox', value: spectrum.grid, change: v => spectrum.update({grid: v})
+	},
 	{id: 'weighting', label: 'weighting', title: 'Weighting', type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
 		value: spectrum.weighting,
 		change: (value) => {
@@ -261,8 +263,7 @@ let settings = createSettings([
 		:host {
 			z-index: 1;
 			position: fixed;
-			left: 50%;
-			transform: translateX(-50%);
+			left: 1rem;
 			max-width: 100vw;
 			white-space: nowrap;
 			bottom: 2.5rem;
@@ -289,75 +290,3 @@ let settings = createSettings([
 		}
 	`
 });
-
-function createColormapSelector (spectrum) {
-
-	app.addParam('grid', spectrum.grid, (v) => {
-		spectrum.grid = v;
-		updateView();
-	});
-
-	app.addParam('width', {
-		min: 0.5,
-		max: 150,
-		step: .5,
-		value: spectrum.width
-	}, (v) => {
-		spectrum.width = v;
-		updateView();
-	});
-
-
-	app.addParams({
-		minDecibels: {
-			type: 'range',
-			value: spectrum.minDecibels,
-			min: -100,
-			max: 0,
-			change: (v) => {
-				spectrum.minDecibels = v;
-				updateView();
-			}
-		},
-		maxDecibels: {
-			type: 'range',
-			value: spectrum.maxDecibels,
-			min: -100,
-			max: 0,
-			change: (v) => {
-				spectrum.maxDecibels = v;
-				updateView();
-			}
-		},
-		minFrequency: {
-			type: 'range',
-			value: spectrum.minFrequency,
-			min: 0,
-			max: 1000,
-			change: (v) => {
-				spectrum.minFrequency = v;
-				updateView();
-			}
-		},
-		maxFrequency: {
-			type: 'range',
-			value: spectrum.maxFrequency,
-			min: 1000,
-			max: spectrum.sampleRate / 2,
-			change: (v) => {
-				spectrum.maxFrequency = v;
-				updateView();
-			}
-		}
-	});
-
-
-	updateView();
-
-	function updateView () {
-		spectrum.update();
-		if (Array.isArray(spectrum.fillData)) {
-			app.setColor('rgb(' + spectrum.fillData.slice(-4, -1).join(', ') + ')');
-		}
-	}
-}

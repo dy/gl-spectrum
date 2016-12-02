@@ -55,7 +55,7 @@ Spectrum.prototype.maxDb = 0;
 Spectrum.prototype.minDb = -100;
 Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
-Spectrum.prototype.smoothing = 0.75;
+Spectrum.prototype.smoothing = 0.82;
 Spectrum.prototype.log = true;
 Spectrum.prototype.weighting = 'itu';
 Spectrum.prototype.sampleRate = 44100;
@@ -63,7 +63,7 @@ Spectrum.prototype.palette = 'black';
 Spectrum.prototype.levels = 32;
 Spectrum.prototype.background = null;
 Spectrum.prototype.balance = .5;
-Spectrum.prototype.trailAlpha = .4;
+Spectrum.prototype.trailAlpha = .33;
 Spectrum.prototype.interactions = false;
 
 
@@ -134,39 +134,50 @@ Spectrum.prototype.update = function (options) {
 	this.infoColor = this.getColor(.5);
 
 	//limit base
-	this.minFrequency = Math.max(this.log ? 1 : 0, this.minFrequency);
+	this.minFrequency = Math.max(20, this.minFrequency);
 	this.maxFrequency = Math.min(this.sampleRate/2, this.maxFrequency);
 
 	//create grid if true/options passed
 	if (this.grid === true || isPlainObj(this.grid)) {
-		this.grid = createGrid({
-			autostart: false,
-			context: this.context,
-			x: extend({
-				type: this.log ? 'logarithmic' : 'linear',
-				minScale: 1e-10,
-				origin: 0,
-				axisOrigin: -Infinity,
-				min: 0,
-				format: (v) => {
-					// v = this.log ? Math.pow(10, v) : v;
-					return pretty(v);
-				}
-			}, this.grid),
-			// y: false
-		});
+		if (!this._grid) {
+			this._grid = createGrid({
+				autostart: false,
+				context: this.context,
+				x: extend({
+					type: this.log ? 'logarithmic' : 'linear',
+					minScale: 1e-10,
+					origin: 0,
+					axisOrigin: -Infinity,
+					format: (v) => {
+						// v = this.log ? Math.pow(10, v) : v;
+						return pretty(v);
+					}
+				}, this.grid),
+				y: 'linear'
+			});
 
-		this.grid.on('panzoom', (grid) => {
-			if (!this.interactions) return;
-			let x = grid.x;
-			let leftF = x.offset;
-			let rightF = x.offset + x.scale*this.viewport[2];
-			if (this.log) {
-				leftF = Math.pow(10, leftF);
-				rightF = Math.pow(10, rightF);
-			}
-			this.update({minFrequency: leftF, maxFrequency: rightF});
-		});
+			this._grid.on('interact', (grid) => {
+				if (!this.interactions) return;
+				let x = grid.x;
+				let leftF = x.offset;
+				let rightF = x.offset + x.scale*this.viewport[2];
+				if (this.log) {
+					leftF = Math.pow(10, leftF);
+					rightF = Math.pow(10, rightF);
+				}
+				this.update({minFrequency: leftF, maxFrequency: rightF});
+			});
+
+			this._grid.redraw = this._grid._draw;
+			this._grid._draw = () => {};
+		}
+
+		this.grid = this._grid;
+		this._grid.update({x: {disabled: false}});
+	}
+	else if (!this.grid && this._grid) {
+		this._grid.update({x: {disabled: true}});
+		this._grid.redraw();
 	}
 
 	//update grid
@@ -174,11 +185,13 @@ Spectrum.prototype.update = function (options) {
 		let scale, range, offset;
 
 		let xOpts = {
-			color: this.infoColor
+			color: this.getColor(.75),
+			// lineColor: .05
 		};
 
 		if (options.log != null) {
 			xOpts.type = this.log ? 'logarithmic' : 'linear';
+			xOpts.min = this.log ? lg(20) : 0;
 			xOpts.max = this.log ? lg(this.sampleRate/2) : this.sampleRate/2;
 
 			xOpts.offset = this.log ? lg(this.minFrequency) : this.minFrequency;
@@ -188,8 +201,22 @@ Spectrum.prototype.update = function (options) {
 			xOpts.pan = xOpts.zoom = options.interactions;
 		}
 
+		let yOpts = {
+			axisOrigin: Infinity,
+			origin: 0,
+			offset: -this.align*200,
+			scale: 200/height,
+			lineColor: false,
+			distance: 10,
+			color: this.getColor(.75),
+			format: v => {
+				return pretty(-100 + Math.abs(v));
+			}
+		}
+
 		this.grid.update({
-			x: xOpts
+			x: xOpts,
+			y: yOpts
 		});
 	}
 
