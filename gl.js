@@ -3,10 +3,10 @@
  */
 'use strict'
 
-const Spectrum = require('./core');
-const clamp = require('mumath/clamp');
-const inherit = require('inherits');
-const rgba = require('color-rgba');
+const Spectrum = require('./core')
+const clamp = require('mumath/clamp')
+const inherit = require('inherits')
+const rgba = require('color-rgba')
 
 module.exports = GlSpectrum;
 
@@ -42,28 +42,40 @@ function GlSpectrum (opts) {
 		//update uniforms
 		this.setUniform('align', this.align);
 		this.setUniform('balance', this.balance);
-		// this.setUniform('minFrequency', this.minFrequency);
-		// this.setUniform('maxFrequency', this.maxFrequency);
-		// this.setUniform('minDb', this.minDb);
-		// this.setUniform('maxDb', this.maxDb);
-		// this.setUniform('logarithmic', this.log ? 1 : 0);
-		// this.setUniform('sampleRate', this.sampleRate);
-		// this.setUniform('width', this.width);
-		// this.setUniform('size', this.magnitudes.length);
-		// this.setUniform('brightness', 1);
-		let colormap = [];
-		this.colormap.forEach((v,i) => {
-			let channels = rgba(v, false);
-			colormap.push(channels[0])
-			colormap.push(channels[1])
-			colormap.push(channels[2])
-			colormap.push(channels[3]*255)
-		})
-		this.setTexture('colormap', colormap);
+
+		this.setUniform('minFrequency', this.minFrequency);
+		this.setUniform('maxFrequency', this.maxFrequency);
+		this.setUniform('minDb', this.minDb);
+		this.setUniform('maxDb', this.maxDb);
+		this.setUniform('logarithmic', this.log ? 1 : 0);
+		this.setUniform('sampleRate', this.sampleRate);
+
+		this.infoColorArr = rgba(this.infoColor);
+		this.infoColorArr[3] *= .4;
+
+		this.isFlat = this.palette.length === 1;
+
+		if (this.isFlat) {
+			let channels = rgba(this.palette, false);
+			channels[3] *= 255;
+			this.setUniform('color', channels);
+		}
+		else {
+			let colormap = [];
+			for (let i = 0; i < this.levels; i++) {
+				let channels = rgba(this.getColor((i + .5)/this.levels), false);
+				colormap.push(channels[0])
+				colormap.push(channels[1])
+				colormap.push(channels[2])
+				colormap.push(channels[3]*255)
+			}
+			this.setTexture('colormap', colormap);
+		}
 	})
 
 	this.update();
 }
+
 
 
 
@@ -72,8 +84,6 @@ function GlSpectrum (opts) {
  */
 Spectrum.prototype.recalc = function (magnitudes, peak) {
 	if (!magnitudes) magnitudes = this.magnitudes;
-
-	this.setUniform('peak', peak);
 
 	var positions = [], l = magnitudes.length;
 
@@ -127,7 +137,6 @@ Spectrum.prototype.recalc = function (magnitudes, peak) {
 	}
 
 	this.positions = positions;
-	this.setAttribute('position', positions);
 
 	return this;
 };
@@ -137,7 +146,13 @@ Spectrum.prototype.recalc = function (magnitudes, peak) {
  * Render main loop
  */
 Spectrum.prototype.draw = function (gl) {
+	//draw data
 	if (!this.positions) return this;
+
+	this.setUniform('peak', this.peak);
+	this.setAttribute('position', this.positions);
+
+	this.setUniform('flatFill', this.isFlat ? 1 : 0);
 
 	if (this.type === 'line') {
 		// if (this.trail) {
@@ -156,6 +171,7 @@ Spectrum.prototype.draw = function (gl) {
 		// }
 	}
 
+
 	return this;
 };
 
@@ -169,14 +185,40 @@ Spectrum.prototype.vert = `
 	attribute vec2 position;
 	uniform float align;
 	uniform float peak;
+	uniform float minFrequency;
+	uniform float maxFrequency;
+	uniform float minDb;
+	uniform float maxDb;
+	uniform float logarithmic;
+	uniform float sampleRate;
 
 	varying float vIntensity;
+
+	float decide (float a, float b, float w) {
+		return step(0.5, w) * b + step(w, 0.5) * a;
+	}
+
+	float f (float ratio) {
+		float halfRate = sampleRate * .5;
+		float leftF = minFrequency / halfRate;
+		float rightF = maxFrequency / halfRate;
+
+		ratio = (ratio - leftF) / (rightF - leftF);
+
+		float logRatio = ratio * (maxFrequency - minFrequency) + minFrequency;
+
+		logRatio = log(logRatio/minFrequency) / log(maxFrequency/minFrequency);
+
+		ratio = decide(ratio, logRatio, logarithmic);
+
+		return clamp(ratio, 0., 1.);
+	}
 
 	void main () {
 		vIntensity = abs(position.y)/peak;
 
 		gl_Position = vec4(
-			position.x * 2. - 1.,
+			f(position.x) * 2. - 1.,
 			(align * 2. - 1.) + step(0., position.y) * position.y * (1. - align) + step(position.y, 0.) * position.y * align,
 		0, 1);
 	}
@@ -305,21 +347,29 @@ Spectrum.prototype.frag = `
 	uniform float align;
 	uniform float peak;
 	uniform float balance;
+	uniform float flatFill;
+	uniform vec4 color;
 
 	varying float vIntensity;
 
 	void main () {
-		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
+		if (flatFill > 0.) {
+			gl_FragColor = color;
+		}
 
-		float dist = abs(coord.y - align);
-		float amt = dist/peak;
+		else {
+			vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
 
-		float intensity = pow((amt + dist)*.5 + .5, .8888) * balance + pow(vIntensity, 2.) * (1. - balance);
-		intensity = clamp(intensity, 0., 1.);
+			float dist = abs(coord.y - align);
+			float amt = dist/peak;
 
-		vec4 color = texture2D(colormap, vec2(coord.x, intensity));
+			float intensity = pow((amt + dist)*.5 + .5, .8888) * balance + pow(vIntensity, 2.) * (1. - balance);
+			intensity = clamp(intensity, 0., 1.);
 
-		gl_FragColor = color;
+			vec4 color = texture2D(colormap, vec2(coord.x, intensity));
+
+			gl_FragColor = color;
+		}
 	}
 `;
 

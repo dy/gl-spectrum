@@ -115,8 +115,8 @@ var spectrum = new Spectrum({
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	type: 'bar',
-	barWidth: 1,
+	// type: 'bar',
+	// barWidth: 1,
 	// weighting: 'z',
 	// background: [27/255,0/255,37/255, 1],
 	//background: [1,0,0,1]//'./images/bg-small.jpg'
@@ -186,7 +186,7 @@ let settings = createSettings([
 		`;
 		el.title = 'Randomize palette';
 		let settings = this.panel;
-		setColors(el, settings.palette, settings.theme.active);
+		setColors(el, spectrum.palette, settings.theme.active);
 
 		el.onclick = () => {
 			// settings.set('colors', 'custom');
@@ -199,19 +199,21 @@ let settings = createSettings([
 
 		//create colors in the element
 		function setColors(el, palette, active) {
-			let bg = palette[palette.length -1];
+			let bg = palette.length <= 1 ? 'white' : palette[palette.length -1];
 
-			settings.update({
-				palette: palette,
-				style: `background-image: linear-gradient(to top, ${Color(bg).setAlpha(.9).toString()} 0%, ${Color(bg).setAlpha(0).toString()} 100%);`
-			});
+			if (palette.length > 1) {
+				settings.update({
+					palette: palette,
+					style: `background-image: linear-gradient(to top, ${Color(bg).setAlpha(.9).toString()} 0%, ${Color(bg).setAlpha(0).toString()} 100%);`
+				});
+			}
 			spectrum.update({
 				background: palette.length > 1 ? palette[palette.length - 1] : null,
 				palette: palette.slice().reverse()
 			});
 
 			audio.update({color: palette[0]});
-			fps.element.style.color = spectrum.getColor(1);
+			fps.element.style.color = spectrum.palette[palette.length-1];
 			audio.element.style.background = `linear-gradient(to bottom, ${Color(bg).setAlpha(.9).toString()} 0%, ${Color(bg).setAlpha(0).toString()} 100%)`;
 
 			el.innerHTML = '';
@@ -245,6 +247,7 @@ let settings = createSettings([
 		:host {
 			z-index: 1;
 			position: fixed;
+			border-radius: 0;
 			bottom: 0;
 			right: 0;
 			left: 0;

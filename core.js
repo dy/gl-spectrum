@@ -42,13 +42,13 @@ Spectrum.prototype.autostart = false;
 Spectrum.prototype.className = 'gl-spectrum';
 Spectrum.prototype.align = .5;
 Spectrum.prototype.trail = false;
-Spectrum.prototype.type = 'line';
+Spectrum.prototype.type = 'fill';
 Spectrum.prototype.barWidth = 2;
 Spectrum.prototype.grid = false;
 Spectrum.prototype.maxDb = 0;
 Spectrum.prototype.minDb = -100;
 Spectrum.prototype.maxFrequency = 20000;
-Spectrum.prototype.minFrequency = 40;
+Spectrum.prototype.minFrequency = 20;
 Spectrum.prototype.smoothing = 0.75;
 Spectrum.prototype.details = 1;
 Spectrum.prototype.log = true;
@@ -240,10 +240,7 @@ Spectrum.prototype.update = function (options) {
 	//create colormap from palette
 	if (!Array.isArray(this.palette)) this.palette = [this.palette];
 	this.getColor = interpolate(this.palette);
-	this.colormap = [];
-	for (let i = 0; i < this.levels; i++) {
-		this.colormap[i] = this.getColor(i/(this.levels-1));
-	}
+	this.infoColor = this.getColor(.5);
 
 	!this.autostart && this.render();
 
