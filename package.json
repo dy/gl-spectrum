@@ -5,6 +5,9 @@
   "main": "gl.js",
   "dependencies": {
     "a-weighting": "^1.0.0",
+    "color-interpolate": "^1.0.2",
+    "color-parse": "^1.2.0",
+    "color-rgba": "^1.0.0",
     "gl-component": "^2.4.1",
     "inherits": "^2.0.1",
     "is-browser": "^2.0.1",

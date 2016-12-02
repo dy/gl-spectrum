@@ -39,14 +39,23 @@ var spectrum = new Spectrum({
 	//0 - bottom, .5 - symmetrically, 1. - top
 	align: 0,
 
+	//peak highlight balance
+	balance: .5,
+
 	//display max value trail for the all time.
 	trail: true,
 
 	//style of rendering: line, bar or fill
 	type: 'line',
 
-	//colormap for the levels of magnitude
-	colormap: ['black', 'white']
+	//width of the bar, applicable only in bar mode
+	barWidth: 2,
+
+	//colormap for the levels of magnitude. Can be single color for flat fill.
+	palette: ['black', 'white'],
+
+	//by default transparent
+	background: null
 });
 
 //pass db values (-100...0 range)

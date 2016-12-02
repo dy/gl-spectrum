@@ -1,16 +1,18 @@
 /**
- * @module  gl-spectrum/lib/code
+ * @module  gl-spectrum/code
  */
+'use strict'
 
-const extend = require('xtend/mutable');
-const inherits = require('inherits');
-const lg = require('mumath/log10');
-const isBrowser = require('is-browser');
-// const createGrid = require('plot-grid');
-const clamp = require('mumath/clamp');
-const Component = require('gl-component');
-const weighting = require('a-weighting');
+const extend = require('xtend/mutable')
+const inherits = require('inherits')
+const lg = require('mumath/log10')
+const isBrowser = require('is-browser')
+// const createGrid = require('plot-grid')
+const clamp = require('mumath/clamp')
+const Component = require('gl-component')
+const weighting = require('a-weighting')
 const db = require('decibels')
+const interpolate = require('color-interpolate')
 
 module.exports = Spectrum;
 
@@ -38,10 +40,10 @@ Spectrum.prototype.context = {
 };
 Spectrum.prototype.autostart = false;
 Spectrum.prototype.className = 'gl-spectrum';
-Spectrum.prototype.align = .0;
+Spectrum.prototype.align = .5;
 Spectrum.prototype.trail = false;
 Spectrum.prototype.type = 'line';
-Spectrum.prototype.width = 1;
+Spectrum.prototype.barWidth = 2;
 Spectrum.prototype.grid = false;
 Spectrum.prototype.maxDb = 0;
 Spectrum.prototype.minDb = -100;
@@ -52,8 +54,10 @@ Spectrum.prototype.details = 1;
 Spectrum.prototype.log = true;
 Spectrum.prototype.weighting = 'itu';
 Spectrum.prototype.sampleRate = 44100;
-Spectrum.prototype.palette = ['black', 'white'];
+Spectrum.prototype.palette = 'black';
+Spectrum.prototype.levels = 32;
 Spectrum.prototype.background = null;
+Spectrum.prototype.balance = .5;
 
 
 /**
@@ -225,21 +229,21 @@ Spectrum.prototype.update = function (options) {
 	}
 	*/
 
-	// this.setFill(this.fill, this.inversed);
-	// this.setTexture('colormap', {
-	// 	data: [0,0,0,1],
-	// 	height: 1,
-	// 	width: 1
-	// });
-	// Spectrogram.prototype.setFill.call(this, cm, inverse);
-
-	// //set grid color to colormap’s color
+	// //set grid color to palette’s color
 	// if (this.freqGridComponent) {
 	// 	this.freqGridComponent.linesContainer.style.color = this.color;
 	// 	this.topGridComponent.linesContainer.style.color = this.color;
 	// 	this.bottomGridComponent.linesContainer.style.color = this.color;
 	// }
+	this.canvas.style.background = this.background;
 
+	//create colormap from palette
+	if (!Array.isArray(this.palette)) this.palette = [this.palette];
+	this.getColor = interpolate(this.palette);
+	this.colormap = [];
+	for (let i = 0; i < this.levels; i++) {
+		this.colormap[i] = this.getColor(i/(this.levels-1));
+	}
 
 	!this.autostart && this.render();
 

@@ -1,10 +1,12 @@
 /**
- * @module  gl-spectrum
+ * @module  gl-spectrum/gl
  */
+'use strict'
 
 const Spectrum = require('./core');
 const clamp = require('mumath/clamp');
 const inherit = require('inherits');
+const rgba = require('color-rgba');
 
 module.exports = GlSpectrum;
 
@@ -23,13 +25,23 @@ function GlSpectrum (opts) {
 	gl.blendEquation( gl.FUNC_ADD );
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
+	this.setTexture('colormap', {
+		type: gl.UNSIGNED_BYTE,
+		format: gl.RGBA,
+		filter: gl.LINEAR,
+		wrap: gl.CLAMP_TO_EDGE,
+		height: this.levels,
+		width: 1
+	});
+
 	this.on('data', (magnitudes, peak) => {
-		this.recalc(magnitudes);
+		this.recalc(magnitudes, peak);
 	});
 
 	this.on('update', () => {
 		//update uniforms
 		this.setUniform('align', this.align);
+		this.setUniform('balance', this.balance);
 		// this.setUniform('minFrequency', this.minFrequency);
 		// this.setUniform('maxFrequency', this.maxFrequency);
 		// this.setUniform('minDb', this.minDb);
@@ -39,16 +51,15 @@ function GlSpectrum (opts) {
 		// this.setUniform('width', this.width);
 		// this.setUniform('size', this.magnitudes.length);
 		// this.setUniform('brightness', 1);
-		// this.setTexture({
-		// 	colormap: {
-		// 		type: gl.UNSIGNED_BYTE,
-		// 		format: gl.RGBA,
-		// 		// filter: gl.LINEAR,
-		// 		// wrap: gl.CLAMP_TO_EDGE,
-		// 		filter: gl.LINEAR,
-		// 		wrap: gl.CLAMP_TO_EDGE,
-		// 	}
-		// });
+		let colormap = [];
+		this.colormap.forEach((v,i) => {
+			let channels = rgba(v, false);
+			colormap.push(channels[0])
+			colormap.push(channels[1])
+			colormap.push(channels[2])
+			colormap.push(channels[3]*255)
+		})
+		this.setTexture('colormap', colormap);
 	})
 
 	this.update();
@@ -59,12 +70,14 @@ function GlSpectrum (opts) {
 /**
  * Recalculate number of verteces
  */
-//FIXME: might be need to be called on data push as it takes data length
-Spectrum.prototype.recalc = function (magnitudes) {
+Spectrum.prototype.recalc = function (magnitudes, peak) {
 	if (!magnitudes) magnitudes = this.magnitudes;
+
+	this.setUniform('peak', peak);
 
 	var positions = [], l = magnitudes.length;
 
+	//creating vertices every time is not much slower than
 	if (this.type === 'line') {
 		for (let i = 0; i < l; i++) {
 			positions[i*2] = i/l;
@@ -75,49 +88,43 @@ Spectrum.prototype.recalc = function (magnitudes) {
 			positions[l*2 + j*2 + 1] = -magnitudes[i];
 		}
 	}
-	else {
-
+	else if (this.type === 'fill') {
+		for (let i = 0; i < l; i++) {
+			positions.push(i/l);
+			positions.push(magnitudes[i]);
+			positions.push(i/l);
+			positions.push(-magnitudes[i]);
+		}
 	}
+	else {
+		let w = this.barWidth / (this.viewport[2] - this.viewport[0]);
 
-	//stripe
-	// if (!isBar) {
-	// 	for (var i = 0; i < l; i++) {
-	// 		var curr = i/l;
-	// 		var next = (i+1)/l;
-	// 		positions.push(curr);
-	// 		positions.push(1);
-	// 		positions.push(next);
-	// 		positions.push(1);
-	// 		positions.push(curr);
-	// 		positions.push(0);
-	// 		positions.push(next);
-	// 		positions.push(0);
-	// 	}
-	// }
+		for (let i = 0; i < l; i++) {
+			let x = i/l;
 
-	// //bars
-	// else {
-	// 	for (var i = 0; i < l; i++) {
-	// 		var curr = i/l;
-	// 		var next = (i+.5)/l;
-	// 		positions.push(curr);
-	// 		positions.push(1);
-	// 		positions.push(curr);
-	// 		positions.push(1);
-	// 		positions.push(curr);
-	// 		positions.push(1);
-	// 		positions.push(next);
-	// 		positions.push(1);
-	// 		positions.push(curr);
-	// 		positions.push(0);
-	// 		positions.push(next);
-	// 		positions.push(0);
-	// 		positions.push(next);
-	// 		positions.push(0);
-	// 		positions.push(next);
-	// 		positions.push(0);
-	// 	}
-	// }
+			//left break
+			positions.push(x);
+			positions.push(magnitudes[i]);
+			positions.push(x);
+			positions.push(magnitudes[i]);
+
+			//bar square
+			positions.push(x);
+			positions.push(magnitudes[i]);
+			positions.push(x + w);
+			positions.push(magnitudes[i]);
+			positions.push(x);
+			positions.push(-magnitudes[i]);
+			positions.push(x + w);
+			positions.push(-magnitudes[i]);
+
+			//right break
+			positions.push(x + w);
+			positions.push(-magnitudes[i]);
+			positions.push(x + w);
+			positions.push(-magnitudes[i]);
+		}
+	}
 
 	this.positions = positions;
 	this.setAttribute('position', positions);
@@ -139,7 +146,8 @@ Spectrum.prototype.draw = function (gl) {
 		// }
 		// this.setUniform('type', 1);
 		gl.drawArrays(gl.LINE_STRIP, 0, this.positions.length/2);
-	} else {
+	}
+	else {
 		// this.setUniform('type', 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.positions.length/2);
 		// if (this.trail) {
@@ -160,8 +168,13 @@ Spectrum.prototype.vert = `
 
 	attribute vec2 position;
 	uniform float align;
+	uniform float peak;
+
+	varying float vIntensity;
 
 	void main () {
+		vIntensity = abs(position.y)/peak;
+
 		gl_Position = vec4(
 			position.x * 2. - 1.,
 			(align * 2. - 1.) + step(0., position.y) * position.y * (1. - align) + step(position.y, 0.) * position.y * align,
@@ -287,8 +300,26 @@ Spectrum.prototype.vert = `
 Spectrum.prototype.frag = `
 	precision highp float;
 
+	uniform sampler2D colormap;
+	uniform vec4 viewport;
+	uniform float align;
+	uniform float peak;
+	uniform float balance;
+
+	varying float vIntensity;
+
 	void main () {
-		gl_FragColor = vec4(0,0,0,1);
+		vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
+
+		float dist = abs(coord.y - align);
+		float amt = dist/peak;
+
+		float intensity = pow((amt + dist)*.5 + .5, .8888) * balance + pow(vIntensity, 2.) * (1. - balance);
+		intensity = clamp(intensity, 0., 1.);
+
+		vec4 color = texture2D(colormap, vec2(coord.x, intensity));
+
+		gl_FragColor = color;
 	}
 `;
 
@@ -299,7 +330,6 @@ Spectrum.prototype.frag = `
 
 	uniform sampler2D colormap;
 	uniform vec4 viewport;
-	uniform float align;
 	uniform float width;
 	uniform float type;
 

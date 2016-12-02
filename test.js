@@ -6,6 +6,7 @@ const colormap = require('colormap');
 const colorScales = require('colormap/colorScales');
 const appAudio = require('../app-audio');
 const ctx = require('audio-context');
+const insertCss =  require('insert-styles');
 const isMobile = require('is-mobile')();
 const Color = require('tinycolor2');
 const createFps = require('fps-indicator');
@@ -43,10 +44,21 @@ palettes = palettes
 });
 
 
+insertCss(`
+	select option {
+		-webkit-appearance: none;
+		appearance: none;
+		display: block;
+		background: white;
+		position: absolute;
+	}
+`);
+
+
 //show framerate
 let fps = createFps();
-// fps.element.style.color = theme.palette[0];
-// fps.element.style.fontFamily = theme.fontFamily;
+fps.element.style.color = theme.palette[0];
+fps.element.style.fontFamily = theme.fontFamily;
 fps.element.style.fontWeight = 500;
 fps.element.style.fontSize = '12px';
 fps.element.style.marginTop = '1rem';
@@ -59,8 +71,8 @@ var audio = appAudio({
 	context: ctx,
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	// source: './Liwei.mp3',
-	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
-	source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
+	source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
 	// source: 'https://soundcloud.com/einmusik/einmusik-live-watergate-4th-may-2016',
@@ -88,7 +100,7 @@ audio.update();
 
 var spectrum = new Spectrum({
 	autostart: true,
-	align: .5,
+	// align: .5,
 	// fill: colormap,
 	// grid: true,
 	// minFrequency: 20,
@@ -103,8 +115,8 @@ var spectrum = new Spectrum({
 	// antialias: true,
 	// fill: [1,1,1,0],
 	// fill: './images/stretch.png',
-	// type: 'line',
-	// width: 2,
+	type: 'bar',
+	barWidth: 1,
 	// weighting: 'z',
 	// background: [27/255,0/255,37/255, 1],
 	//background: [1,0,0,1]//'./images/bg-small.jpg'
@@ -134,44 +146,96 @@ function upd () {
 
 // createColormapSelector(spectrum);
 
-
 // test('line webgl');
-
 // test('bars 2d');
-
 // test('node');
-
 // test('viewport');
-
 // test('clannels');
-
 // test('classic');
-
 // test('bars');
-
 // test('bars line');
-
 // test('dots');
-
 // test('dots line');
-
 // test('colormap (heatmap)');
-
 // test('multilayered (max values)');
-
 // test('line');
-
 // test('oscilloscope');
 
 let settings = createSettings([
-	{id: 'type', type: 'select', options: ['line', 'bar', 'fill'], value: spectrum.type, change: v => spectrum.update({type: v})},
-	{id: 'weighting', type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
-		value: spectrum.weighting,
-		change: (value) => {
-			spectrum.update({weighting: value})
+	{id: 'type', type: 'select', label: false, options: ['line', 'bar', 'fill'], value: spectrum.type, change: v => spectrum.update({type: v})},
+	// {id: 'weighting', label:false, type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
+	// 	value: spectrum.weighting,
+	// 	change: (value) => {
+	// 		spectrum.update({weighting: value})
+	// 	}
+	// },
+	// {id: 'align', label: '↕', title: 'align', type: 'range', min: 0, max: 1, value: spectrum.align, change: v => spectrum.update({align: v})},
+	// {id: 'smoothing', label: '~', title: 'smoothing', type: 'range', min: 0, max: 1, value: spectrum.smoothing, change: v => spectrum.update({smoothing: v})},
+	{type: 'raw', label: false, id: 'palette', style: ``, content: function (data) {
+		let el = document.createElement('div');
+		el.className = 'random-palette';
+		el.style.cssText = `
+			width: 1.5em;
+			height: 1.5em;
+			background-color: rgba(120,120,120,.2);
+			margin-left: 0em;
+			display: inline-block;
+			vertical-align: middle;
+			cursor: pointer;
+			margin-right: 1em;
+		`;
+		el.title = 'Randomize palette';
+		let settings = this.panel;
+		setColors(el, settings.palette, settings.theme.active);
+
+		el.onclick = () => {
+			// settings.set('colors', 'custom');
+			let palette = palettes[Math.floor((palettes.length - 1) * Math.random())];
+
+			if (Math.random() > .5) palette = palette.reverse();
+
+			setColors(el, palette);
 		}
-	},
-	{id: 'align', type: 'range', min: 0, max: 1, value: spectrum.align, change: v => spectrum.update({align: v})}
+
+		//create colors in the element
+		function setColors(el, palette, active) {
+			let bg = palette[palette.length -1];
+
+			settings.update({
+				palette: palette,
+				style: `background-image: linear-gradient(to top, ${Color(bg).setAlpha(.9).toString()} 0%, ${Color(bg).setAlpha(0).toString()} 100%);`
+			});
+			spectrum.update({
+				background: palette.length > 1 ? palette[palette.length - 1] : null,
+				palette: palette.slice().reverse()
+			});
+
+			audio.update({color: palette[0]});
+			fps.element.style.color = spectrum.getColor(1);
+			audio.element.style.background = `linear-gradient(to bottom, ${Color(bg).setAlpha(.9).toString()} 0%, ${Color(bg).setAlpha(0).toString()} 100%)`;
+
+			el.innerHTML = '';
+			if (active) {
+				palette = palette.slice();
+				palette.unshift(active);
+			}
+			for (var i = 0; i < 3; i++) {
+				let colorEl = document.createElement('div');
+				el.appendChild(colorEl);
+				colorEl.className = 'random-palette-color';
+				colorEl.style.cssText = `
+					width: 50%;
+					height: 50%;
+					float: left;
+					background-color: ${palette[i] || 'transparent'}
+				`;
+			}
+		}
+		return el;
+	}},
+
+	{id: 'log', type: 'checkbox', value: spectrum.log, change: v => spectrum.update({log: v})
+	}
 ],{
 	title: '<a href="https://github.com/audio-lab/gl-spectrum">gl-spectrum</a>',
 	theme: theme,
@@ -210,33 +274,6 @@ let settings = createSettings([
 });
 
 function createColormapSelector (spectrum) {
-	app.addParam('colormap', {
-		values: colormaps,
-		value: colormap,
-		change: (value, state) => {
-			spectrum.setFill(value, app.getParamValue('inversed'));
-			updateView();
-		}
-	});
-
-	//inversed colormap checkbox
-	app.addParam('inversed', {
-		value: false,
-		change: (value) => {
-			spectrum.setFill(app.getParamValue('colormap'), value);
-			updateView();
-		}
-	});
-
-
-	//logarithmic
-	app.addParam('log', {
-		value: spectrum.logarithmic,
-		change: (v) => {
-			spectrum.logarithmic = v;
-			updateView();
-		}
-	});
 
 	app.addParam('grid', spectrum.grid, (v) => {
 		spectrum.grid = v;
@@ -261,13 +298,6 @@ function createColormapSelector (spectrum) {
 	}, (v) => {
 		spectrum.trail = parseFloat(v);
 		updateView();
-	});
-
-	app.addParam('smoothing',
-		spectrum.smoothing,
-		(v) => {
-			spectrum.smoothing = v;
-			updateView();
 	});
 
 
