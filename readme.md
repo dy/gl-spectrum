@@ -14,8 +14,12 @@ var Spectrum = require('gl-spectrum');
 
 var spectrum = new Spectrum({
 	container: document.body,
-	canvas: canvas,
-	context: 'webgl',
+
+	//if undefined, new canvas will be created
+	canvas: null,
+
+	//existing webgl-context or context options
+	context: {},
 
 	//visible range
 	maxDb: -30,
@@ -42,7 +46,7 @@ var spectrum = new Spectrum({
 	//peak highlight balance
 	balance: .5,
 
-	//display max value trail for the all time.
+	//display max value trail
 	trail: true,
 
 	//style of rendering: line, bar or fill
@@ -58,7 +62,7 @@ var spectrum = new Spectrum({
 	background: null
 });
 
-//pass db values (-100...0 range)
+//pass values in decibels (-100...0 range)
 spectrum.set(magnitudes);
 
 //update style/options

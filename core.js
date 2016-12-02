@@ -83,7 +83,25 @@ Spectrum.prototype.set = function (data) {
 	}
 
 	this.peak = peak;
-	this.emit('data', magnitudes, peak);
+
+	if (this.trail) {
+		if (!Array.isArray(this.trail)) {
+			this.trail = magnitudes;
+			this.trailPeak = this.peak;
+		}
+		else {
+			this.trail.length = magnitudes.length;
+			let trailPeak = 0;
+			this.trail = magnitudes.map((v, i) => {
+				v = Math.max(v, this.trail[i]);
+				if (v > trailPeak) trailPeak = v;
+				return v;
+			});
+			this.trailPeak = trailPeak;
+		}
+	}
+
+	this.emit('data', magnitudes, this.trail);
 
 	!this.autostart && this.render();
 
@@ -101,6 +119,7 @@ Spectrum.prototype.update = function (options) {
 
 	//limit base
 	this.minFrequency = Math.max(1, this.minFrequency);
+	this.maxFrequency = Math.min(this.sampleRate/2, this.maxFrequency);
 
 	//create grid, if not created yet
 	/*

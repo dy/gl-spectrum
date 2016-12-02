@@ -163,12 +163,6 @@ function upd () {
 
 let settings = createSettings([
 	{id: 'type', type: 'select', label: false, options: ['line', 'bar', 'fill'], value: spectrum.type, change: v => spectrum.update({type: v})},
-	// {id: 'weighting', label:false, type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
-	// 	value: spectrum.weighting,
-	// 	change: (value) => {
-	// 		spectrum.update({weighting: value})
-	// 	}
-	// },
 	// {id: 'align', label: '↕', title: 'align', type: 'range', min: 0, max: 1, value: spectrum.align, change: v => spectrum.update({align: v})},
 	// {id: 'smoothing', label: '~', title: 'smoothing', type: 'range', min: 0, max: 1, value: spectrum.smoothing, change: v => spectrum.update({smoothing: v})},
 	{type: 'raw', label: false, id: 'palette', style: ``, content: function (data) {
@@ -235,8 +229,15 @@ let settings = createSettings([
 		}
 		return el;
 	}},
-
 	{id: 'log', type: 'checkbox', value: spectrum.log, change: v => spectrum.update({log: v})
+	},
+	{id: 'weighting', label: false, title: 'Weighting', type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
+		value: spectrum.weighting,
+		change: (value) => {
+			spectrum.update({weighting: value})
+		}
+	},
+	{id: 'trail', label: 'trail', type: 'checkbox', value: !!spectrum.trail, change: v => spectrum.update({trail: v})
 	}
 ],{
 	title: '<a href="https://github.com/audio-lab/gl-spectrum">gl-spectrum</a>',
@@ -290,16 +291,6 @@ function createColormapSelector (spectrum) {
 		value: spectrum.width
 	}, (v) => {
 		spectrum.width = v;
-		updateView();
-	});
-
-	app.addParam('trail', {
-		min: 0,
-		max: 100,
-		step: 1,
-		value: spectrum.trail
-	}, (v) => {
-		spectrum.trail = parseFloat(v);
 		updateView();
 	});
 

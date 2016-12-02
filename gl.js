@@ -34,8 +34,9 @@ function GlSpectrum (opts) {
 		width: 1
 	});
 
-	this.on('data', (magnitudes, peak) => {
-		this.recalc(magnitudes, peak);
+	this.on('data', (magnitudes, trail) => {
+		this.positions = this.calcPositions(this.type, magnitudes);
+		this.trailPositions = this.calcPositions('line', trail);
 	});
 
 	this.on('update', () => {
@@ -56,21 +57,18 @@ function GlSpectrum (opts) {
 		this.isFlat = this.palette.length === 1;
 
 		if (this.isFlat) {
-			let channels = rgba(this.palette, false);
-			channels[3] *= 255;
-			this.setUniform('color', channels);
+			this.colorArr = rgba(this.palette);
 		}
-		else {
-			let colormap = [];
-			for (let i = 0; i < this.levels; i++) {
-				let channels = rgba(this.getColor((i + .5)/this.levels), false);
-				colormap.push(channels[0])
-				colormap.push(channels[1])
-				colormap.push(channels[2])
-				colormap.push(channels[3]*255)
-			}
-			this.setTexture('colormap', colormap);
+
+		let colormap = [];
+		for (let i = 0; i < this.levels; i++) {
+			let channels = rgba(this.getColor((i + .5)/this.levels), false);
+			colormap.push(channels[0])
+			colormap.push(channels[1])
+			colormap.push(channels[2])
+			colormap.push(channels[3]*255)
 		}
+		this.setTexture('colormap', colormap);
 	})
 
 	this.update();
@@ -82,13 +80,13 @@ function GlSpectrum (opts) {
 /**
  * Recalculate number of verteces
  */
-Spectrum.prototype.recalc = function (magnitudes, peak) {
+Spectrum.prototype.calcPositions = function (type, magnitudes) {
 	if (!magnitudes) magnitudes = this.magnitudes;
 
 	var positions = [], l = magnitudes.length;
 
 	//creating vertices every time is not much slower than
-	if (this.type === 'line') {
+	if (type === 'line') {
 		for (let i = 0; i < l; i++) {
 			positions[i*2] = i/l;
 			positions[i*2 + 1] = magnitudes[i];
@@ -98,7 +96,7 @@ Spectrum.prototype.recalc = function (magnitudes, peak) {
 			positions[l*2 + j*2 + 1] = -magnitudes[i];
 		}
 	}
-	else if (this.type === 'fill') {
+	else if (type === 'fill') {
 		for (let i = 0; i < l; i++) {
 			positions.push(i/l);
 			positions.push(magnitudes[i]);
@@ -136,41 +134,39 @@ Spectrum.prototype.recalc = function (magnitudes, peak) {
 		}
 	}
 
-	this.positions = positions;
-
-	return this;
+	return positions;
 };
 
 
 /**
  * Render main loop
  */
-Spectrum.prototype.draw = function (gl) {
-	//draw data
+Spectrum.prototype.draw = function (gl, viewport) {
 	if (!this.positions) return this;
 
 	this.setUniform('peak', this.peak);
-	this.setAttribute('position', this.positions);
-
 	this.setUniform('flatFill', this.isFlat ? 1 : 0);
+	this.setAttribute('position', this.positions);
+	if (this.isFlat) this.setUniform('color', this.colorArr);
 
+	//draw fill
 	if (this.type === 'line') {
-		// if (this.trail) {
-		// 	this.setUniform('type', 2);
-		// 	gl.drawArrays(gl.TRIANGLE_STRIP, 0, count);
-		// }
-		// this.setUniform('type', 1);
 		gl.drawArrays(gl.LINE_STRIP, 0, this.positions.length/2);
 	}
 	else {
-		// this.setUniform('type', 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.positions.length/2);
-		// if (this.trail) {
-		// 	this.setUniform('type', 1);
-		// 	gl.drawArrays(gl.LINES, 0, count);
-		// }
 	}
 
+	//draw trail
+	if (this.trail) {
+		this.setUniform('flatFill', this.isFlat ? 1 : 0);
+		this.setUniform('balance', this.balance*.5);
+		if (this.isFlat) this.setUniform('color', this.infoColorArr);
+		this.setUniform('peak', this.trailPeak);
+		this.setAttribute('position', this.trailPositions);
+		gl.drawArrays(gl.LINE_STRIP, 0, this.trailPositions.length/2);
+		this.setUniform('balance', this.balance);
+	}
 
 	return this;
 };
