@@ -25,7 +25,7 @@ function GlSpectrum (opts) {
 	gl.blendEquation( gl.FUNC_ADD );
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-	this.setTexture('colormap', {
+	this.texture('colormap', {
 		type: gl.UNSIGNED_BYTE,
 		format: gl.RGBA,
 		filter: gl.LINEAR,
@@ -41,15 +41,15 @@ function GlSpectrum (opts) {
 
 	this.on('update', () => {
 		//update uniforms
-		this.setUniform('align', this.align);
-		this.setUniform('balance', this.balance);
+		this.uniform('align', this.align);
+		this.uniform('balance', this.balance);
 
-		this.setUniform('minFrequency', this.minFrequency);
-		this.setUniform('maxFrequency', this.maxFrequency);
-		this.setUniform('minDb', this.minDb);
-		this.setUniform('maxDb', this.maxDb);
-		this.setUniform('logarithmic', this.log ? 1 : 0);
-		this.setUniform('sampleRate', this.sampleRate);
+		this.uniform('minFrequency', this.minFrequency);
+		this.uniform('maxFrequency', this.maxFrequency);
+		this.uniform('minDb', this.minDb);
+		this.uniform('maxDb', this.maxDb);
+		this.uniform('logarithmic', this.log ? 1 : 0);
+		this.uniform('sampleRate', this.sampleRate);
 
 		this.infoColorArr = rgba(this.infoColor);
 		this.infoColorArr[3] *= this.trailAlpha;
@@ -70,7 +70,7 @@ function GlSpectrum (opts) {
 			colormap.push(channels[2])
 			colormap.push(channels[3]*255)
 		}
-		this.setTexture('colormap', colormap);
+		this.texture('colormap', colormap);
 	})
 
 	this.update();
@@ -143,7 +143,10 @@ Spectrum.prototype.calcPositions = function (type, magnitudes) {
 /**
  * Render main loop
  */
-Spectrum.prototype.draw = function (gl, viewport) {
+Spectrum.prototype.draw = function (data) {
+	let gl = this.gl;
+	let viewport = this.viewport;
+
 	if (!this.glAttribs.alpha) {
 		let bg = this.bgArr;
 		gl.clearColor(bg[0], bg[1], bg[2], 1);
@@ -151,11 +154,11 @@ Spectrum.prototype.draw = function (gl, viewport) {
 	}
 
 	if (this.positions) {
-		this.setUniform('alpha', 1);
-		this.setUniform('peak', this.peak);
-		this.setUniform('flatFill', this.isFlat ? 1 : 0);
-		this.setAttribute('position', this.positions);
-		if (this.isFlat) this.setUniform('color', this.colorArr);
+		this.uniform('alpha', 1);
+		this.uniform('peak', this.peak);
+		this.uniform('flatFill', this.isFlat ? 1 : 0);
+		this.attribute('position', this.positions);
+		if (this.isFlat) this.uniform('color', this.colorArr);
 
 		//draw fill
 		if (this.type === 'line') {
@@ -167,14 +170,14 @@ Spectrum.prototype.draw = function (gl, viewport) {
 
 		//draw trail
 		if (this.trail) {
-			this.setUniform('alpha', this.trailAlpha);
-			this.setUniform('flatFill', this.isFlat ? 1 : 0);
-			this.setUniform('balance', this.balance*.5);
-			if (this.isFlat) this.setUniform('color', this.infoColorArr);
-			this.setUniform('peak', this.trailPeak);
-			this.setAttribute('position', this.trailPositions);
+			this.uniform('alpha', this.trailAlpha);
+			this.uniform('flatFill', this.isFlat ? 1 : 0);
+			this.uniform('balance', this.balance*.5);
+			if (this.isFlat) this.uniform('color', this.infoColorArr);
+			this.uniform('peak', this.trailPeak);
+			this.attribute('position', this.trailPositions);
 			gl.drawArrays(gl.LINE_STRIP, 0, this.trailPositions.length/2);
-			this.setUniform('balance', this.balance);
+			this.uniform('balance', this.balance);
 		}
 	}
 

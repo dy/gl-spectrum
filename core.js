@@ -153,7 +153,7 @@ Spectrum.prototype.update = function (options) {
 						return pretty(v);
 					}
 				}, this.grid),
-				y: 'linear'
+				// y: 'linear'
 			});
 
 			this._grid.on('interact', (grid) => {
@@ -168,8 +168,8 @@ Spectrum.prototype.update = function (options) {
 				this.update({minFrequency: leftF, maxFrequency: rightF});
 			});
 
-			this._grid.redraw = this._grid._draw;
-			this._grid._draw = () => {};
+			this._grid.redraw = this._grid.draw;
+			this._grid.draw = () => {};
 		}
 
 		this.grid = this._grid;
@@ -201,26 +201,30 @@ Spectrum.prototype.update = function (options) {
 			xOpts.pan = xOpts.zoom = options.interactions;
 		}
 
-		let yOpts = {
-			axisOrigin: Infinity,
-			origin: 0,
-			offset: -this.align*200,
-			scale: 200/height,
-			lineColor: false,
-			distance: 10,
-			color: this.getColor(.75),
-			format: v => {
-				return pretty(-100 + Math.abs(v));
-			}
-		}
+		//FIXME: add better decibels rendering
+		// let yOpts = {
+		// 	axisOrigin: Infinity,
+		// 	origin: 0,
+		// 	offset: -this.align*200,
+		// 	scale: 200/height,
+		// 	lineColor: false,
+		// 	distance: 10,
+		// 	color: this.getColor(.75),
+		// 	format: v => {
+		// 		return pretty(-100 + Math.abs(v));
+		// 	}
+		// }
 
 		this.grid.update({
 			x: xOpts,
-			y: yOpts
+			//y: yOpts
 		});
 	}
 
 	if (this.glAttribs.alpha) this.canvas.style.background = this.background;
+
+	//reset trail if weight changed
+	if (options.weighting) this.trail = !!this.trail;
 
 	//emit update
 	this.emit('update');

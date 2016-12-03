@@ -9,7 +9,7 @@
     "color-interpolate": "^1.0.2",
     "color-parse": "^1.2.0",
     "color-rgba": "^1.0.0",
-    "gl-component": "^2.4.1",
+    "gl-component": "^3.0.0",
     "inherits": "^2.0.1",
     "is-browser": "^2.0.1",
     "is-plain-obj": "^1.1.0",
