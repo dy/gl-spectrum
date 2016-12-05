@@ -105,7 +105,7 @@ audio.update();
 
 
 var spectrum = new Spectrum({
-	autostart: true,
+	// autostart: false,
 	interactions: true,
 	// log: false,
 	// align: .5,
@@ -134,7 +134,7 @@ var spectrum = new Spectrum({
 }).on('render', upd)
 
 spectrum.grid.update({x: {fontFamily: theme.fontFamily, fontSize: '10px'}});
-
+// setInterval(upd, 100)
 
 
 function upd () {
@@ -221,7 +221,6 @@ let settings = createSettings([
 
 			audio.update({color: palette[0]});
 			fps.element.style.color = spectrum.palette[palette.length-1];
-			audio.element.style.background = `linear-gradient(to bottom, ${Color(bg).setAlpha(.9).toString()} 0%, ${Color(bg).setAlpha(0).toString()} 100%)`;
 
 			el.innerHTML = '';
 			if (active) {

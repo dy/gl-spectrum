@@ -7,6 +7,10 @@ const Spectrum = require('./core')
 const clamp = require('mumath/clamp')
 const inherit = require('inherits')
 const rgba = require('color-rgba')
+const uniform = require('gl-util/uniform')
+const attribute = require('gl-util/attribute')
+const texture = require('gl-util/texture')
+const setProgram = require('gl-util/program')
 
 module.exports = GlSpectrum;
 
@@ -18,14 +22,12 @@ function GlSpectrum (opts) {
 
 	Spectrum.call(this, opts);
 
-	var gl = this.gl;
+	var gl = this.gl = this.context;
 
-	//setup alpha
-	gl.enable( gl.BLEND );
-	gl.blendEquation( gl.FUNC_ADD );
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+	this.program = setProgram(gl, this.vert, this.frag);
 
-	this.texture('colormap', {
+	texture(this.gl, 'position', {usage: gl.STREAM_DRAW, size: 2})
+	texture(this.gl, 'colormap', {
 		type: gl.UNSIGNED_BYTE,
 		format: gl.RGBA,
 		filter: gl.LINEAR,
@@ -40,16 +42,19 @@ function GlSpectrum (opts) {
 	});
 
 	this.on('update', () => {
-		//update uniforms
-		this.uniform('align', this.align);
-		this.uniform('balance', this.balance);
+		let gl = this.gl;
 
-		this.uniform('minFrequency', this.minFrequency);
-		this.uniform('maxFrequency', this.maxFrequency);
-		this.uniform('minDb', this.minDb);
-		this.uniform('maxDb', this.maxDb);
-		this.uniform('logarithmic', this.log ? 1 : 0);
-		this.uniform('sampleRate', this.sampleRate);
+		setProgram(gl, this.program);
+
+		//update uniforms
+		uniform(gl, 'align', this.align, this.program);
+		uniform(gl, 'balance', this.balance, this.program);
+		uniform(gl, 'minFrequency', this.minFrequency, this.program);
+		uniform(gl, 'maxFrequency', this.maxFrequency, this.program);
+		uniform(gl, 'minDb', this.minDb, this.program);
+		uniform(gl, 'maxDb', this.maxDb, this.program);
+		uniform(gl, 'logarithmic', this.log ? 1 : 0, this.program);
+		uniform(gl, 'sampleRate', this.sampleRate, this.program);
 
 		this.infoColorArr = rgba(this.infoColor);
 		this.infoColorArr[3] *= this.trailAlpha;
@@ -59,7 +64,7 @@ function GlSpectrum (opts) {
 		this.isFlat = this.palette.length === 1;
 
 		if (this.isFlat) {
-			this.colorArr = rgba(this.palette);
+			this.colorArr = rgba(this.palette[0]);
 		}
 
 		let colormap = [];
@@ -70,7 +75,7 @@ function GlSpectrum (opts) {
 			colormap.push(channels[2])
 			colormap.push(channels[3]*255)
 		}
-		this.texture('colormap', colormap);
+		texture(this.gl, 'colormap', colormap);
 	})
 
 	this.update();
@@ -78,11 +83,18 @@ function GlSpectrum (opts) {
 
 
 
+GlSpectrum.prototype.antialias = true;
+GlSpectrum.prototype.alpha = false;
+GlSpectrum.prototype.premultipliedAlpha = true;
+GlSpectrum.prototype.preserveDrawingBuffer = false;
+GlSpectrum.prototype.depth = false;
+GlSpectrum.prototype.stencil = false;
+
 
 /**
  * Recalculate number of verteces
  */
-Spectrum.prototype.calcPositions = function (type, magnitudes) {
+GlSpectrum.prototype.calcPositions = function (type, magnitudes) {
 	if (!magnitudes) magnitudes = this.magnitudes;
 
 	var positions = [], l = magnitudes.length;
@@ -107,7 +119,7 @@ Spectrum.prototype.calcPositions = function (type, magnitudes) {
 		}
 	}
 	else {
-		let w = this.barWidth / (this.viewport[2] - this.viewport[0]);
+		let w = this.barWidth / this.canvas.width;
 
 		for (let i = 0; i < l; i++) {
 			let x = i/l;
@@ -140,25 +152,35 @@ Spectrum.prototype.calcPositions = function (type, magnitudes) {
 };
 
 
+GlSpectrum.prototype.render = function () {
+	this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+	if (!this.alpha) {
+		let bg = this.bgArr;
+		this.gl.clearColor(...bg);
+		this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+	}
+	this.emit('render')
+	this.draw();
+}
+
+
 /**
  * Render main loop
  */
-Spectrum.prototype.draw = function (data) {
-	let gl = this.gl;
-	let viewport = this.viewport;
+GlSpectrum.prototype.draw = function () {
+	setProgram(this.gl, this.program);
 
-	if (!this.glAttribs.alpha) {
-		let bg = this.bgArr;
-		gl.clearColor(bg[0], bg[1], bg[2], 1);
-		gl.clear(gl.COLOR_BUFFER_BIT);
-	}
+	let gl = this.gl;
+
+	let shape = [this.canvas.width, this.canvas.height];
 
 	if (this.positions) {
-		this.uniform('alpha', 1);
-		this.uniform('peak', this.peak);
-		this.uniform('flatFill', this.isFlat ? 1 : 0);
-		this.attribute('position', this.positions);
-		if (this.isFlat) this.uniform('color', this.colorArr);
+		uniform(this.gl, 'shape', shape, this.program);
+		uniform(this.gl, 'alpha', 1, this.program);
+		uniform(this.gl, 'peak', this.peak, this.program);
+		uniform(this.gl, 'flatFill', this.isFlat ? 1 : 0, this.program);
+		attribute(this.gl, 'position', this.positions);
+		if (this.isFlat) uniform(this.gl, 'color', this.colorArr, this.program);
 
 		//draw fill
 		if (this.type === 'line') {
@@ -170,20 +192,20 @@ Spectrum.prototype.draw = function (data) {
 
 		//draw trail
 		if (this.trail) {
-			this.uniform('alpha', this.trailAlpha);
-			this.uniform('flatFill', this.isFlat ? 1 : 0);
-			this.uniform('balance', this.balance*.5);
-			if (this.isFlat) this.uniform('color', this.infoColorArr);
-			this.uniform('peak', this.trailPeak);
-			this.attribute('position', this.trailPositions);
+			uniform(this.gl, 'alpha', this.trailAlpha, this.program);
+			uniform(this.gl, 'flatFill', this.isFlat ? 1 : 0, this.program);
+			uniform(this.gl, 'balance', this.balance*.5, this.program);
+			if (this.isFlat) uniform(this.gl, 'color', this.infoColorArr, this.program);
+			uniform(this.gl, 'peak', this.trailPeak, this.program);
+			attribute(this.gl, 'position', this.trailPositions);
 			gl.drawArrays(gl.LINE_STRIP, 0, this.trailPositions.length/2);
-			this.uniform('balance', this.balance);
+			uniform(this.gl, 'balance', this.balance, this.program);
 		}
 	}
 
 	//draw grid
 	if (this.grid) {
-		this.grid.redraw();
+		this.grid.draw();
 	}
 
 	return this;
@@ -193,7 +215,7 @@ Spectrum.prototype.draw = function (data) {
 
 
 //vertex shader applies alignment mapping
-Spectrum.prototype.vert = `
+GlSpectrum.prototype.vert = `
 	precision highp float;
 
 	attribute vec2 position;
@@ -241,11 +263,11 @@ Spectrum.prototype.vert = `
 
 
 
-Spectrum.prototype.frag = `
+GlSpectrum.prototype.frag = `
 	precision highp float;
 
 	uniform sampler2D colormap;
-	uniform vec4 viewport;
+	uniform vec2 shape;
 	uniform float align;
 	uniform float peak;
 	uniform float balance;
@@ -261,7 +283,7 @@ Spectrum.prototype.frag = `
 		}
 
 		else {
-			vec2 coord = (gl_FragCoord.xy - viewport.xy) / (viewport.zw);
+			vec2 coord = gl_FragCoord.xy / shape;
 
 			float dist = abs(coord.y - align);
 			float amt = dist/peak;

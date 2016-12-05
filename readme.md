@@ -18,11 +18,15 @@ var spectrum = new Spectrum({
 	//if undefined, new canvas will be created
 	canvas: null,
 
-	//existing webgl-context or context options
-	context: {},
+	//existing webgl-context and some context options
+	context: null,
+	alpha: false,
+
+	//enable render on every frame, disable for manual rendering
+	autostart: true,
 
 	//visible range
-	maxDb: -30,
+	maxDb: 0,
 	minDb: -100,
 	maxFrequency: 20000,
 	minFrequency: 20,
@@ -37,8 +41,8 @@ var spectrum = new Spectrum({
 	//place frequencies logarithmically
 	log: true,
 
-	//rendering settings
-	smoothing: 0.5,
+	//smooth series of data
+	smoothing: 0.75,
 
 	//0 - bottom, .5 - symmetrically, 1. - top
 	align: 0,
@@ -55,10 +59,10 @@ var spectrum = new Spectrum({
 	//width of the bar, applicable only in bar mode
 	barWidth: 2,
 
-	//colormap for the levels of magnitude. Can be single color for flat fill.
+	//colormap for the levels of magnitude. Can be a single color for flat fill.
 	palette: ['black', 'white'],
 
-	//by default transparent
+	//by default transparent, to draw waveform
 	background: null,
 
 	//pan and zoom to show detailed view
@@ -70,9 +74,15 @@ spectrum.set(magnitudes);
 
 //update style/options
 spectrum.update(options);
+
+//hook up every data set
+spectrum.on('data', (magnitudes, trail) => {});
+
+//for manual mode of rendering you may want to call this whenever you feel right
+spectrum.render();
+spectrum.draw();
 ```
 
-Canvas 2d version is available as `require('gl-spectrum/2d')`.
 
 ## Related
 
