@@ -2734,6 +2734,7 @@ Spectrum.prototype.update = function (options) {
 					leftF = Math.pow(10, leftF);
 					rightF = Math.pow(10, rightF);
 				}
+
 				this$1.update({minFrequency: leftF, maxFrequency: rightF});
 			});
 		}
@@ -2759,10 +2760,10 @@ Spectrum.prototype.update = function (options) {
 			xOpts.type = this.log ? 'logarithmic' : 'linear';
 			xOpts.min = this.log ? lg(20) : 0;
 			xOpts.max = this.log ? lg(this.sampleRate/2) : this.sampleRate/2;
-
-			xOpts.offset = this.log ? lg(this.minFrequency) : this.minFrequency;
-			xOpts.scale = (this.log ? lg(this.maxFrequency/this.minFrequency) : (this.maxFrequency - this.minFrequency)) / this.canvas.width;
 		}
+
+		xOpts.offset = this.log ? lg(this.minFrequency) : this.minFrequency;
+		xOpts.scale = (this.log ? lg(this.maxFrequency/this.minFrequency) : (this.maxFrequency - this.minFrequency)) / this.canvas.width;
 		if (options.interactions) {
 			xOpts.pan = xOpts.zoom = options.interactions;
 		}
@@ -2792,8 +2793,6 @@ Spectrum.prototype.update = function (options) {
 
 	//emit update
 	this.emit('update');
-
-	!this.autostart && this.render();
 
 	return this;
 };
@@ -2857,6 +2856,7 @@ function GlSpectrum (opts) {
 		uniform(gl, 'maxDb', this$1.maxDb, this$1.program);
 		uniform(gl, 'logarithmic', this$1.log ? 1 : 0, this$1.program);
 		uniform(gl, 'sampleRate', this$1.sampleRate, this$1.program);
+		uniform(gl, 'shape', [this$1.canvas.width, this$1.canvas.height], this$1.program);
 
 		this$1.infoColorArr = rgba(this$1.infoColor);
 		this$1.infoColorArr[3] *= this$1.trailAlpha;
@@ -2975,10 +2975,7 @@ GlSpectrum.prototype.draw = function () {
 
 	var gl = this.gl;
 
-	var shape = [this.canvas.width, this.canvas.height];
-
 	if (this.positions) {
-		uniform(this.gl, 'shape', shape, this.program);
 		uniform(this.gl, 'alpha', 1, this.program);
 		uniform(this.gl, 'peak', this.peak, this.program);
 		uniform(this.gl, 'flatFill', this.isFlat ? 1 : 0, this.program);
@@ -11583,7 +11580,7 @@ function Grid (opts) {
 		this$1.render();
 	});
 	this.loop.on('resize', function () {
-		this$1.update()
+		this$1.update();
 	});
 
 	this.autostart && this.loop.start();
