@@ -179,6 +179,7 @@ Spectrum.prototype.update = function (options) {
 					leftF = Math.pow(10, leftF);
 					rightF = Math.pow(10, rightF);
 				}
+
 				this.update({minFrequency: leftF, maxFrequency: rightF});
 			});
 		}
@@ -204,10 +205,10 @@ Spectrum.prototype.update = function (options) {
 			xOpts.type = this.log ? 'logarithmic' : 'linear';
 			xOpts.min = this.log ? lg(20) : 0;
 			xOpts.max = this.log ? lg(this.sampleRate/2) : this.sampleRate/2;
-
-			xOpts.offset = this.log ? lg(this.minFrequency) : this.minFrequency;
-			xOpts.scale = (this.log ? lg(this.maxFrequency/this.minFrequency) : (this.maxFrequency - this.minFrequency)) / this.canvas.width;
 		}
+
+		xOpts.offset = this.log ? lg(this.minFrequency) : this.minFrequency;
+		xOpts.scale = (this.log ? lg(this.maxFrequency/this.minFrequency) : (this.maxFrequency - this.minFrequency)) / this.canvas.width;
 		if (options.interactions) {
 			xOpts.pan = xOpts.zoom = options.interactions;
 		}
@@ -237,8 +238,6 @@ Spectrum.prototype.update = function (options) {
 
 	//emit update
 	this.emit('update');
-
-	!this.autostart && this.render();
 
 	return this;
 };

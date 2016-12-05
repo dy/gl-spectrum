@@ -55,6 +55,7 @@ function GlSpectrum (opts) {
 		uniform(gl, 'maxDb', this.maxDb, this.program);
 		uniform(gl, 'logarithmic', this.log ? 1 : 0, this.program);
 		uniform(gl, 'sampleRate', this.sampleRate, this.program);
+		uniform(gl, 'shape', [this.canvas.width, this.canvas.height], this.program);
 
 		this.infoColorArr = rgba(this.infoColor);
 		this.infoColorArr[3] *= this.trailAlpha;
@@ -172,10 +173,7 @@ GlSpectrum.prototype.draw = function () {
 
 	let gl = this.gl;
 
-	let shape = [this.canvas.width, this.canvas.height];
-
 	if (this.positions) {
-		uniform(this.gl, 'shape', shape, this.program);
 		uniform(this.gl, 'alpha', 1, this.program);
 		uniform(this.gl, 'peak', this.peak, this.program);
 		uniform(this.gl, 'flatFill', this.isFlat ? 1 : 0, this.program);
