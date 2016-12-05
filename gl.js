@@ -4,7 +4,6 @@
 'use strict'
 
 const Spectrum = require('./core')
-const clamp = require('mumath/clamp')
 const inherit = require('inherits')
 const rgba = require('color-rgba')
 const uniform = require('gl-util/uniform')

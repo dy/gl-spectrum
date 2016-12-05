@@ -6,15 +6,12 @@
 const extend = require('object-assign')
 const inherits = require('inherits')
 const lg = require('mumath/log10')
-const isBrowser = require('is-browser')
 const createGrid = require('plot-grid')
 const clamp = require('mumath/clamp')
 const Emitter = require('events')
 const weighting = require('a-weighting')
-const db = require('decibels')
 const interpolate = require('color-interpolate')
 const pretty = require('pretty-number')
-const alpha = require('color-alpha')
 const isPlainObj = require('is-plain-obj')
 const createLoop = require('canvas-loop')
 const getContext = require('gl-util/context')
@@ -31,6 +28,8 @@ inherits(Spectrum, Emitter);
  */
 function Spectrum (options) {
 	if (!(this instanceof Spectrum)) return new Spectrum(options);
+
+	Emitter.call();
 
 	extend(this, options);
 
@@ -194,8 +193,6 @@ Spectrum.prototype.update = function (options) {
 
 	//update grid
 	if (this.grid) {
-		let scale, range, offset;
-
 		let xOpts = {
 			color: this.getColor(.75),
 			// lineColor: .05
