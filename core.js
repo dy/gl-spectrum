@@ -14,6 +14,7 @@ const interpolate = require('color-interpolate')
 const pretty = require('pretty-number')
 const isPlainObj = require('is-plain-obj')
 const createLoop = require('canvas-loop')
+const db = require('decibels')
 const getContext = require('gl-util/context')
 
 
@@ -95,9 +96,8 @@ Spectrum.prototype.set = function (data) {
 	//apply weighting and clamping, bring db to 0..1 range
 	let peak = 0;
 	for (let i = 0; i < data.length; i++) {
-		//let v = db.toGain(data[i])// * weight(i * nf);
 		let v = .01 * (clamp(data[i], -100, 0) + 100);
-		if (weight) v *= weight(i * nf);
+		if (weight) v += 20 * Math.log(weight(i * nf)) / Math.log(10);
 		if (v > peak) peak = v;
 		magnitudes[i] = v * (1 - smoothing) + (magnitudes[i] || 0) * smoothing;
 	}
