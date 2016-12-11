@@ -96,8 +96,10 @@ Spectrum.prototype.set = function (data) {
 	//apply weighting and clamping, bring db to 0..1 range
 	let peak = 0;
 	for (let i = 0; i < data.length; i++) {
-		let v = .01 * (clamp(data[i], -100, 0) + 100);
+		let v = data[i]
 		if (weight) v += 20 * Math.log(weight(i * nf)) / Math.log(10);
+		v = clamp(v, -100, 0)
+		v = .01 * (v + 100);
 		if (v > peak) peak = v;
 		magnitudes[i] = v * (1 - smoothing) + (magnitudes[i] || 0) * smoothing;
 	}
