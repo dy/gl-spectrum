@@ -158,7 +158,7 @@ Spectrum.prototype.update = function (options) {
 			this._grid = createGrid({
 				autostart: false,
 				context: this.context,
-				interactions: false,
+				interactions: this.interactions,
 				x: extend({
 					type: this.log ? 'logarithmic' : 'linear',
 					minScale: 1e-10,
