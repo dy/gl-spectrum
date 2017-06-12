@@ -5,7 +5,7 @@ const db = require('decibels');
 const colormap = require('colormap');
 const colorScales = require('colormap/colorScales');
 const appAudio = require('app-audio');
-const ctx = require('audio-context');
+const ctx = require('audio-context')();
 const insertCss =  require('insert-styles');
 const isMobile = require('is-mobile')();
 const Color = require('tinycolor2');
@@ -16,7 +16,6 @@ const fft = require('fourier-transform');
 const alpha = require('color-alpha');
 const blackman = require('scijs-window-functions/blackman-harris');
 let palettes = require('nice-color-palettes');
-// require('get-float-time-domain-data');
 
 
 let colormaps = {};
@@ -72,7 +71,8 @@ var audio = appAudio({
 	context: ctx,
 	token: '6b7ae5b9df6a0eb3fcca34cc3bb0ef14',
 	// source: './Liwei.mp3',
-	source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
+	source: 'https://soundcloud.com/egroove/premiere-jazzuelle-music-of-the-spheres-get-physical',
+	// source: 'https://soundcloud.com/wooded-events/wooded-podcast-cinthie',
 	// source: 'https://soundcloud.com/compost/cbls-362-compost-black-label-sessions-tom-burclay',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/vertvrecords/trailer-mad-rey-hotel-la-chapelle-mp3-128kbit-s',
 	// source: isMobile ? './sample.mp3' : 'https://soundcloud.com/robbabicz/rbabicz-lavander-and-the-firefly',
@@ -83,7 +83,7 @@ var audio = appAudio({
 }).on('load', (node) => {
 	analyser = audio.context.createAnalyser();
 	analyser.smoothingTimeConstant = 0;
-	analyser.fftSize = 1024;
+	analyser.fftSize = 4096;
 	analyser.minDecibels = -100;
 	analyser.maxDecibels = 0;
 
@@ -114,7 +114,7 @@ var spectrum = new Spectrum({
 	// minFrequency: 20,
 	// maxFrequency: 20000,
 	// logarithmic: true,
-	// smoothing: .7,
+	smoothing: 0.5,
 	// maxDecibels: 0,
 	// align: .5,
 	// trail: 38,
@@ -245,7 +245,7 @@ let settings = createSettings([
 	},
 	{id: 'grid', type: 'checkbox', value: spectrum.grid, change: v => spectrum.update({grid: v})
 	},
-	{id: 'weighting', label: 'weighting', title: 'Weighting', type: 'select', options: ['a', 'b', 'c', 'd', 'itu', 'z'],
+	{id: 'weighting', label: 'weighting', title: 'Weighting', type: 'select', options: ['a', 'b', 'c', 'd', 'm', 'z'],
 		value: spectrum.weighting,
 		change: (value) => {
 			spectrum.update({weighting: value, trail: true})
@@ -269,6 +269,7 @@ let settings = createSettings([
 			width: auto;
 			background-color: transparent;
 			padding: .5rem 1rem;
+			border-radius: 0;
 		}
 		.settings-panel-title {
 			width: auto;

@@ -5,9 +5,8 @@
 
 const extend = require('object-assign')
 const inherits = require('inherits')
-const lg = require('mumath/log10')
 const createGrid = require('plot-grid')
-const clamp = require('mumath/clamp')
+const clamp = require('clamp')
 const Emitter = require('events')
 const weighting = require('a-weighting')
 const interpolate = require('color-interpolate')
@@ -16,6 +15,7 @@ const isPlainObj = require('is-plain-obj')
 const createLoop = require('canvas-loop')
 const db = require('decibels')
 const getContext = require('gl-util/context')
+const lg = Math.log10
 
 
 module.exports = Spectrum;
@@ -71,7 +71,7 @@ Spectrum.prototype.maxFrequency = 20000;
 Spectrum.prototype.minFrequency = 20;
 Spectrum.prototype.smoothing = 0.82;
 Spectrum.prototype.log = true;
-Spectrum.prototype.weighting = 'itu';
+Spectrum.prototype.weighting = 'm';
 Spectrum.prototype.sampleRate = 44100;
 Spectrum.prototype.palette = 'black';
 Spectrum.prototype.levels = 32;
