@@ -92,3 +92,4 @@ spectrum.draw();
 * [colormap](https://github.com/bpostlethwaite/colormap) — list of js color maps.
 * [cli-visualizer](https://github.com/dpayne/cli-visualizer) — C++ spectrum visualizer.
 * [spectrum](https://github.com/mattdesl/spectrum) by mattdesl
+* [audioMotion](https://github.com/hvianna/audioMotion.js/)
