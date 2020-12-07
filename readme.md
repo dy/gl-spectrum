@@ -1,86 +1,83 @@
-# gl-spectrum [![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
+# @a-vis/spectrum [![unstable](http://badges.github.io/stability-badges/dist/unstable.svg)](http://github.com/badges/stability-badges)
 
-Spectrum rendering component with webgl or context2d.
+Audio spectrum rendering custom element.
 
-[![Spectrum](https://raw.githubusercontent.com/audio-lab/gl-spectrum/gh-pages/preview.png "Spectrum")](http://audio-lab.github.io/gl-spectrum/)
+[![Spectrum](https://raw.githubusercontent.com/a-vis/spectrum/gh-pages/preview.png "Spectrum")](http://a-vis.github.io/spectrum/)
 
 
 ## Usage
 
-[![npm install gl-spectrum](https://nodei.co/npm/gl-spectrum.png?mini=true)](https://npmjs.org/package/gl-spectrum/)
+[![npm install @a-vis/spectrum](https://nodei.co/npm/@a-vis/spectrum.png?mini=true)](https://npmjs.org/package/@a-vis/spectrum/)
+
+### Custom Element
+
+```html
+<script src="//unpkg.com/@a-vis/spectrum"></script>
+<script src="//unpkg.com/@a-vis/plot"></script>
+
+<a-source></a-source>
+<a-grid type="frequency"></a-grid>
+<a-spectrum></a-spectrum>
+```
+
+### Class
 
 ```js
-var Spectrum = require('gl-spectrum');
+import Spectrum from '@a-vis/spectrum'
 
-var spectrum = new Spectrum({
-	container: document.body,
-
-	//if undefined, new canvas will be created
-	canvas: null,
-
-	//existing webgl-context and some context options
-	context: null,
-	alpha: false,
-
-	//enable render on every frame, disable for manual rendering
-	autostart: true,
+const spectrum = new Spectrum({
+	// TODO: a bit weird to collapse decibels in symmetrical mode, that subrange can be done on data prep stage
+	// maxDb: 0,
+	// minDb: -100,
 
 	//visible range
-	maxDb: 0,
-	minDb: -100,
 	maxFrequency: 20000,
 	minFrequency: 20,
 	sampleRate: 44100,
 
-	//perceptual loudness weighting, 'a', 'b', 'c', 'd', 'itu' or 'z' (see a-weighting)
-	weighting: 'itu',
-
-	//display grid, can be an object with plot-grid settings
-	grid: true,
-
 	//place frequencies logarithmically
-	log: true,
+	// TODO: there can be different types of logs, some are musical
+	// instead would be fair to generalize data
+	// log: true,
 
 	//smooth series of data
 	smoothing: 0.75,
 
 	//0 - bottom, .5 - symmetrically, 1. - top
-	align: 0,
+	verticalAlign: 0,
 
-	//peak highlight balance
-	balance: .5,
-
-	//display max value trail
-	trail: true,
+	//display max value trail, number for seconds
+	trail: 1,
 
 	//style of rendering: line, bar or fill
 	type: 'line',
 
-	//width of the bar, applicable only in bar mode
-	barWidth: 2,
+	//width of bar or line
+	width: 2,
 
-	//colormap for the levels of magnitude. Can be a single color for flat fill.
-	palette: ['black', 'white'],
+	//colormap for the levels of magnitude.
+	// Can be a single color, list of colors or gradient strops {.1: a, .9:b}
+	colormap: ['black', 'white'],
+	//peak highlight balance
+	// TODO: maybe replace alongside with palette with gradient?
+	// even contrast is possible to be organized with colormap
+	// peakHighlight: .5,
 
 	//by default transparent, to draw waveform
 	background: null,
 
 	//pan and zoom to show detailed view
 	interactions: false
-});
+})
+
+document.body.appendChild(spectrum)
 
 //pass values in decibels (-100...0 range)
-spectrum.set(magnitudes);
+spectrum.set(magnitudes)
 
-//update style/options
-spectrum.update(options);
-
-//hook up every data set
-spectrum.on('data', (magnitudes, trail) => {});
-
-//for manual mode of rendering you may want to call this whenever you feel right
-spectrum.render();
-spectrum.draw();
+// update options
+spectrum.maxFrequency = 10000
+spectrum.minFrequency = 100
 ```
 
 
