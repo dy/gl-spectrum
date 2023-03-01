@@ -2,7 +2,7 @@
 
 Spectrum rendering component with webgl or context2d.
 
-[![Spectrum](https://raw.githubusercontent.com/audio-lab/gl-spectrum/gh-pages/preview.png "Spectrum")](http://audio-lab.github.io/gl-spectrum/)
+[![Spectrum](https://raw.githubusercontent.com/dy/gl-spectrum/gh-pages/preview.png "Spectrum")](http://dy.github.io/gl-spectrum/)
 
 
 ## Usage
@@ -86,8 +86,8 @@ spectrum.draw();
 
 ## Related
 
-* [gl-waveform](https://github.com/audio-lab/gl-waveform)
-* [gl-spectrogram](https://github.com/audio-lab/gl-spectrogram)
+* [gl-waveform](https://github.com/dy/gl-waveform)
+* [gl-spectrogram](https://github.com/dy/gl-spectrogram)
 * [a-weighting](https://github.com/audio-lab/a-weighting) — perception loudness weighting for audio.
 * [colormap](https://github.com/bpostlethwaite/colormap) — list of js color maps.
 * [cli-visualizer](https://github.com/dpayne/cli-visualizer) — C++ spectrum visualizer.
