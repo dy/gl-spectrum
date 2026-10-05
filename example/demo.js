@@ -6,6 +6,7 @@ const canvas = $('chart'), ax = $('axes').getContext('2d'), grid = $('grid').get
 const LEFT = 48, TOP = 8, BOTTOM = 24, DURATION = 24, FALL = 20 // peak hold falls 20 dB a second
 const sp = new Spectrum(canvas), hold = new Spectrum(sp.gl, { fill: false })
 let samples = new Float32Array(0), rate = 48000, title = '', url = null, mic = null, saved = null, task = 0
+let running = true, sound = false, clockAt = 0, clockSince = 0
 let band = [20, 24000], scale = 'log', bins = null, mags = null, peaks = null, win = null, last = 0
 let w = 1, h = 1, pr = 1, pw = 1, ph = 1, paint = true, ruled = false, pointer = null, reported = 0
 
@@ -44,7 +45,7 @@ function analyse(now) {
   }
   if (mic) { mic.analyser.getFloatTimeDomainData(mic.buf); win.set(mic.buf.subarray(mic.buf.length - N)) }
   else {
-    const at = Math.round(player.currentTime * rate) - N / 2
+    const at = Math.round(position() * rate) - N / 2
     for (let i = 0; i < N; i++) { const k = at + i; win[i] = k >= 0 && k < samples.length ? samples[k] : 0 }
   }
   spectrum(win, bins, mags, num('smoothing'))
@@ -94,7 +95,7 @@ function readout() {
 const time = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 function status() {
   $('status').value = mic ? `Microphone  ${rate / 1000} kHz  FFT ${num('fft')}`
-    : `${title}  ${time(player.currentTime)} / ${time(samples.length / rate)}  ${rate / 1000} kHz  FFT ${num('fft')}`
+    : `${title}  ${time(position())} / ${time(samples.length / rate)}  ${rate / 1000} kHz  FFT ${num('fft')}`
 }
 function wav(data, sr) {
   const bytes = new ArrayBuffer(44 + data.length * 2), v = new DataView(bytes)
@@ -106,13 +107,29 @@ function wav(data, sr) {
   for (let i = 0; i < data.length; i++) v.setInt16(44 + i * 2, clamp(data[i], -1, 1) * 32767, true)
   return new Blob([bytes], { type: 'audio/wav' })
 }
-// Sound plays muted from the start, so the spectrum moves; Sound unmutes it
+// The playhead: a clock, so the spectrum moves from the start, as no browser plays sound before a click; the player's
+// position while it sounds
+function clock() {
+  const d = samples.length / rate, t = clockAt + (running ? (performance.now() - clockSince) / 1000 : 0)
+  return d ? t % d : 0
+}
+const position = () => sound && running && !player.paused ? player.currentTime : clock()
+function setClock(t = position()) { clockAt = t; clockSince = performance.now() }
+function listen() {
+  if (!(sound && running && !mic)) return player.pause()
+  player.currentTime = clock()
+  player.play().catch(e => { sound = false; controls(); error(e.message) })
+}
+function controls() {
+  $('play').textContent = running ? 'Pause' : 'Play'; $('play').setAttribute('aria-label', $('play').textContent)
+  $('sound').setAttribute('aria-pressed', String(sound))
+}
 function load(data, sr, heading, blob) {
   samples = data; rate = sr; title = heading
   mags?.fill(0); peaks?.fill(-Infinity)
   if (url) URL.revokeObjectURL(url)
   player.src = url = URL.createObjectURL(blob)
-  player.play().catch(() => {})
+  setClock(0); listen()
   $('seek').disabled = false; $('seek').value = 0
   setBand(); error(''); status()
 }
@@ -137,7 +154,7 @@ async function startMic() {
     analyser.fftSize = 32768; ctx.createMediaStreamSource(stream).connect(analyser)
     if (id !== task) { stream.getTracks().forEach(t => t.stop()); return ctx.close() }
     saved = { source: $('source').value, rate }
-    player.pause(); mic = { stream, ctx, analyser, buf: new Float32Array(32768) }; rate = ctx.sampleRate
+    setClock(); mic = { stream, ctx, analyser, buf: new Float32Array(32768) }; rate = ctx.sampleRate; listen()
     $('source').querySelector('[value=mic]').hidden = false; $('source').value = 'mic'
     $('mic').setAttribute('aria-pressed', 'true'); $('play').disabled = $('sound').disabled = $('seek').disabled = true
     mags?.fill(0); peaks?.fill(-Infinity); setBand(); error(''); status()
@@ -155,18 +172,10 @@ function stopMic() {
 setup({ resize: (width, height, ratio) => { w = width; h = height; pr = ratio; layout() }, zoom, pan, fit: () => setBand(), inspect })
 $('source').onchange = generate
 $('voice-band').onclick = () => setBand(Math.max(80, scales[scale].low), Math.min(4000, rate / 2))
-$('mic').onclick = () => mic ? (stopMic(), player.play().catch(() => {})) : startMic()
-$('play').onclick = () => player.paused ? player.play().catch(e => error(e.message)) : player.pause()
-$('sound').onclick = () => {
-  player.muted = !player.muted
-  $('sound').setAttribute('aria-pressed', String(!player.muted))
-  if (!player.muted && player.paused) player.play().catch(e => error(e.message))
-}
-for (const event of ['play', 'pause']) player.addEventListener(event, () => {
-  $('play').textContent = player.paused ? 'Play' : 'Pause'; $('play').setAttribute('aria-label', $('play').textContent)
-})
-player.addEventListener('timeupdate', () => { if (Number.isFinite(player.duration)) $('seek').value = player.currentTime / player.duration * 1000 })
-$('seek').oninput = () => { if (Number.isFinite(player.duration)) player.currentTime = num('seek') / 1000 * player.duration }
+$('mic').onclick = () => mic ? (stopMic(), setClock(), listen()) : startMic()
+$('play').onclick = () => { setClock(); running = !running; controls(); listen() }
+$('sound').onclick = () => { setClock(); sound = !sound; controls(); listen() }
+$('seek').oninput = () => { setClock(num('seek') / 1000 * samples.length / rate); listen() }
 $('controls').oninput = e => {
   if (!e.target.validity.valid || (e.target.type === 'number' && !e.target.value)) return
   if (e.target.id === 'scale') { scale = $('scale').value; setBand() }
@@ -212,6 +221,7 @@ requestAnimationFrame(function draw(now) {
     if ($('hold').checked) hold.render()
     if (!ruled) axes()
     readout()
+    if (!mic && document.activeElement !== $('seek')) $('seek').value = position() / (samples.length / rate) * 1000
     if (now - reported >= 250) {
       $('perf').value = `${(performance.now() - start).toFixed(1)} ms/frame`
       $('perf').title = 'CPU time of a frame: the FFT, then drawing the spectrum and the peak hold; excludes GPU completion.'

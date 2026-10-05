@@ -19,7 +19,7 @@ test('demo signals continue across blocks without restarting', () => {
   }
 })
 
-test('playground: moves muted from the start, palettes, align, scale/band, levels, sound, files and reset', async () => {
+test('playground: moves from the start without sound, palettes, align, scale/band, levels, sound, files and reset', async () => {
   const { browser, page } = await open({ width: 1000, height: 850 }), errors = []
   page.on('pageerror', e => errors.push(e.message))
   const text = id => page.locator('#' + id).textContent()
@@ -31,16 +31,20 @@ test('playground: moves muted from the start, palettes, align, scale/band, level
     await page.goto(origin + '/index.html'); await page.waitForURL(origin + '/example/')
     await wait('Plucked strings'); await page.waitForFunction(() => document.getElementById('perf').textContent.includes('ms/frame'))
     assert.equal(await page.locator('#panel').isHidden(), true)
-    assert.equal(await page.locator('#player').evaluate(p => p.muted), true, 'sound is off till asked for')
-    await page.waitForFunction(() => document.getElementById('player').currentTime > .2)
-    const a = await pixels(); await page.waitForTimeout(300); assert.notEqual(await pixels(), a, 'the spectrum moves as it plays')
-    await page.locator('#play').click(); assert.equal(await playing(), false); assert.equal(await text('play'), 'Play')
-    const at = await page.locator('#player').evaluate(p => p.currentTime); await page.waitForTimeout(200)
-    assert.equal(await page.locator('#player').evaluate(p => p.currentTime), at, 'paused, the frame stays')
-    await page.locator('#sound').click(); assert.equal(await page.locator('#player').evaluate(p => p.muted), false); assert.equal(await playing(), true)
+    assert.equal(await page.locator('#sound').getAttribute('aria-pressed'), 'false', 'sound is off till asked for')
+    assert.equal(await playing(), false)
+    const a = await pixels(); await page.waitForTimeout(300); assert.notEqual(await pixels(), a, 'the spectrum moves without sound')
+    const seek = () => page.locator('#seek').evaluate(s => +s.value)
+    await page.locator('#play').click(); assert.equal(await text('play'), 'Play')
+    const at = await seek(); await page.waitForTimeout(300); assert.equal(await seek(), at, 'paused, the playhead stays')
+    await page.locator('#sound').click(); assert.equal(await playing(), false, 'paused, sound waits')
+    await page.locator('#play').click(); assert.equal(await playing(), true, 'sound plays from the playhead')
+    assert.ok(Math.abs(await page.locator('#player').evaluate(p => p.currentTime) - at / 1000 * 24) < .5)
     assert.equal(await page.locator('#sound').getAttribute('aria-pressed'), 'true')
     await page.locator('#seek').fill('500'); await page.locator('#seek').dispatchEvent('input')
-    assert.ok(await page.locator('#player').evaluate(p => p.currentTime >= 11))
+    assert.ok(await page.locator('#player').evaluate(p => p.currentTime >= 11.9))
+    await page.locator('#sound').click(); assert.equal(await playing(), false)
+    assert.ok(await seek() >= 495, 'the clock carries on from where sound stopped')
     await page.locator('#play').click()
     const box = await page.locator('#chart').boundingBox(); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     assert.match(await text('readout'), /Hz.*(dB|silence)/)
