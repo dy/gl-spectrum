@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Watch the spectrum of sound with gl-spectrum.">
+<title>gl-spectrum</title>
+<link rel="stylesheet" href="./style.css">
+<body class="spectrum">
+<header>
+  <h1><a href="https://github.com/dy/gl-spectrum">gl-spectrum</a></h1>
+  <nav aria-label="Source">
+    <select id="source" aria-label="Source"><option value="ensemble">Plucked strings &amp; percussion</option><option value="birds">Birdsong</option><option value="voice">Synthetic voice</option><option value="sweep">Frequency sweep</option><option value="chord">Chords</option><option value="tones">Harmonics</option><option value="clicks">Clicks</option><option value="noise">Noise</option><option value="file" hidden>Audio file</option><option value="mic" hidden>Microphone</option></select>
+    <button id="play" aria-label="Pause">Pause</button><button id="sound" aria-pressed="false">Sound</button><button id="open">Open audio</button><input id="file" type="file" accept="audio/*" hidden>
+    <button id="mic" aria-pressed="false">Microphone</button>
+  </nav>
+  <output id="perf"></output>
+  <button id="settings" aria-expanded="false" aria-controls="panel">Settings</button>
+</header>
+<main>
+  <div class="plot" id="plot"><canvas id="grid" aria-hidden="true"></canvas><canvas id="chart" tabindex="0" aria-label="Spectrum: wheel or pinch to zoom frequencies, drag to pan, Home to fit."></canvas><canvas id="axes" aria-hidden="true"></canvas></div>
+  <audio id="player" preload="auto" loop muted hidden></audio><input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Playback position" disabled>
+  <p id="error" role="alert" hidden></p>
+</main>
+<footer>
+  <nav aria-label="View"><button id="fit">Fit</button><button id="voice-band">Voice band</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button></nav>
+  <output id="status" role="status">Generating…</output>
+  <output id="readout"></output>
+</footer>
+<aside id="panel" aria-label="Settings" hidden>
+  <button id="close-settings" aria-label="Close settings">×</button>
+  <form id="controls">
+    <fieldset><legend>Look</legend>
+      <label>Palette<select id="palette"><option value="ember">Ember</option><option value="lagoon">Lagoon</option><option value="ink">Ink</option></select></label>
+      <label>Align<select id="align"><option value="0.5">Mirrored</option><option value="0">Bottom</option><option value="1">Top</option></select></label>
+      <label>Line width <output id="thickness-value">1 px</output><input id="thickness" type="range" min="0" max="6" step="0.5" value="1"></label>
+      <label class="check"><input id="hold" type="checkbox" checked>Peak hold</label>
+      <label class="check"><input id="grid-on" type="checkbox" checked>Grid</label>
+    </fieldset>
+    <fieldset><legend>Frequency</legend>
+      <label>Scale<select id="scale"><option value="log">Logarithmic</option><option value="mel">Mel</option><option value="erb">ERB</option><option value="lin">Linear</option></select></label>
+      <div class="pair"><label>Low  Hz<input id="low" type="number" min="0" max="23999" step="any" value="20"></label><label>High  Hz<input id="high" type="number" min="1" max="24000" step="any" value="24000"></label></div>
+      <label>FFT size<select id="fft"><option>512</option><option>1024</option><option>2048</option><option selected>4096</option><option>8192</option><option>16384</option></select></label>
+    </fieldset>
+    <fieldset><legend>Levels</legend>
+      <div class="pair"><label>Floor  dB<input id="floor" type="number" min="-200" max="19" value="-100"></label><label>Top  dB<input id="top" type="number" min="-199" max="20" value="0"></label></div>
+      <label>Smoothing <output id="smoothing-value">0.8</output><input id="smoothing" type="range" min="0" max="0.95" step="0.05" value="0.8"></label>
+    </fieldset>
+    <button type="reset" class="reset">Reset settings</button>
+  </form>
+</aside>
+<script type="module">
+import('./demo.js').catch(e => { const error = document.getElementById('error'); error.hidden = false; error.textContent = e.message })
+</script>
+</body>
+</html>
