@@ -1,9 +1,12 @@
 // gl-spectrum's demo: the v3 page (2016–2017, git show 8b01874:test.js) on the v4 renderer, with its scales, align,
 // FFT size and smoothing in the settings, and the band zoomed by wheel or pinch and dragged
 import Spectrum, { scales } from '../index.js'
-import { $, clamp, css, unit, alpha, palette, picker, sound, gestures, rules, pretty } from './app.js'
+import { $, clamp, css, unit, alpha, palette, picker, sound, gestures, rules, pretty, esm } from './app.js'
 
-const weights = await import('https://esm.sh/a-weighting@2.0.1').then(m => m.default ?? m, () => ({ z: () => 1 }))
+// weighting curves load behind the page; till then, or without them, only 'z' (none)
+let weights = { z: () => 1 }
+const allow = () => { for (const o of $('weighting').options) o.disabled = !weights[o.value === 'itu' ? 'm' : o.value] }
+esm('a-weighting@2.0.1').then(w => { if (w) { weights = w; allow(); weigh() } })
 
 // v3's look (core.js): the trail's alpha, the balance of its coloring, its 32 levels
 const TRAIL = .33, BALANCE = .5, LEVELS = 32
@@ -66,7 +69,7 @@ function weigh() {
   for (let i = 0; i < n; i++) curve[i] = 20 * Math.log10(f(i * df))
   top.fill(0)
 }
-for (const o of $('weighting').options) o.disabled = !weights[o.value === 'itu' ? 'm' : o.value]
+allow()
 
 // The share of the axis each bin spans: v3 colored each column by its own height, so a level's color is the mean over the columns that reach it
 function columns() {

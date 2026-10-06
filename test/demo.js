@@ -26,7 +26,7 @@ test('demo: the v3 page; a file plays into the spectrum; palettes, scale, align,
   page.on('pageerror', e => errors.push(e.message))
   await page.route(url => !url.href.startsWith(origin), route => route.abort()) // offline: the libraries' stand-ins
   try {
-    await page.goto(origin + '/example/')
+    await page.goto(origin + '/index.html')
     await page.waitForFunction(() => document.getElementById('title').textContent.startsWith('Bach'))
     assert.equal(await page.locator('#credit').textContent(), 'John Michel, CC BY-SA 3.0')
     assert.equal(await page.locator('#hint').isVisible(), true)

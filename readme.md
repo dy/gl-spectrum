@@ -127,7 +127,7 @@ Bins | Whole axis, CPU | Whole axis, GPU | 2–2.5 kHz, CPU | 2–2.5 kHz, GPU
 
 * `npm test`: every pixel column's bin against brute force over the bins (log, mel, erb and lin axes; whole, zoomed and past-Nyquist bands; 1 to 65539 bins; NaN runs, ±Infinity; DPR 1 to 2, offset viewports), pixel checks through `readPixels` (a one-bin peak among 65536, the line and dots, align, colormap and default fill, transparency, gaps, lanes, data refilled in place, resize, colors), context loss, the API contract and the demo. Headless Chromium through Playwright; `npx playwright install chromium` if it is missing.
 * `npm run bench`: the table above.
-* Demo: any static server at the repo root, e.g. `npx serve`, then open `/example/`. `?source=blackbird` picks a recording, `wqxr` the radio, `mic` the microphone.
+* Demo: any static server at the repo root, e.g. `npx serve`, then open `/`. `?source=blackbird` picks a recording, `wqxr` the radio, `mic` the microphone.
 
 ## License
 
