@@ -2,9 +2,9 @@
 
 WebGL2 spectrum renderer for audio analysers and editors. Every pixel column shows the loudest of the bins under it, so a one-bin peak among 65536 stays visible at any width; where bins spread apart, an anti-aliased line runs through them, with dots. The fill under the line is colored by level, and can mirror the spectrum about a center line.
 
-[<img src="example/preview.png" width="968" alt="Spectrum of plucked strings, mirrored about a center line: crimson peaks at the fundamental and its harmonics, a falling peak-hold line above them">](https://dy.github.io/gl-spectrum/)
+[<img src="example/preview.png" width="968" alt="Spectrum of a cello playing Bach, mirrored about a center line: crimson peaks at the notes and their harmonics, thinning out past 5 kHz">](https://dy.github.io/gl-spectrum/)
 
-[Demo](https://dy.github.io/gl-spectrum/): plucked strings and percussion, birdsong, voice, sweeps, chords and clicks, your own audio or the microphone, with peak hold. Wheel zooms frequencies, drag pans.
+[Demo](https://dy.github.io/gl-spectrum/): Bach's cello, Chopin, Vivaldi, Beethoven, a blackbird and a poem read aloud; live radio and the microphone; test signals, or your own audio, with peak hold. Wheel zooms frequencies, drag pans. The [v3 demo](https://dy.github.io/gl-spectrum/example/old.html), palettes and all, runs on v4 too.
 
 ## Usage
 
@@ -127,7 +127,7 @@ Bins | Whole axis, CPU | Whole axis, GPU | 2–2.5 kHz, CPU | 2–2.5 kHz, GPU
 
 * `npm test`: every pixel column's bin against brute force over the bins (log, mel, erb and lin axes; whole, zoomed and past-Nyquist bands; 1 to 65539 bins; NaN runs, ±Infinity; DPR 1 to 2, offset viewports), pixel checks through `readPixels` (a one-bin peak among 65536, the line and dots, align, colormap and default fill, transparency, gaps, lanes, data refilled in place, resize, colors), context loss, the API contract and the demo. Headless Chromium through Playwright; `npx playwright install chromium` if it is missing.
 * `npm run bench`: the table above.
-* Demo: any static server at the repo root, e.g. `npx serve`, then open `/example/`.
+* Demo: any static server at the repo root, e.g. `npx serve`, then open `/example/`. `?source=blackbird` opens a recording, `wqxr` the radio, `mic` the microphone. The v3 demo is at `/example/old.html`.
 
 ## License
 

@@ -9,9 +9,8 @@
 <header>
   <h1><a href="https://github.com/dy/gl-spectrum">gl-spectrum</a></h1>
   <nav aria-label="Source">
-    <select id="source" aria-label="Source"><option value="ensemble">Plucked strings &amp; percussion</option><option value="birds">Birdsong</option><option value="voice">Synthetic voice</option><option value="sweep">Frequency sweep</option><option value="chord">Chords</option><option value="tones">Harmonics</option><option value="clicks">Clicks</option><option value="noise">Noise</option><option value="file" hidden>Audio file</option><option value="mic" hidden>Microphone</option></select>
+    <select id="source" aria-label="Source"><optgroup label="Test signals"><option value="sweep">Frequency sweep</option><option value="chord">Chords</option><option value="tones">Harmonics</option><option value="clicks">Clicks</option><option value="noise">Noise</option></optgroup><option value="file" hidden>Audio file</option></select>
     <button id="play" aria-label="Pause">Pause</button><button id="sound" aria-pressed="false">Sound</button><button id="open">Open audio</button><input id="file" type="file" accept="audio/*" hidden>
-    <button id="mic" aria-pressed="false">Microphone</button>
   </nav>
   <output id="perf"></output>
   <button id="settings" aria-expanded="false" aria-controls="panel">Settings</button>
@@ -19,11 +18,12 @@
 <main>
   <div class="plot" id="plot"><canvas id="grid" aria-hidden="true"></canvas><canvas id="chart" tabindex="0" aria-label="Spectrum: wheel or pinch to zoom frequencies, drag to pan, Home to fit."></canvas><canvas id="axes" aria-hidden="true"></canvas></div>
   <audio id="player" preload="auto" loop hidden></audio><input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Playback position" disabled>
+  <output id="note" hidden></output>
   <p id="error" role="alert" hidden></p>
 </main>
 <footer>
   <nav aria-label="View"><button id="fit">Fit</button><button id="voice-band">Voice band</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button></nav>
-  <output id="status" role="status">Generating…</output>
+  <output id="status" role="status"></output><a id="credit" target="_blank" rel="noopener" hidden></a>
   <output id="readout"></output>
 </footer>
 <aside id="panel" aria-label="Settings" hidden>

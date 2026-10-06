@@ -1,11 +1,14 @@
 import Spectrum, { scales } from '../index.js'
 import { palettes, generator, spectrum } from './data.js'
+import { recordings, streams, download, listen as radio, record } from './sources.js'
 import { $, css, num, clamp, error, frame, step, label, setup, decode } from './ui.js'
 
 const canvas = $('chart'), ax = $('axes').getContext('2d'), grid = $('grid').getContext('2d'), player = $('player')
 const LEFT = 48, TOP = 8, BOTTOM = 24, DURATION = 24, FALL = 20 // peak hold falls 20 dB a second
 const sp = new Spectrum(canvas), hold = new Spectrum(sp.gl, { fill: false })
-let samples = new Float32Array(0), rate = 48000, title = '', url = null, mic = null, saved = null, task = 0
+let samples = new Float32Array(0), rate = 48000, title = '', url = null, live = null, task = 0
+const ring = new Float32Array(32768), cache = new Map() // the latest live samples; recordings already decoded
+let ringAt = 0
 let running = true, sound = false, clockAt = 0, clockSince = 0
 let band = [20, 24000], scale = 'log', bins = null, mags = null, peaks = null, win = null, last = 0
 let w = 1, h = 1, pr = 1, pw = 1, ph = 1, paint = true, ruled = false, pointer = null, reported = 0
@@ -35,7 +38,7 @@ function look() {
   hold.update({ ...shared, color: p.line + '70' })
   ruled = false
 }
-// The window under the playhead, or the microphone's latest, to dB per bin; the peak hold falls behind it
+// The window under the playhead, or the latest live samples, to dB per bin; the peak hold falls behind it
 function analyse(now) {
   const N = num('fft'), n = N / 2, dt = Math.min((now - last) / 1000, .1)
   last = now
@@ -43,7 +46,7 @@ function analyse(now) {
     bins = new Float32Array(n); mags = new Float64Array(n); peaks = new Float32Array(n).fill(-Infinity); win = new Float32Array(N)
     sp.update({ data: bins }); hold.update({ data: peaks })
   }
-  if (mic) { mic.analyser.getFloatTimeDomainData(mic.buf); win.set(mic.buf.subarray(mic.buf.length - N)) }
+  if (live) for (let i = 0, L = ring.length; i < N; i++) win[i] = ring[(ringAt - N + i + L) % L]
   else {
     const at = Math.round(position() * rate) - N / 2
     for (let i = 0; i < N; i++) { const k = at + i; win[i] = k >= 0 && k < samples.length ? samples[k] : 0 }
@@ -94,7 +97,7 @@ function readout() {
 }
 const time = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 function status() {
-  $('status').value = mic ? `Microphone  ${rate / 1000} kHz  FFT ${num('fft')}`
+  $('status').value = live ? `${title}  live  ${rate / 1000} kHz  FFT ${num('fft')}`
     : `${title}  ${time(position())} / ${time(samples.length / rate)}  ${rate / 1000} kHz  FFT ${num('fft')}`
 }
 function wav(data, sr) {
@@ -116,7 +119,7 @@ function clock() {
 const position = () => sound && running && !player.paused ? player.currentTime : clock()
 function setClock(t = position()) { clockAt = t; clockSince = performance.now() }
 function listen() {
-  if (!(sound && running && !mic)) return player.pause()
+  if (!(sound && running && !live)) return player.pause()
   player.currentTime = clock()
   player.play().catch(e => { sound = false; controls(); error(e.message) })
 }
@@ -124,55 +127,82 @@ function controls() {
   $('play').textContent = running ? 'Pause' : 'Play'; $('play').setAttribute('aria-label', $('play').textContent)
   $('sound').setAttribute('aria-pressed', String(sound))
 }
-function load(data, sr, heading, blob) {
+function credit(info) {
+  $('credit').hidden = !info
+  if (!info) return
+  $('credit').href = info.page; $('credit').textContent = info.credit ? `${info.credit} · ${info.license}` : new URL(info.page).hostname
+}
+function notice(text = '') { $('note').value = text; $('note').hidden = !text }
+function load(data, sr, heading, blob, info) {
   samples = data; rate = sr; title = heading
   mags?.fill(0); peaks?.fill(-Infinity)
   if (url) URL.revokeObjectURL(url)
   player.src = url = URL.createObjectURL(blob)
   setClock(0); listen()
   $('seek').disabled = false; $('seek').value = 0
-  setBand(); error(''); status()
+  credit(info); notice(); setBand(); error(''); status()
 }
-async function generate() {
-  const id = ++task, source = $('source').value
-  if (source === 'file' || source === 'mic') return
-  stopMic(); $('status').value = 'Generating…'
+const mono = data => data.length === 1 ? data[0] : data[0].map((_, i) => data.reduce((s, d) => s + d[i], 0) / data.length)
+// Live chunks, mixed to one channel, into the ring the analysis reads
+function push(chunk) {
+  for (let i = 0, n = chunk[0].length; i < n; i++) {
+    let s = 0
+    for (const c of chunk) s += c[i]
+    ring[ringAt] = s / chunk.length; ringAt = (ringAt + 1) % ring.length
+  }
+}
+function stopLive() {
+  if (!live) return
+  live.stop(); live = null
+  $('play').disabled = $('sound').disabled = $('seek').disabled = false
+}
+// A recording (downloaded once), live radio, the microphone or a test signal
+async function choose() {
+  const id = ++task, value = $('source').value, rec = recordings.find(r => r.id === value), station = streams.find(s => s.id === value)
+  if (value === 'file') return
+  const name = $('source').selectedOptions[0].textContent
+  stopLive(); error('')
   try {
-    const sr = 48000, n = DURATION * sr, gen = generator(source, sr), data = new Float32Array(n)
-    for (let a = 0; a < n; a += 262144) {
-      data.set(gen(Math.min(262144, n - a)), a)
-      await frame(); if (id !== task) return
+    if (rec) {
+      let got = cache.get(value)
+      if (!got) {
+        notice(`Downloading ${name}…`)
+        const blob = await download(rec.url, p => { if (id === task) notice(`Downloading ${name}  ${Math.round(p * 100)}%`) })
+        if (id !== task) return
+        notice(`Decoding ${name}…`)
+        const { data, rate: sr } = await decode(blob)
+        cache.set(value, got = { data: mono(data), rate: sr, blob })
+      }
+      if (id === task) load(got.data, got.rate, name, got.blob, rec)
+    } else if (station || value === 'mic') {
+      notice(station ? `Tuning in to ${name}…` : 'Waiting for the microphone…')
+      const tap = await (station ? radio(station.url, push) : record(push))
+      if (id !== task) return tap.stop()
+      live = tap; rate = tap.rate; title = name; ring.fill(0)
+      player.pause(); $('play').disabled = $('sound').disabled = $('seek').disabled = true
+      mags?.fill(0); peaks?.fill(-Infinity); credit(station); notice(); setBand(); status()
+    } else {
+      notice('Generating…')
+      const sr = 48000, n = DURATION * sr, gen = generator(value, sr), data = new Float32Array(n)
+      for (let a = 0; a < n; a += 262144) {
+        data.set(gen(Math.min(262144, n - a)), a)
+        await frame(); if (id !== task) return
+      }
+      load(data, sr, name, wav(data, sr))
     }
     $('source').querySelector('[value=file]').hidden = true
-    load(data, sr, $('source').selectedOptions[0].textContent, wav(data, sr))
-  } catch (e) { if (id === task) error(e.message) }
-}
-async function startMic() {
-  const id = ++task
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true }), ctx = new AudioContext(), analyser = ctx.createAnalyser()
-    analyser.fftSize = 32768; ctx.createMediaStreamSource(stream).connect(analyser)
-    if (id !== task) { stream.getTracks().forEach(t => t.stop()); return ctx.close() }
-    saved = { source: $('source').value, rate }
-    setClock(); mic = { stream, ctx, analyser, buf: new Float32Array(32768) }; rate = ctx.sampleRate; listen()
-    $('source').querySelector('[value=mic]').hidden = false; $('source').value = 'mic'
-    $('mic').setAttribute('aria-pressed', 'true'); $('play').disabled = $('sound').disabled = $('seek').disabled = true
-    mags?.fill(0); peaks?.fill(-Infinity); setBand(); error(''); status()
-  } catch (e) { if (id === task) error(`Microphone: ${e.message}`) }
-}
-function stopMic() {
-  if (!mic) return
-  mic.stream.getTracks().forEach(t => t.stop()); mic.ctx.close(); mic = null
-  $('source').querySelector('[value=mic]').hidden = true; $('mic').setAttribute('aria-pressed', 'false')
-  $('play').disabled = $('sound').disabled = $('seek').disabled = false
-  rate = saved.rate; if ($('source').value === 'mic') $('source').value = saved.source
-  mags?.fill(0); peaks?.fill(-Infinity); setBand(); status()
+  } catch (e) { if (id === task) { notice(); error(`${name}: ${e.message}`); status() } }
 }
 
 setup({ resize: (width, height, ratio) => { w = width; h = height; pr = ratio; layout() }, zoom, pan, fit: () => setBand(), inspect })
-$('source').onchange = generate
+$('source').prepend(...[['Recordings', recordings], ['Live', [...streams, { id: 'mic', name: 'Microphone' }]]].map(([label, list]) => {
+  const group = document.createElement('optgroup')
+  group.label = label
+  group.append(...list.map(s => new Option(s.name, s.id)))
+  return group
+}))
+$('source').onchange = choose
 $('voice-band').onclick = () => setBand(Math.max(80, scales[scale].low), Math.min(4000, rate / 2))
-$('mic').onclick = () => mic ? (stopMic(), setClock(), listen()) : startMic()
 $('play').onclick = () => { setClock(); running = !running; controls(); listen() }
 $('sound').onclick = () => { setClock(); sound = !sound; controls(); listen() }
 $('seek').oninput = () => { setClock(num('seek') / 1000 * samples.length / rate); listen() }
@@ -190,8 +220,7 @@ $('controls').oninput = e => {
 }
 $('controls').onreset = () => queueMicrotask(() => {
   scale = 'log'; $('thickness-value').value = '1 px'; $('smoothing-value').value = '0.8'
-  if (mic) stopMic()
-  $('source').value = 'ensemble'; generate()
+  $('source').value = initial; choose()
 })
 $('file').onchange = async () => {
   const file = $('file').files[0]; if (!file) return
@@ -199,20 +228,18 @@ $('file').onchange = async () => {
   try {
     const { data, rate: sr } = await decode(file)
     if (id !== task) return
-    // channels mixed to one
-    const mono = data.length === 1 ? data[0] : data[0].map((_, i) => data.reduce((s, d) => s + d[i], 0) / data.length)
-    stopMic()
+    stopLive()
     $('source').querySelector('[value=file]').hidden = false; $('source').value = 'file'
-    load(mono, sr, file.name, file)
+    load(mono(data), sr, file.name, file)
   } catch (e) { if (id === task) { error(`Cannot open ${file.name}: ${e.message}`); status() } }
   finally { $('file').value = '' }
 }
 player.addEventListener('error', () => { if (player.getAttribute('src')) error('The browser cannot play this audio.') })
-window.addEventListener('pagehide', () => { stopMic(); if (url) URL.revokeObjectURL(url) })
+window.addEventListener('pagehide', () => { stopLive(); if (url) URL.revokeObjectURL(url) })
 
 requestAnimationFrame(function draw(now) {
   requestAnimationFrame(draw)
-  if (!samples.length && !mic) return
+  if (!samples.length && !live) return
   const start = performance.now()
   try {
     analyse(now)
@@ -221,7 +248,7 @@ requestAnimationFrame(function draw(now) {
     if ($('hold').checked) hold.render()
     if (!ruled) axes()
     readout()
-    if (!mic && document.activeElement !== $('seek')) $('seek').value = position() / (samples.length / rate) * 1000
+    if (!live && document.activeElement !== $('seek')) $('seek').value = position() / (samples.length / rate) * 1000
     if (now - reported >= 250) {
       $('perf').value = `${(performance.now() - start).toFixed(1)} ms/frame`
       $('perf').title = 'CPU time of a frame: the FFT, then drawing the spectrum and the peak hold; excludes GPU completion.'
@@ -229,4 +256,7 @@ requestAnimationFrame(function draw(now) {
     }
   } catch (e) { error(e.message) }
 })
-await generate()
+// ?source= picks the first source: a recording, a stream, mic or a test signal
+const asked = new URLSearchParams(location.search).get('source'), initial = $('source').querySelector(`option[value="${CSS.escape(asked ?? '')}"]`) ? asked : 'cello'
+$('source').value = initial
+await choose()

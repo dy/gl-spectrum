@@ -13,7 +13,7 @@ test('demo spectrum: a full-scale sine on its bin reads 0 dB, Hann neighbours -6
 })
 
 test('demo signals continue across blocks without restarting', () => {
-  for (const source of ['ensemble', 'birds', 'tones', 'voice', 'sweep', 'chord', 'clicks', 'noise']) {
+  for (const source of ['sweep', 'chord', 'tones', 'clicks', 'noise']) {
     const whole = generator(source)(10000), chunks = generator(source)
     assert.deepEqual([...whole], [...chunks(3333), ...chunks(6667)], source)
   }
@@ -28,14 +28,19 @@ test('playground: moves from the start without sound, palettes, align, scale/ban
   const change = async (id, val) => { await page.locator('#' + id).fill(val); await page.locator('#' + id).press('Tab') }
   const playing = () => page.locator('#player').evaluate(p => !p.paused)
   try {
-    await page.goto(origin + '/index.html'); await page.waitForURL(origin + '/example/')
-    await wait('Plucked strings'); await page.waitForFunction(() => document.getElementById('perf').textContent.includes('ms/frame'))
+    // the default source downloads a recording; tests stay offline with a test signal
+    await page.goto(origin + '/index.html?source=sweep'); await page.waitForURL(origin + '/example/?source=sweep')
+    await wait('Frequency sweep'); await page.waitForFunction(() => document.getElementById('perf').textContent.includes('ms/frame'))
     assert.equal(await page.locator('#panel').isHidden(), true)
+    const options = await page.locator('#source optgroup').evaluateAll(gs => gs.map(g => [g.label, g.children.length]))
+    assert.deepEqual(options, [['Recordings', 6], ['Live', 3], ['Test signals', 5]], 'recordings, live radio and the microphone, test signals')
+    assert.equal(await page.locator('#credit').isHidden(), true, 'test signals need no credit')
     assert.equal(await page.locator('#sound').getAttribute('aria-pressed'), 'false', 'sound is off till asked for')
     assert.equal(await playing(), false)
     const a = await pixels(); await page.waitForTimeout(300); assert.notEqual(await pixels(), a, 'the spectrum moves without sound')
     const seek = () => page.locator('#seek').evaluate(s => +s.value)
     await page.locator('#play').click(); assert.equal(await text('play'), 'Play')
+    await page.waitForTimeout(100) // a frame to draw the paused position
     const at = await seek(); await page.waitForTimeout(300); assert.equal(await seek(), at, 'paused, the playhead stays')
     await page.locator('#sound').click(); assert.equal(await playing(), false, 'paused, sound waits')
     await page.locator('#play').click(); assert.equal(await playing(), true, 'sound plays from the playhead')
@@ -67,7 +72,7 @@ test('playground: moves from the start without sound, palettes, align, scale/ban
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.wheel(0, -200); await page.waitForTimeout(50)
     assert.ok(+(await page.locator('#high').inputValue()) < 24000, 'wheel zooms the band')
 
-    await page.locator('#source').selectOption('birds'); await wait('Birdsong')
+    await page.locator('#source').selectOption('chord'); await wait('Chords')
     // Decode a real mono WAV at another rate; the band follows its Nyquist
     const bytes = Buffer.alloc(44 + 8000 * 2); bytes.write('RIFF'); bytes.writeUInt32LE(bytes.length - 8, 4); bytes.write('WAVEfmt ', 8)
     bytes.writeUInt32LE(16, 16); bytes.writeUInt16LE(1, 20); bytes.writeUInt16LE(1, 22); bytes.writeUInt32LE(8000, 24); bytes.writeUInt32LE(16000, 28); bytes.writeUInt16LE(2, 32); bytes.writeUInt16LE(16, 34); bytes.write('data', 36); bytes.writeUInt32LE(16000, 40)
@@ -77,7 +82,7 @@ test('playground: moves from the start without sound, palettes, align, scale/ban
     assert.equal(+(await page.locator('#high').inputValue()), rate / 2)
     await page.locator('#file').setInputFiles({ name: 'broken.wav', mimeType: 'audio/wav', buffer: Buffer.from('not audio') })
     await page.waitForFunction(() => !document.getElementById('error').hidden); assert.match(await text('status'), /tone.wav/)
-    await page.locator('#settings').click(); await page.locator('[type=reset]').click(); await wait('Plucked strings')
+    await page.locator('#settings').click(); await page.locator('[type=reset]').click(); await wait('Frequency sweep')
     assert.equal(await page.locator('#error').isHidden(), true)
     for (const width of [320, 375, 414, 768]) {
       await page.setViewportSize({ width, height: 850 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
